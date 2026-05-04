@@ -1,12 +1,21 @@
 {
   "name": "grimoire-vault",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "migrate": "node scripts/migrate.mjs",
+    "migrate:plan": "node scripts/migrate.mjs --plan",
+    "verify:api": "node scripts/backlog-verify.mjs",
+    "test": "playwright test",
+    "docs:pdf": "node scripts/build-pdfs.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1041.0",
@@ -32,12 +41,14 @@
   "devDependencies": {
     "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4",
+    "@types/markdown-it": "^14.1.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "markdown-it": "^14.1.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

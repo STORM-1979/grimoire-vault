@@ -8,14 +8,18 @@
 
 ## 📚 Documentation
 
-| Doc | For who |
-|---|---|
-| [`docs/GETTING-STARTED.md`](./docs/GETTING-STARTED.md) | 5-минутный обзор — куда смотреть |
-| [`docs/USER.md`](./docs/USER.md) | Гайд пользователя — как работать с приложением |
-| [`docs/DEVELOPER.md`](./docs/DEVELOPER.md) | Гайд разработчика — стек, локальный запуск, расширение |
-| [`docs/PROJECT-STORY.md`](./docs/PROJECT-STORY.md) | История проекта — стек, эволюция, аналоги |
-| [`docs/CHANGELOG.md`](./docs/CHANGELOG.md) | Полный список фичей по волнам разработки |
-| [`BACKLOG.md`](./BACKLOG.md) | Verification checklist — что покрыто тестами, что — manual |
+| Doc | Markdown | PDF | For who |
+|---|---|---|---|
+| Getting Started | [`docs/GETTING-STARTED.md`](./docs/GETTING-STARTED.md) | [pdf](./docs/pdf/GETTING-STARTED.pdf) | 5-минутный обзор — куда смотреть |
+| User guide | [`docs/USER.md`](./docs/USER.md) | [pdf](./docs/pdf/USER.pdf) | Гайд пользователя — как работать с приложением |
+| Developer guide | [`docs/DEVELOPER.md`](./docs/DEVELOPER.md) | [pdf](./docs/pdf/DEVELOPER.pdf) | Стек, локальный запуск, расширение |
+| Project story | [`docs/PROJECT-STORY.md`](./docs/PROJECT-STORY.md) | [pdf](./docs/pdf/PROJECT-STORY.pdf) | История создания, технологии, аналоги |
+| Changelog | [`docs/CHANGELOG.md`](./docs/CHANGELOG.md) | [pdf](./docs/pdf/CHANGELOG.pdf) | Полный список фичей по волнам |
+| Upgrading | [`docs/UPGRADING.md`](./docs/UPGRADING.md) | [pdf](./docs/pdf/UPGRADING.pdf) | Миграции, версии, breaking changes |
+| Backlog | [`BACKLOG.md`](./BACKLOG.md) | — | Verification checklist |
+
+> PDF копии генерируются через `npm run docs:pdf` (Playwright-рендер из markdown).
+> Регенерируй после любого изменения в `docs/*.md`.
 
 ---
 

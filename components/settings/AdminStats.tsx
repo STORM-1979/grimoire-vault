@@ -13,6 +13,8 @@ interface WipeResult {
 
 interface Stats {
   generatedAt: string;
+  runtime?: { version: string; commit: string | null; env: string; nodeVersion: string };
+  migrations?: { applied: number; latest: string | null; latestAt: string | null };
   totals: { entries: number; kanbanCards: number; credentials: number };
   triage: { botImported: number; untriaged: number; embedded: number; embeddingCoverage: number };
   timestamps: { lastEntryAt: string | null; lastBotImportAt: string | null };
@@ -63,8 +65,11 @@ export function AdminStats() {
             Vault stats
           </h3>
           {stats && (
-            <div className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute mt-1">
-              {new Date(stats.generatedAt).toLocaleString("ru-RU")}
+            <div className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute mt-1 flex items-center gap-2 flex-wrap">
+              <span>v{stats.runtime?.version ?? "?"}</span>
+              {stats.runtime?.commit && <span className="text-gold">· {stats.runtime.commit}</span>}
+              {stats.migrations && <span>· {stats.migrations.applied} migrations</span>}
+              <span>· {new Date(stats.generatedAt).toLocaleString("ru-RU")}</span>
             </div>
           )}
         </div>

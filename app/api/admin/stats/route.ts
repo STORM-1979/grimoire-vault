@@ -77,8 +77,25 @@ export const GET = withErrorHandler(async () => {
     target.bytes += o.size;
   }
 
+  // Pull migration log so the dashboard can surface "9 / 9 applied".
+  const { data: migrationsData } = await svc
+    .from("schema_migrations")
+    .select("name, applied_at")
+    .order("applied_at", { ascending: true });
+
   return NextResponse.json({
     generatedAt: new Date().toISOString(),
+    runtime: {
+      version: process.env.NEXT_PUBLIC_APP_VERSION ?? "unknown",
+      commit: (process.env.VERCEL_GIT_COMMIT_SHA ?? "").slice(0, 7) || null,
+      env: process.env.VERCEL_ENV ?? "development",
+      nodeVersion: process.version,
+    },
+    migrations: {
+      applied: migrationsData?.length ?? 0,
+      latest: migrationsData?.[migrationsData.length - 1]?.name ?? null,
+      latestAt: migrationsData?.[migrationsData.length - 1]?.applied_at ?? null,
+    },
     totals: {
       entries: entriesCnt.count ?? 0,
       kanbanCards: kanbanCnt.count ?? 0,
