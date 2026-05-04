@@ -1,26 +1,217 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* ==========================================================
+   GRIMOIRE VAULT — Atelier theme
+   Design tokens preserved from prototype (v13).
+   Single dark theme — emerald deep ground, gold + ivory accents.
+   ========================================================== */
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* -- Brand palette -- */
+  --color-ivory:        #faf6e9;
+  --color-ivory-dim:    #e8e2d2;
+  --color-ivory-mute:   #a39c8a;
+
+  --color-emerald-50:   #ecfdf5;
+  --color-emerald-100:  #d1fae5;
+  --color-emerald-200:  #a7e8c7;
+  --color-emerald-400:  #26a373;
+  --color-emerald-500:  #0f8a5c;
+  --color-emerald-600:  #0a6b4a;
+  --color-emerald-700:  #0a5f43;
+  --color-emerald-800:  #064e3b;
+  --color-emerald-900:  #03311f;
+  --color-emerald-950:  #021810;
+  --color-emerald-deep: #031912;
+  --color-emerald-glass:#0a2a1f;
+
+  --color-gold:         #d4b76a;
+  --color-gold-soft:    #e8d29c;
+  --color-gold-deep:    #9a8047;
+
+  /* -- Background / foreground bridge -- */
+  --color-background:   var(--color-emerald-deep);
+  --color-foreground:   var(--color-ivory);
+
+  /* -- Typography -- */
+  --font-display:       var(--font-fraunces), Georgia, serif;
+  --font-sans:          var(--font-sans-display), system-ui, sans-serif;
+  --font-mono:          var(--font-mono-display), ui-monospace, monospace;
+
+  /* -- Radii / spacing customisation -- */
+  --radius-card:        16px;
+  --radius-pill:        9999px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* Tighten reset */
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-emerald-deep);
+  color: var(--color-ivory);
+  font-family: var(--font-sans);
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  background-image:
+    radial-gradient(ellipse at 80% -20%, rgba(38,163,115,.18) 0, transparent 55%),
+    radial-gradient(ellipse at 0% 110%, rgba(38,163,115,.10) 0, transparent 55%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='280' height='280'><filter id='n'><feTurbulence baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/></svg>");
+  background-attachment: fixed;
+}
+
+/* ===== Re-usable utility classes ===== */
+
+.display      { font-family: var(--font-display); font-optical-sizing: auto; }
+.font-display { font-family: var(--font-display); }
+.font-sans    { font-family: var(--font-sans); }
+.font-mono    { font-family: var(--font-mono); }
+
+.tracking-tightest { letter-spacing: -0.04em; }
+
+.gold { color: var(--color-gold); }
+.text-gold { color: var(--color-gold); }
+.text-ivory { color: var(--color-ivory); }
+.text-ivory-dim { color: var(--color-ivory-dim); }
+.text-ivory-mute { color: var(--color-ivory-mute); }
+
+.hairline-gold {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-gold) 50%, transparent);
+}
+
+.glass {
+  background: rgba(250, 246, 233, 0.04);
+  border: 1px solid rgba(250, 246, 233, 0.10);
+  backdrop-filter: blur(6px);
+}
+
+.keynote {
+  background: linear-gradient(180deg, rgba(250,246,233,.05), rgba(250,246,233,.02));
+  border: 1px solid rgba(212,183,106,.18);
+  border-radius: var(--radius-card);
+  transition: border-color 240ms;
+}
+.keynote:hover { border-color: rgba(212,183,106,.45); }
+
+.badge {
+  display: inline-block;
+  border: 1px solid rgba(212,183,106,.5);
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-gold);
+}
+
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(212,183,106,.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(212,183,106,.06) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+/* ===== Tag pills (used in cards + modals) ===== */
+.tag {
+  display: inline-block; padding: 2px 8px;
+  border: 1px solid rgba(212,183,106,.35); border-radius: 4px;
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .06em;
+  color: var(--color-gold);
+}
+.tag-emerald {
+  display: inline-block; padding: 2px 8px;
+  background: rgba(38,163,115,.15);
+  border: 1px solid rgba(38,163,115,.35); border-radius: 4px;
+  font-family: var(--font-mono); font-size: 10px; color: var(--color-emerald-200);
+}
+.tag-soft {
+  display: inline-block; padding: 2px 8px;
+  border: 1px solid rgba(250,246,233,.18); border-radius: 4px;
+  font-family: var(--font-mono); font-size: 10px; color: var(--color-ivory-mute);
+}
+
+/* ===== Item action buttons (pin/delete on hover) ===== */
+.item-actions-btn {
+  padding: 6px; border-radius: 6px;
+  background: rgba(2,15,11,.85);
+  border: 1px solid rgba(250,246,233,.10);
+  color: rgba(163,156,138,.9);
+  transition: all 180ms;
+  cursor: pointer;
+}
+.item-actions-btn:hover { background: rgba(2,15,11,.95); color: var(--color-gold); border-color: rgba(212,183,106,.35); }
+.item-actions-btn.danger:hover { color: #f87171; border-color: rgba(248,113,113,.35); }
+.item-actions-btn.active { color: var(--color-gold); border-color: rgba(212,183,106,.50); background: rgba(212,183,106,.10); }
+
+/* ===== Cards ===== */
+.cat-card { transition: all 380ms cubic-bezier(.2,.8,.2,1); position: relative; }
+.cat-card:hover { background: rgba(250,246,233,.06); }
+
+/* ===== Modal ===== */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(2,15,11,.78); backdrop-filter: blur(10px);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  animation: fadeOverlay 200ms ease-out;
+}
+@keyframes fadeOverlay { from { opacity: 0; } to { opacity: 1; } }
+
+.modal {
+  background: var(--color-emerald-950);
+  border: 1px solid rgba(212,183,106,.35);
+  border-radius: 20px;
+  max-width: 640px; width: 100%; max-height: 92vh; overflow-y: auto;
+  box-shadow: 0 50px 120px -20px rgba(0,0,0,.7), 0 0 0 1px rgba(212,183,106,.08);
+  animation: slideUp 280ms cubic-bezier(.2,.8,.2,1);
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px) scale(.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ===== Form fields ===== */
+.field-input, .field-textarea, .field-select {
+  background: rgba(250,246,233,.04);
+  border: 1px solid rgba(212,183,106,.20);
+  color: var(--color-ivory);
+  padding: 11px 14px; border-radius: 8px;
+  font-size: 14px; width: 100%; outline: none;
+  transition: all 200ms; font-family: inherit;
+}
+.field-input:focus, .field-textarea:focus, .field-select:focus {
+  border-color: var(--color-gold);
+  background: rgba(250,246,233,.06);
+  box-shadow: 0 0 0 3px rgba(212,183,106,.10);
+}
+.field-input::placeholder, .field-textarea::placeholder { color: rgba(163,156,138,.55); }
+.field-textarea { resize: vertical; min-height: 78px; line-height: 1.5; }
+.field-select {
+  appearance: none; cursor: pointer;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8' fill='none' stroke='%23d4b76a' stroke-width='1.4'><path d='M1 1l5 5 5-5'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 12px;
+  padding-right: 36px;
+}
+
+/* ===== Animation on route enter ===== */
+.fade-in { animation: fadeIn 400ms ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Custom scrollbars */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(212,183,106,.18); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(212,183,106,.35); }
+
+/* Selection */
+::selection { background: var(--color-gold); color: var(--color-emerald-deep); }
+
+/* Focus ring (a11y) */
+:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
+  border-radius: 4px;
 }

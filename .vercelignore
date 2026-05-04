@@ -1,0 +1,12 @@
+.env.local
+.env*.local
+.keys.json
+.keys-extracted.txt
+.dev.log
+.body.json
+.migration-body.json
+scripts/e2e-*.mjs
+scripts/debug-*.mjs
+scripts/r2-setup.mjs
+node_modules
+.next

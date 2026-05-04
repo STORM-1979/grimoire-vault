@@ -1,0 +1,156 @@
+/**
+ * Shared domain types — the lingua franca between database, API and UI.
+ */
+
+export type CategoryId =
+  | "documents"
+  | "web"
+  | "youtube"
+  | "local"
+  | "designs"
+  | "images"
+  | "skills"
+  | "prompts"
+  | "kanban"
+  | "ideas"
+  | "portfolio"
+  | "misc"
+  | "credentials";
+
+export type IconName =
+  | "documents" | "web" | "youtube" | "local" | "designs" | "images"
+  | "skills" | "prompts" | "kanban" | "ideas" | "portfolio" | "misc"
+  | "lock" | "search" | "inbox" | "settings" | "add" | "arrow"
+  | "pin" | "pinFilled" | "star" | "play" | "x" | "check"
+  | "eye" | "eyeOff" | "copy" | "shield" | "refresh"
+  | "edit" | "drag" | "wifi" | "wifiOff";
+
+export interface Category {
+  id: CategoryId;
+  no: string;            // '01' .. '13'
+  en: string;
+  ru: string;
+  icon: IconName;
+  ordering: number;
+  secured?: boolean;
+}
+
+export type ImportedVia = "web" | "bot" | "cli" | "api";
+
+/**
+ * Universal entry — everything except credentials and kanban.
+ * Mirrors the `entries` table 1:1 (snake_case in db, camel here via mapper).
+ */
+export interface Entry {
+  id: string;                       // uuid
+  userId: string;
+  categoryId: CategoryId;
+  title: string;
+  description?: string | null;
+  body?: string | null;             // for prompt persona body, long notes
+  url?: string | null;
+  thumbUrl?: string | null;
+  coverUrl?: string | null;
+  duration?: string | null;
+  sizeBytes?: number | null;
+  sizeLabel?: string | null;
+  fileCount?: number | null;
+  sourcePath?: string | null;
+  extractedText?: string | null;
+  aiSummary?: string | null;
+  contentHash?: string | null;
+  metadata: Record<string, unknown>;
+  tags: string[];
+  pinned: boolean;
+  importedVia: ImportedVia;
+  /**
+   * When this entry was filed away from the inbox.  Null for fresh
+   * bot-imported rows that still need review; ISO timestamp once the
+   * user has confirmed (or moved) the category.
+   */
+  triagedAt?: string | null;
+  /**
+   * Shared-vault scope.  Null = personal (visible only to the
+   * `userId` author).  Non-null = visible to every member of that
+   * vault (read + write per RLS).
+   */
+  vaultId?: string | null;
+  createdAt: string;                // ISO timestamp
+  updatedAt: string;
+}
+
+export interface CredentialRecord {
+  id: string;
+  userId: string;
+  service: string;
+  url?: string | null;
+  /** AES-GCM ciphertexts, base64 — decrypt only on client. */
+  usernameEncrypted: string;
+  passwordEncrypted: string;
+  notesEncrypted?: string | null;
+  /** Per-field IVs (base64) — never reused across fields, AES-GCM safety. */
+  ivUsername: string;
+  ivPassword: string;
+  ivNotes?: string | null;
+  twoFactor: boolean;
+  strength: "weak" | "medium" | "strong" | null;
+  tags: string[];
+  pinned: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Decrypted view used in the UI after the master key unlocks the vault. */
+export interface CredentialDecrypted {
+  id: string;
+  service: string;
+  url?: string | null;
+  username: string;
+  password: string;
+  notes?: string | null;
+  twoFactor: boolean;
+  strength: "weak" | "medium" | "strong" | null;
+  tags: string[];
+  pinned: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type KanbanColumn = "backlog" | "doing" | "done";
+export type Priority = "low" | "medium" | "high";
+
+export interface KanbanCard {
+  id: string;
+  userId: string;
+  columnName: KanbanColumn;
+  position: number;
+  title: string;
+  description?: string | null;
+  relatedCategory?: CategoryId | null;
+  dueDate?: string | null;          // YYYY-MM-DD
+  priority: Priority;
+  progress?: number | null;         // 0-100
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ImportLog {
+  id: string;
+  userId: string;
+  sourceType: "youtube" | "pdf" | "html" | "manual" | "telegram" | "image" | "url";
+  sourceUrl?: string | null;
+  manifest?: Record<string, unknown> | null;
+  status: "pending" | "success" | "partial" | "failed";
+  errors?: Record<string, unknown> | null;
+  entryId?: string | null;
+  createdAt: string;
+}
+
+/**
+ * Convenience type: Entry decorated for UI display
+ * — what most cards/modals receive.
+ */
+export type EntryView = Entry & {
+  category: Category;
+};
