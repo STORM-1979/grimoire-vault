@@ -27,7 +27,7 @@ export function CommandHint() {
       className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 hover:border-gold hover:text-gold transition text-ivory-mute font-mono text-[10px] uppercase tracking-widest"
     >
       <Icon name="search" size={12} />
-      <span>Quick</span>
+      <span>Поиск</span>
       <span className="ml-1 inline-flex items-center gap-0.5">
         <kbd className="border border-white/15 rounded px-1 py-0.5 text-[9px]">{mac ? "⌘" : "Ctrl"}</kbd>
         <kbd className="border border-white/15 rounded px-1 py-0.5 text-[9px]">K</kbd>

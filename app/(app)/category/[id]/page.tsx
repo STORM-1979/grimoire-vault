@@ -25,9 +25,9 @@ export default async function CategoryPage({ params }: PageProps) {
       {/* Breadcrumb + hero */}
       <section className="max-w-[1480px] mx-auto px-10 pt-12 pb-8 border-b border-white/10">
         <div className="flex items-center gap-3 mb-6 text-[12px] font-mono uppercase tracking-widest text-ivory-mute">
-          <Link href="/" className="hover:text-gold">Index</Link>
+          <Link href="/" className="hover:text-gold">Главная</Link>
           <span>/</span>
-          <Link href="/categories" className="hover:text-gold">Categories</Link>
+          <Link href="/categories" className="hover:text-gold">Категории</Link>
           <span>/</span>
           <span className="text-gold">№ {cat.no} · {cat.en}</span>
         </div>

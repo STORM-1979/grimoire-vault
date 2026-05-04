@@ -124,7 +124,7 @@ export function PushNotifications() {
       <div className="flex items-start justify-between mb-3">
         <div>
           <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-1">
-            Mobile · push notifications
+            Мобильное · пуш-уведомления
           </div>
           <h3 className="font-display text-[22px] font-medium leading-tight">
             Уведомления

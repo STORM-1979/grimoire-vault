@@ -42,24 +42,24 @@ export function CredentialsView() {
       <div className="max-w-[1480px] mx-auto px-10 -mt-24 mb-8 flex items-end justify-end gap-3">
         <div className="keynote text-center min-w-[110px] p-4">
           <div className="font-display text-[32px] font-light text-gold leading-none">{creds.items.length}</div>
-          <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute mt-1">Items</div>
+          <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute mt-1">Записей</div>
         </div>
         <div className="keynote text-center min-w-[110px] p-4">
           <div className="font-display text-[32px] font-light text-gold leading-none">{pinned.length}</div>
-          <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute mt-1">Pinned</div>
+          <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute mt-1">Закреплено</div>
         </div>
         <button
           onClick={mk.lock}
-          title="Lock vault"
+          title="Заблокировать vault"
           className="border border-white/30 text-ivory-dim px-4 py-3 rounded-full font-mono text-[10px] uppercase tracking-widest hover:border-gold hover:text-gold transition flex items-center gap-2"
         >
-          <Icon name="lock" size={13} /> Lock
+          <Icon name="lock" size={13} /> Запереть
         </button>
         <button
           onClick={() => setShowAdd(true)}
           className="bg-ivory text-emerald-950 px-5 py-3 rounded-full font-medium tracking-tight hover:bg-emerald-100 transition flex items-center gap-2"
         >
-          <Icon name="add" size={16} /> Add Credential
+          <Icon name="add" size={16} /> Добавить пароль
         </button>
       </div>
 
@@ -75,11 +75,11 @@ export function CredentialsView() {
         <div className="flex items-start gap-4 p-5 rounded-xl border border-gold/30 bg-gold/[0.04]">
           <div className="text-gold flex-shrink-0 mt-0.5"><Icon name="shield" size={22} /></div>
           <div className="flex-1">
-            <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-1">Encryption</div>
+            <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-1">Шифрование</div>
             <p className="text-[13.5px] text-ivory-dim leading-snug font-light">
-              Пароли зашифрованы на клиенте через <span className="text-ivory">PBKDF2-SHA256 (600k iterations)</span> →{" "}
+              Пароли зашифрованы на клиенте через <span className="text-ivory">PBKDF2-SHA256 (600k итераций)</span> →{" "}
               <span className="text-ivory">AES-GCM-256</span> с уникальным IV на каждое поле. Сервер видит только base64-blobs.
-              Master password живёт в <span className="text-ivory">sessionStorage</span> до закрытия вкладки.
+              Мастер-пароль живёт в <span className="text-ivory">sessionStorage</span> до закрытия вкладки.
             </p>
           </div>
         </div>
@@ -94,14 +94,14 @@ export function CredentialsView() {
       {pinned.length > 0 && (
         <section className="max-w-[1480px] mx-auto px-10 py-8">
           <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-4 flex items-center gap-2">
-            <Icon name="pin" size={14} /> Pinned
+            <Icon name="pin" size={14} /> Закреплено
           </div>
           <CredentialsTable items={pinned} onTogglePin={creds.togglePin} onDelete={creds.remove} />
         </section>
       )}
 
       <section className="max-w-[1480px] mx-auto px-10 py-8">
-        <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-4">All entries · {others.length}</div>
+        <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-4">Все записи · {others.length}</div>
         <CredentialsTable items={others} onTogglePin={creds.togglePin} onDelete={creds.remove} />
       </section>
 
@@ -109,7 +109,7 @@ export function CredentialsView() {
         <section className="max-w-[1480px] mx-auto px-10 py-32 text-center">
           <div className="text-ivory-mute font-light italic mb-4">— vault пуст —</div>
           <div className="font-mono text-[11px] uppercase tracking-widest text-gold">
-            Жми «Add Credential» чтобы сохранить первый аккаунт
+            Жми «Добавить пароль» чтобы сохранить первый аккаунт
           </div>
         </section>
       )}

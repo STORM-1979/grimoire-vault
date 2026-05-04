@@ -57,11 +57,11 @@ type HitItem = {
 type Item = NavItem | SaveItem | HitItem;
 
 const NAV_ITEMS: NavItem[] = [
-  { kind: "nav", id: "home", label: "Index", hint: "Все категории", href: "/", icon: "arrow" },
-  { kind: "nav", id: "search", label: "Search", hint: "Полный поиск с фильтрами", href: "/search", icon: "search" },
-  { kind: "nav", id: "kanban", label: "Kanban", hint: "Доска задач", href: "/kanban", icon: "kanban" },
+  { kind: "nav", id: "home", label: "Главная", hint: "Все категории", href: "/", icon: "arrow" },
+  { kind: "nav", id: "search", label: "Поиск", hint: "Полный поиск с фильтрами", href: "/search", icon: "search" },
+  { kind: "nav", id: "kanban", label: "Канбан", hint: "Доска задач", href: "/kanban", icon: "kanban" },
   { kind: "nav", id: "inbox", label: "Inbox", hint: "Импорт из бота", href: "/inbox", icon: "inbox" },
-  { kind: "nav", id: "settings", label: "Settings", hint: "Аккаунт · Telegram · Reindex", href: "/settings", icon: "settings" },
+  { kind: "nav", id: "settings", label: "Настройки", hint: "Аккаунт · Telegram · Reindex", href: "/settings", icon: "settings" },
 ];
 
 const CATEGORY_NAV: NavItem[] = CATEGORIES.map((c) => ({

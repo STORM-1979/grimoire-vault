@@ -36,20 +36,20 @@ export function ExportVault() {
       <div className="flex items-start justify-between mb-3">
         <div>
           <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-1">
-            Backup · own your data
+            Бэкап · твои данные с тобой
           </div>
           <h3 className="font-display text-[22px] font-medium leading-tight">
-            Export Vault
+            Экспорт vault&apos;а
           </h3>
         </div>
         <Icon name="shield" size={18} className="text-emerald-200" />
       </div>
       <p className="text-[13.5px] text-ivory-dim leading-snug font-light mb-4">
-        Один клик — и ты получаешь весь свой вольт в виде JSON-файла:
+        Один клик — и ты получаешь весь свой vault в виде JSON-файла:
         записи во всех 13 категориях, доска kanban, зашифрованные
         credentials. Embeddings не включаются (восстанавливаются
-        локально через Reindex), R2-файлы — по URL в JSON. Master-пароль
-        от vault never leaves твой браузер: credentials в экспорте —
+        локально через Reindex), R2-файлы — по URL в JSON.
+        Мастер-пароль от vault&apos;а никогда не покидает браузер: credentials в экспорте —
         только AES-GCM-шифротексты.
       </p>
 

@@ -59,10 +59,10 @@ export function AdminStats() {
       <div className="flex items-start justify-between mb-4">
         <div>
           <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-1">
-            Owner-only · operational
+            Только для владельца · операционная
           </div>
           <h3 className="font-display text-[22px] font-medium leading-tight">
-            Vault stats
+            Статистика vault&apos;а
           </h3>
           {stats && (
             <div className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute mt-1 flex items-center gap-2 flex-wrap">
@@ -99,14 +99,14 @@ export function AdminStats() {
       {stats && (
         <>
           <div className="grid grid-cols-3 gap-3 mb-5">
-            <Tile label="Entries" value={stats.totals.entries} />
-            <Tile label="Kanban" value={stats.totals.kanbanCards} />
+            <Tile label="Записи" value={stats.totals.entries} />
+            <Tile label="Канбан" value={stats.totals.kanbanCards} />
             <Tile label="Credentials" value={stats.totals.credentials} />
           </div>
 
           <div className="grid grid-cols-4 gap-3 mb-5">
-            <Tile small label="Bot-imported" value={stats.triage.botImported} />
-            <Tile small label="Untriaged" value={stats.triage.untriaged} accent={stats.triage.untriaged > 0 ? "gold" : undefined} />
+            <Tile small label="От бота" value={stats.triage.botImported} />
+            <Tile small label="Не разобрано" value={stats.triage.untriaged} accent={stats.triage.untriaged > 0 ? "gold" : undefined} />
             <Tile small label="Embedded" value={stats.triage.embedded} />
             <Tile small label="Coverage" value={`${stats.triage.embeddingCoverage}%`} />
           </div>
@@ -114,7 +114,7 @@ export function AdminStats() {
           {/* Per-category */}
           <div className="mb-5">
             <div className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute mb-2">
-              By category
+              По категориям
             </div>
             <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
               {CATEGORIES.map((c) => (
@@ -136,7 +136,7 @@ export function AdminStats() {
               R2 storage
             </div>
             <div className="grid grid-cols-4 gap-3">
-              <Tile small label="Total" value={`${stats.r2.count} · ${humanBytes(stats.r2.bytes)}`} />
+              <Tile small label="Всего" value={`${stats.r2.count} · ${humanBytes(stats.r2.bytes)}`} />
               <Tile small label="Originals" value={`${stats.r2.byKind.originals?.count ?? 0} · ${humanBytes(stats.r2.byKind.originals?.bytes ?? 0)}`} />
               <Tile small label="Covers" value={`${stats.r2.byKind.covers?.count ?? 0} · ${humanBytes(stats.r2.byKind.covers?.bytes ?? 0)}`} />
               <Tile small label="Thumbs" value={`${stats.r2.byKind.thumbs?.count ?? 0} · ${humanBytes(stats.r2.byKind.thumbs?.bytes ?? 0)}`} />
@@ -145,8 +145,8 @@ export function AdminStats() {
 
           {/* Timestamps */}
           <div className="grid grid-cols-2 gap-3 mb-6">
-            <Tile small label="Last entry" value={fmtTs(stats.timestamps.lastEntryAt)} />
-            <Tile small label="Last bot import" value={fmtTs(stats.timestamps.lastBotImportAt)} />
+            <Tile small label="Последняя запись" value={fmtTs(stats.timestamps.lastEntryAt)} />
+            <Tile small label="Последний импорт от бота" value={fmtTs(stats.timestamps.lastBotImportAt)} />
           </div>
 
           <DangerZone onWiped={refresh} />
@@ -262,10 +262,10 @@ function DangerZone({ onWiped }: { onWiped: () => void }) {
             <Icon name="check" size={11} /> Vault очищен
           </div>
           <div className="font-mono text-[11px] grid grid-cols-2 gap-1 text-ivory-dim">
-            <span>Entries: {result.deleted.entries}</span>
-            <span>Kanban: {result.deleted.kanbanCards}</span>
+            <span>Записи: {result.deleted.entries}</span>
+            <span>Канбан: {result.deleted.kanbanCards}</span>
             <span>Credentials: {result.deleted.credentials}</span>
-            <span>R2 objects: {result.deleted.r2Objects}</span>
+            <span>R2-файлов: {result.deleted.r2Objects}</span>
           </div>
           {result.errors.length > 0 && (
             <details className="mt-2">

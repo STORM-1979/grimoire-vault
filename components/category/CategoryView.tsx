@@ -126,17 +126,17 @@ export function CategoryView({ category, initialItems }: Props) {
       <div className="flex items-end justify-end gap-3 -mt-24 mb-12 max-w-[1480px] mx-auto px-10">
         <div className="keynote text-center min-w-[110px] p-4">
           <div className="font-display text-[32px] font-light text-gold leading-none">{items.length}</div>
-          <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute mt-1">Items</div>
+          <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute mt-1">Записей</div>
         </div>
         <div className="keynote text-center min-w-[110px] p-4">
           <div className="font-display text-[32px] font-light text-gold leading-none">{pinned.length}</div>
-          <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute mt-1">Pinned</div>
+          <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute mt-1">Закреплено</div>
         </div>
         <button
           onClick={() => setShowAdd(true)}
           className="bg-ivory text-emerald-950 px-5 py-3 rounded-full font-medium tracking-tight hover:bg-emerald-100 transition flex items-center gap-2"
         >
-          <Icon name="add" size={16} /> Add Entry
+          <Icon name="add" size={16} /> Добавить запись
         </button>
       </div>
 
@@ -166,7 +166,7 @@ export function CategoryView({ category, initialItems }: Props) {
       {pinned.length > 0 && (
         <section className="max-w-[1480px] mx-auto px-10 py-10">
           <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-4 flex items-center gap-2">
-            <Icon name="pin" size={14} /> Pinned
+            <Icon name="pin" size={14} /> Закреплено
           </div>
           {isVideo ? (
             <div className="grid grid-cols-2 gap-7">
@@ -204,7 +204,7 @@ export function CategoryView({ category, initialItems }: Props) {
 
       {/* Main list */}
       <section className="max-w-[1480px] mx-auto px-10 py-10">
-        <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-4">All entries · {others.length}</div>
+        <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-4">Все записи · {others.length}</div>
         {isVideo ? (
           <div className="grid grid-cols-3 gap-7">
             {others.map((it) => (

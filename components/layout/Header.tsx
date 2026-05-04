@@ -17,15 +17,15 @@ export function Header({ user }: HeaderProps) {
         <Logo />
 
         <nav className="flex items-center gap-9">
-          <NavLink href="/" exact>Index</NavLink>
-          <NavLink href="/categories">Categories</NavLink>
+          <NavLink href="/" exact>Главная</NavLink>
+          <NavLink href="/categories">Категории</NavLink>
           <span className="inline-flex items-center">
             <NavLink href="/inbox">Inbox</NavLink>
             <InboxBadge />
           </span>
-          <NavLink href="/search">Search</NavLink>
-          <NavLink href="/kanban">Kanban</NavLink>
-          <NavLink href="/settings">Settings</NavLink>
+          <NavLink href="/search">Поиск</NavLink>
+          <NavLink href="/kanban">Канбан</NavLink>
+          <NavLink href="/settings">Настройки</NavLink>
         </nav>
 
         <div className="flex items-center gap-4">

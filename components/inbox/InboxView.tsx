@@ -202,7 +202,7 @@ export function InboxView() {
                 : "border-white/10 text-ivory-mute hover:border-gold hover:text-gold"
             }`}
           >
-            Inbox · Pending
+            Inbox · в очереди
           </button>
           <button
             onClick={() => { setView("triaged"); clearSelection(); }}
@@ -212,7 +212,7 @@ export function InboxView() {
                 : "border-white/10 text-ivory-mute hover:border-gold hover:text-gold"
             }`}
           >
-            Triaged · History
+            Разобрано · история
           </button>
         </div>
 
@@ -248,7 +248,7 @@ export function InboxView() {
                 disabled={busy}
                 className="font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full border border-emerald-200/40 text-emerald-200 hover:bg-emerald-200 hover:text-emerald-deep transition disabled:opacity-50 flex items-center gap-1.5"
               >
-                <Icon name="check" size={11} /> Filed (как есть)
+                <Icon name="check" size={11} /> Разобрать как есть
               </button>
             )}
             <button
@@ -367,7 +367,7 @@ export function InboxView() {
                           title="Подтвердить категорию и убрать из inbox"
                           className="font-mono text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full border border-emerald-200/30 text-emerald-200 hover:bg-emerald-200 hover:text-emerald-deep transition flex items-center gap-1.5 disabled:opacity-50"
                         >
-                          <Icon name="check" size={10} /> Filed
+                          <Icon name="check" size={10} /> Разобрать
                         </button>
                         <div className="relative">
                           <button
@@ -404,7 +404,7 @@ export function InboxView() {
                           <Icon name="refresh" size={10} /> Вернуть
                         </button>
                         <span className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute">
-                          filed{" "}
+                          разобрано{" "}
                           {it.triagedAt
                             ? new Date(it.triagedAt).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" })
                             : "—"}

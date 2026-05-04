@@ -54,10 +54,10 @@ export function VaultsPanel({ ownerUserId }: { ownerUserId: string }) {
       <div className="flex items-start justify-between mb-3">
         <div>
           <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-1">
-            Shared workspaces
+            Общие пространства
           </div>
           <h3 className="font-display text-[22px] font-medium leading-tight">
-            Vaults
+            Vault&apos;ы
           </h3>
         </div>
         <Icon name="shield" size={18} className="text-emerald-200" />
@@ -178,7 +178,7 @@ function VaultCard({ vault, ownerUserId, onChange }: { vault: Vault; ownerUserId
           <div className="min-w-0 flex-1 text-left">
             <div className="font-display text-[16px] font-medium leading-tight truncate">{vault.name}</div>
             <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute">
-              {vault.role} · created {new Date(vault.createdAt).toLocaleDateString("ru-RU")}
+              {vault.role === "owner" ? "владелец" : "редактор"} · создан {new Date(vault.createdAt).toLocaleDateString("ru-RU")}
             </div>
           </div>
         </div>
@@ -190,7 +190,7 @@ function VaultCard({ vault, ownerUserId, onChange }: { vault: Vault; ownerUserId
       {expanded && (
         <div className="px-4 pb-4 border-t border-white/10 pt-3">
           {/* Members */}
-          <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-2">Members</div>
+          <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-2">Участники</div>
           {members === null ? (
             <div className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute">Загружаю…</div>
           ) : (
@@ -200,7 +200,7 @@ function VaultCard({ vault, ownerUserId, onChange }: { vault: Vault; ownerUserId
                   <div className="min-w-0 flex-1">
                     <div className="font-mono text-[12px] truncate">{m.email ?? m.userId}</div>
                     <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute">
-                      {m.role}
+                      {m.role === "owner" ? "владелец" : "редактор"}
                     </div>
                   </div>
                   {isOwner && m.userId !== ownerUserId && (
@@ -220,7 +220,7 @@ function VaultCard({ vault, ownerUserId, onChange }: { vault: Vault; ownerUserId
           {isOwner && (
             <>
               <div className="flex items-center justify-between mb-2">
-                <div className="font-mono text-[10px] uppercase tracking-widest text-gold">Invites</div>
+                <div className="font-mono text-[10px] uppercase tracking-widest text-gold">Приглашения</div>
                 <button
                   onClick={createInvite}
                   disabled={busy}

@@ -35,13 +35,13 @@ export default function HomePage() {
                 href="/categories"
                 className="bg-ivory text-emerald-950 px-7 py-3.5 rounded-full font-medium tracking-tight hover:bg-emerald-100 transition flex items-center gap-2"
               >
-                Open the Vault <Icon name="arrow" size={16} />
+                Открыть Vault <Icon name="arrow" size={16} />
               </Link>
               <Link
                 href="/inbox"
                 className="border border-white/30 text-ivory px-7 py-3.5 rounded-full font-medium tracking-tight hover:border-gold hover:text-gold transition"
               >
-                Open Inbox
+                Открыть Inbox
               </Link>
             </div>
           </div>
@@ -71,7 +71,7 @@ export default function HomePage() {
       <section className="max-w-[1480px] mx-auto px-10 py-16">
         <div className="grid grid-cols-12 gap-10 mb-12">
           <div className="col-span-6">
-            <div className="badge mb-4">Index — Thirteen</div>
+            <div className="badge mb-4">Указатель — тринадцать</div>
             <h2 className="font-display text-[68px] font-light leading-[0.92] tracking-tightest">
               Thirteen <span className="italic text-gold">rooms</span> of one library.
             </h2>
@@ -179,7 +179,7 @@ async function FeaturedCard() {
     <>
       <Link href={`/category/${featured.id}`} className="keynote p-7 rounded-xl block">
         <div className="flex justify-between items-baseline mb-3">
-          <div className="font-mono text-[10px] uppercase tracking-widest text-gold">Featured · most entries</div>
+          <div className="font-mono text-[10px] uppercase tracking-widest text-gold">Featured · максимум записей</div>
           <span className="font-mono text-[10px] text-ivory-mute">№ {featured.no}</span>
         </div>
         <h3 className="font-display italic text-[36px] font-medium leading-none">{featured.en}</h3>
@@ -203,17 +203,17 @@ async function FeaturedCard() {
       <div className="grid grid-cols-3 gap-3">
         <div className="keynote p-4 rounded-lg">
           <div className="font-display text-[28px] font-light text-gold leading-none">13</div>
-          <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute mt-2">Categories</div>
+          <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute mt-2">Категорий</div>
         </div>
         <div className="keynote p-4 rounded-lg">
           <div className="font-display text-[28px] font-light text-gold leading-none">
             {total.toLocaleString("ru-RU").replace(",", " ")}
           </div>
-          <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute mt-2">Entries</div>
+          <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute mt-2">Записей</div>
         </div>
         <div className="keynote p-4 rounded-lg">
           <div className="font-display text-[28px] font-light text-gold leading-none">∞</div>
-          <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute mt-2">Sub-cats</div>
+          <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute mt-2">Подкатегорий</div>
         </div>
       </div>
     </>
@@ -245,9 +245,9 @@ async function CategoriesGrid() {
           </div>
           <div className="flex justify-between items-baseline mt-6 pt-3 border-t border-white/10">
             <span className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute">
-              {counts[c.id] ?? 0} items
+              {counts[c.id] ?? 0} записей
             </span>
-            <span className="font-mono text-[10px] uppercase tracking-widest text-gold">∞ subcat.</span>
+            <span className="font-mono text-[10px] uppercase tracking-widest text-gold">∞ подкат.</span>
           </div>
         </Link>
       ))}

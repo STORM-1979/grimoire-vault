@@ -70,16 +70,16 @@ export function ImportVault() {
       <div className="flex items-start justify-between mb-3">
         <div>
           <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-1">
-            Restore · merge · migrate
+            Восстановить · объединить · мигрировать
           </div>
           <h3 className="font-display text-[22px] font-medium leading-tight">
-            Import Vault
+            Импорт vault&apos;а
           </h3>
         </div>
         <Icon name="refresh" size={18} className="text-emerald-200" />
       </div>
       <p className="text-[13.5px] text-ivory-dim leading-snug font-light mb-4">
-        Загрузи JSON-файл из <em>Export Vault</em> — все entries, kanban-карточки
+        Загрузи JSON-файл из <em>Экспорта</em> — все записи, kanban-карточки
         и credentials добавятся в твой текущий vault. Дубли по
         <code className="px-1 mx-1 font-mono text-[12px] bg-white/5 rounded">content_hash</code>
         пропускаются автоматически. Безопасно мерджить дампы из разных
@@ -126,8 +126,8 @@ export function ImportVault() {
             <Icon name="check" size={11} /> Импорт завершён
           </div>
           <div className="grid grid-cols-3 gap-2 font-mono text-[11px]">
-            <SummaryCell label="Entries" s={result.summary.entries} />
-            <SummaryCell label="Kanban" s={result.summary.kanbanCards} />
+            <SummaryCell label="Записи" s={result.summary.entries} />
+            <SummaryCell label="Канбан" s={result.summary.kanbanCards} />
             <SummaryCell label="Credentials" s={result.summary.credentials} />
           </div>
           {result.errors.length > 0 && (

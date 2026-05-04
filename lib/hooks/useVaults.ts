@@ -60,7 +60,7 @@ export function useVaults() {
 
   const activeName = activeId
     ? (vaults.find((v) => v.id === activeId)?.name ?? "…")
-    : "Personal";
+    : "Личный";
 
   return { vaults, activeId, setActiveId, activeName, loading, refresh };
 }

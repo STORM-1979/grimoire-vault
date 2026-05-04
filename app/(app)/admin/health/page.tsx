@@ -21,9 +21,9 @@ export default async function HealthPage() {
     <div className="fade-in">
       <section className="max-w-[980px] mx-auto px-10 pt-12 pb-8 border-b border-white/10">
         <div className="flex items-center gap-3 mb-6 text-[12px] font-mono uppercase tracking-widest text-ivory-mute">
-          <Link href="/" className="hover:text-gold">Index</Link>
+          <Link href="/" className="hover:text-gold">Главная</Link>
           <span>/</span>
-          <Link href="/settings" className="hover:text-gold">Settings</Link>
+          <Link href="/settings" className="hover:text-gold">Настройки</Link>
           <span>/</span>
           <span className="text-gold">Admin · Health</span>
         </div>
@@ -31,10 +31,10 @@ export default async function HealthPage() {
         <div className="flex items-end justify-between gap-8 flex-wrap">
           <div>
             <div className="font-mono text-[11px] uppercase tracking-widest text-gold mb-2 flex items-center gap-2">
-              <Icon name="shield" size={11} /> Owner-only · dependency probe
+              <Icon name="shield" size={11} /> Только для владельца · проверка зависимостей
             </div>
             <h1 className="font-display text-[72px] font-light leading-[0.92] tracking-tightest">
-              Health <span className="italic text-gold">check</span>
+              Состояние <span className="italic text-gold">системы</span>
             </h1>
             <p className="text-[15px] text-ivory-dim mt-3 max-w-2xl">
               Дёргает каждую внешнюю зависимость по разу — Supabase REST,

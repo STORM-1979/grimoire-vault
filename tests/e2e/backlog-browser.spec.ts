@@ -216,8 +216,9 @@ test.describe("BACKLOG — browser checks", () => {
 
   test("Hotkeys suppressed inside an input field", async ({ page }) => {
     await page.goto("/category/ideas");
-    // Open the AddItemModal where the title input lives.
-    await page.getByRole("button", { name: /Add Entry/ }).click();
+    // Open the AddItemModal where the title input lives.  `.first()` —
+    // the modal's submit button shares the same accessible name.
+    await page.getByRole("button", { name: /Добавить запись/ }).first().click();
     const titleInput = page.getByPlaceholder(/Краткий заголовок|Theo - обзор/);
     await titleInput.fill("");
     await titleInput.focus();

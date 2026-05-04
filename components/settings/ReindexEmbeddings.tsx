@@ -100,7 +100,7 @@ export function ReindexEmbeddings() {
       <div className="flex items-start justify-between mb-3">
         <div>
           <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-1">
-            Semantic search · index
+            Семантический поиск · индекс
           </div>
           <h3 className="font-display text-[22px] font-medium leading-tight">
             Поисковые embeddings

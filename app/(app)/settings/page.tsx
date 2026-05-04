@@ -21,18 +21,18 @@ export default async function SettingsPage() {
   return (
     <div className="fade-in">
       <section className="max-w-[1080px] mx-auto px-10 pt-12 pb-8 border-b border-white/10">
-        <div className="badge mb-6">Settings</div>
+        <div className="badge mb-6">Настройки</div>
         <h1 className="font-display text-[80px] font-light leading-[0.92] tracking-tightest">
-          Configuration.
+          Конфигурация.
         </h1>
       </section>
 
       <section className="max-w-[1080px] mx-auto px-10 py-12 space-y-6">
         <div className="keynote rounded-2xl p-7">
           <div className="mb-5">
-            <h3 className="font-display text-[28px] font-medium leading-none">Account</h3>
+            <h3 className="font-display text-[28px] font-medium leading-none">Аккаунт</h3>
             <div className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute mt-2">
-              Supabase Auth · authenticated session
+              Supabase Auth · активная сессия
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4 text-[14px]">
@@ -63,9 +63,9 @@ export default async function SettingsPage() {
 
         <div className="keynote rounded-2xl p-7">
           <div className="mb-5">
-            <h3 className="font-display text-[28px] font-medium leading-none">Architecture</h3>
+            <h3 className="font-display text-[28px] font-medium leading-none">Архитектура</h3>
             <div className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute mt-2">
-              Stack overview
+              Обзор стека
             </div>
           </div>
           <table className="w-full">
@@ -82,18 +82,18 @@ export default async function SettingsPage() {
         <div className="keynote rounded-2xl p-7">
           <div className="mb-3 flex items-center gap-3">
             <Icon name="shield" size={20} className="text-gold" />
-            <h3 className="font-display text-[28px] font-medium leading-none">Migration status</h3>
+            <h3 className="font-display text-[28px] font-medium leading-none">Статус разработки</h3>
           </div>
           <div className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute mb-4">
-            Week 1 · Foundation — IN PROGRESS
+            v1.0.0 · production
           </div>
           <ul className="text-[14px] text-ivory-dim space-y-1.5 list-disc list-inside">
-            <li>Next.js 16 проект — готово</li>
-            <li>Tailwind v4 + дизайн-токены — готово</li>
-            <li>Supabase clients + middleware — готово</li>
-            <li>Schema + миграции — готово</li>
-            <li>Auth (magic link) — готово</li>
-            <li>Header + Home + 13 routes (placeholders) — готово</li>
+            <li>Все фазы миграции (1-6) — завершены</li>
+            <li>Семантический поиск + WebP-транскодинг — в проде</li>
+            <li>⌘K Command Palette + vim keyboard nav — в проде</li>
+            <li>Inbox triage + bulk-операции — в проде</li>
+            <li>Export / Import + Owner-only ops layer — в проде</li>
+            <li>Web Push + Shared vaults + Upstash rate limit — в проде</li>
           </ul>
         </div>
       </section>

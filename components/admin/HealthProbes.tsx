@@ -19,23 +19,23 @@ interface HealthResponse {
 const PROBE_LABELS: Record<string, { title: string; help: string }> = {
   "supabase-rest": {
     title: "Supabase REST",
-    help: "Service-role HEAD on `categories` — confirms DB reachable + RLS bypass works",
+    help: "Service-role HEAD по `categories` — БД доступна + RLS-bypass работает",
   },
   "supabase-pgvector": {
     title: "pgvector RPC",
-    help: "Calls `search_entries_semantic` with a zero vector — confirms migration applied",
+    help: "Вызов `search_entries_semantic` с нулевым вектором — миграция применена",
   },
   "r2-bucket": {
     title: "Cloudflare R2",
-    help: "HEAD bucket — confirms credentials + endpoint",
+    help: "HEAD bucket — credentials + endpoint валидны",
   },
   "telegram-bot": {
-    title: "Telegram bot",
-    help: "Bot token validity — `getMe`",
+    title: "Telegram-бот",
+    help: "Токен валиден — `getMe`",
   },
   "telegram-webhook": {
     title: "Telegram webhook",
-    help: "`getWebhookInfo` — surfaces `last_error_message` if delivery is stuck",
+    help: "`getWebhookInfo` — покажет `last_error_message`, если доставка зависла",
   },
 };
 
@@ -58,7 +58,7 @@ export function HealthProbes() {
         return (await r.json()) as HealthResponse;
       })
       .then(setData)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Probe failed"))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Проверка не удалась"))
       .finally(() => setLoading(false));
   }, []);
 
@@ -71,7 +71,7 @@ export function HealthProbes() {
           {data && (
             <span className={`w-2 h-2 rounded-full ${data.ok ? "bg-emerald-400" : "bg-red-400"} ${data.ok ? "animate-pulse" : ""}`} />
           )}
-          {loading ? "Probing…" : data ? (data.ok ? "All systems go" : "Degraded") : "—"}
+          {loading ? "Проверяю…" : data ? (data.ok ? "Все системы работают" : "Деградация") : "—"}
           {data && <span className="text-ivory-mute">· {new Date(data.checkedAt).toLocaleString("ru-RU")}</span>}
         </div>
         <button
@@ -79,7 +79,7 @@ export function HealthProbes() {
           disabled={loading}
           className="font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full border border-white/15 text-ivory-mute hover:border-gold hover:text-gold transition disabled:opacity-50 flex items-center gap-1.5"
         >
-          <Icon name="refresh" size={11} /> {loading ? "…" : "Re-probe"}
+          <Icon name="refresh" size={11} /> {loading ? "…" : "Проверить ещё раз"}
         </button>
       </div>
 

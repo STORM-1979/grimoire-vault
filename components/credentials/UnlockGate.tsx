@@ -133,7 +133,7 @@ export function UnlockGate({ isSetup, busy, error, onSetup, onUnlock }: Props) {
           disabled={busy || !pwd}
           className="w-full bg-ivory text-emerald-950 py-3 rounded-full font-medium tracking-tight hover:bg-emerald-100 disabled:opacity-50 transition flex items-center justify-center gap-2"
         >
-          {busy ? "…" : isSetup ? "Unlock vault" : "Create master password"}
+          {busy ? "…" : isSetup ? "Разблокировать vault" : "Создать мастер-пароль"}
           {!busy && <Icon name="arrow" size={14} />}
         </button>
 

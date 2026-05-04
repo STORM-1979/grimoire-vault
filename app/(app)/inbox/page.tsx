@@ -40,7 +40,7 @@ export default async function InboxPage() {
     <div className="fade-in">
       <section className="max-w-[1180px] mx-auto px-10 pt-12 pb-8 border-b border-white/10">
         <div className="flex items-center gap-3 mb-6 text-[12px] font-mono uppercase tracking-widest text-ivory-mute">
-          <Link href="/" className="hover:text-gold">Index</Link>
+          <Link href="/" className="hover:text-gold">Главная</Link>
           <span>/</span>
           <span className="text-gold">Inbox · Telegram</span>
         </div>
@@ -49,7 +49,7 @@ export default async function InboxPage() {
           <div>
             <div className="font-mono text-[11px] uppercase tracking-widest text-gold mb-2 flex items-center gap-2">
               <span className={`w-1.5 h-1.5 rounded-full ${session ? "bg-emerald-400 animate-pulse" : "bg-red-400"}`} />
-              {session ? "Bot online · webhook active" : "Bot not linked"}
+              {session ? "Бот онлайн · webhook активен" : "Бот не привязан"}
             </div>
             <h1 className="font-display text-[80px] font-light leading-[0.92] tracking-tightest">
               Telegram <span className="italic text-gold">Inbox</span>
@@ -63,15 +63,15 @@ export default async function InboxPage() {
           <div className="flex items-end gap-3">
             <div className="keynote text-center min-w-[110px] p-4">
               <div className="font-display text-[32px] font-light text-gold leading-none">{pendingCount ?? 0}</div>
-              <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute mt-1">Pending</div>
+              <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute mt-1">В очереди</div>
             </div>
             <div className="keynote text-center min-w-[110px] p-4">
               <div className="font-display text-[32px] font-light text-gold leading-none">{triagedCount ?? 0}</div>
-              <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute mt-1">Triaged</div>
+              <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute mt-1">Разобрано</div>
             </div>
             <div className="keynote text-center min-w-[110px] p-4">
               <div className="font-display text-[32px] font-light text-gold leading-none">{todays}</div>
-              <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute mt-1">Today</div>
+              <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute mt-1">Сегодня</div>
             </div>
           </div>
         </div>
@@ -81,11 +81,11 @@ export default async function InboxPage() {
         <section className="max-w-[1180px] mx-auto px-10 py-8">
           <div className="keynote rounded-xl p-6">
             <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-2 flex items-center gap-2">
-              <Icon name="shield" size={11} /> Setup
+              <Icon name="shield" size={11} /> Подключение
             </div>
             <p className="text-[14px] text-ivory-dim leading-snug">
               Чтобы получать сообщения с любого устройства — открой
-              <Link href="/settings" className="text-gold mx-1 hover:underline">Settings → Telegram</Link>
+              <Link href="/settings" className="text-gold mx-1 hover:underline">Настройки → Telegram</Link>
               и привяжи свой чат коротким кодом.
             </p>
           </div>

@@ -51,7 +51,7 @@ export function VaultPicker() {
             >
               <Icon name="lock" size={14} className="text-emerald-200" />
               <div className="flex-1 min-w-0">
-                <div className="font-display text-[14px] font-medium leading-tight">Personal</div>
+                <div className="font-display text-[14px] font-medium leading-tight">Личный</div>
                 <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute">
                   Только ты
                 </div>
@@ -71,7 +71,7 @@ export function VaultPicker() {
                 <div className="flex-1 min-w-0">
                   <div className="font-display text-[14px] font-medium leading-tight truncate">{v.name}</div>
                   <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute">
-                    {v.role === "owner" ? "Owner" : "Editor"}
+                    {v.role === "owner" ? "Владелец" : "Редактор"}
                   </div>
                 </div>
                 {activeId === v.id && <Icon name="check" size={11} />}

@@ -122,11 +122,14 @@ test.describe("Grimoire Vault — production E2E", () => {
 
   test("add entry → appears in list", async ({ page }) => {
     await page.goto("/category/misc");
-    await page.getByRole("button", { name: /Add Entry/i }).click();
+    // Page CTA opens the modal — `.first()` since the modal also has
+    // a submit button with the same accessible name.
+    await page.getByRole("button", { name: /Добавить запись/i }).first().click();
     await expect(page.getByRole("heading", { name: /Добавить запись/i })).toBeVisible();
     const title = `Playwright run ${Date.now()}`;
     await page.getByPlaceholder(/Краткий заголовок/i).fill(title);
-    await page.getByRole("button", { name: /Добавить запись/i }).click();
+    // Submit button inside the form — scope to the form to disambiguate.
+    await page.locator("form").getByRole("button", { name: /Добавить запись/i }).click();
     // Wait for card to appear
     await expect(page.getByText(title)).toBeVisible({ timeout: 15_000 });
   });
