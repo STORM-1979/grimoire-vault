@@ -51,3 +51,8 @@ next-env.d.ts
 /test-results
 /playwright-report
 .dev.log
+
+# Historical artefacts: original HTML mockups + legacy docs.  Kept
+# locally for reference, excluded from the repo to keep clone size
+# tight.  See archive/README.md for what's there.
+/archive
