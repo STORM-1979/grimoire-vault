@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons/Icon";
 import { ItemActions } from "./ItemActions";
 import type { Entry } from "@/lib/types";
@@ -16,16 +17,20 @@ interface MediaCardProps {
 }
 
 export function MediaCard({ item, big, selected, bulkSelected, onBulkToggle, onTogglePin, onDelete, onEdit }: MediaCardProps) {
-  const onClick = onBulkToggle
-    ? (e: React.MouseEvent) => { if (e.shiftKey) { e.preventDefault(); onBulkToggle(item.id, e); } }
-    : undefined;
+  const router = useRouter();
+  const onClick = (e: React.MouseEvent) => {
+    if (e.shiftKey && onBulkToggle) { e.preventDefault(); onBulkToggle(item.id, e); return; }
+    const tgt = e.target as HTMLElement | null;
+    if (tgt?.closest("button, a, input")) return;
+    router.push(`/entry/${item.id}`);
+  };
   const ring = bulkSelected
     ? "ring-2 ring-emerald-300 ring-offset-2 ring-offset-emerald-deep"
     : selected
     ? "ring-2 ring-gold ring-offset-2 ring-offset-emerald-deep"
     : "";
   return (
-    <a data-entry-id={item.id} onClick={onClick} className={`cat-card group block ${onClick ? "cursor-pointer" : ""}`}>
+    <div data-entry-id={item.id} onClick={onClick} className="cat-card group block cursor-pointer">
       <div
         className={`relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-700 via-emerald-800 to-emerald-deep ${
           big ? "aspect-[3/2]" : "aspect-[4/3]"
@@ -81,6 +86,6 @@ export function MediaCard({ item, big, selected, bulkSelected, onBulkToggle, onT
           </span>
         </div>
       </div>
-    </a>
+    </div>
   );
 }

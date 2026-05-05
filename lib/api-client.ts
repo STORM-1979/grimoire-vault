@@ -93,6 +93,34 @@ export const credentialsApi = {
     call<void>(`/api/credentials/${id}`, { method: "DELETE" }),
 };
 
+/* ---------- Entry attachments (board) ---------- */
+import type { EntryAttachment } from "@/lib/types";
+import type {
+  CreateAttachmentInput, UpdateAttachmentInput,
+} from "@/lib/schemas/attachments";
+
+export const attachmentsApi = {
+  list: (entryId: string) =>
+    call<{ items: EntryAttachment[] }>(`/api/entries/${entryId}/attachments`),
+  create: (entryId: string, input: CreateAttachmentInput) =>
+    call<EntryAttachment>(`/api/entries/${entryId}/attachments`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+  update: (id: string, input: UpdateAttachmentInput) =>
+    call<EntryAttachment>(`/api/attachments/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    }),
+  delete: (id: string) =>
+    call<void>(`/api/attachments/${id}`, { method: "DELETE" }),
+  reorder: (entryId: string, ids: string[]) =>
+    call<void>(`/api/entries/${entryId}/attachments/reorder`, {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    }),
+};
+
 /* ---------- URL metadata extraction ---------- */
 export interface ExtractedMeta {
   url: string;

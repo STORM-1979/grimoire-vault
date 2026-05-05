@@ -37,6 +37,31 @@ export interface Category {
 
 export type ImportedVia = "web" | "bot" | "cli" | "api";
 
+export type AttachmentKind = "image" | "video" | "link" | "note" | "file";
+
+/**
+ * A single block on an entry's "interactive board" — one of:
+ *   • image  (R2 or external URL → <img>)
+ *   • video  (YouTube / Vimeo URL → iframe; raw .mp4 → <video>)
+ *   • link   (URL with title / description / thumbnail from og: extract)
+ *   • note   (plain text, no URL)
+ *   • file   (R2 download — PDF / ZIP / arbitrary)
+ */
+export interface EntryAttachment {
+  id: string;
+  entryId: string;
+  userId: string;
+  kind: AttachmentKind;
+  url?: string | null;
+  caption?: string | null;
+  body?: string | null;
+  thumbUrl?: string | null;
+  metadata: Record<string, unknown>;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /**
  * Universal entry — everything except credentials and kanban.
  * Mirrors the `entries` table 1:1 (snake_case in db, camel here via mapper).

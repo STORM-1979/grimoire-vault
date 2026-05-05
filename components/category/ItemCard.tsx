@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons/Icon";
 import { ItemActions } from "./ItemActions";
 import type { Entry, Category } from "@/lib/types";
@@ -23,6 +24,7 @@ export function ItemCard({
   item, category, large, selected, bulkSelected, onBulkToggle,
   onTogglePin, onDelete, onEdit,
 }: ItemCardProps) {
+  const router = useRouter();
   const meta = item.sizeLabel || item.duration || (item.fileCount ? `${item.fileCount} files` : (item.metadata?.model as string | undefined) || "");
   // Bulk-selected wins visually over keyboard-focused — they often coincide
   // anyway and the emerald check is more explicit feedback that a bulk
@@ -32,16 +34,24 @@ export function ItemCard({
     : selected
     ? "ring-2 ring-gold ring-offset-2 ring-offset-emerald-deep"
     : "";
-  const onClick = onBulkToggle
-    ? (e: React.MouseEvent) => { if (e.shiftKey) { e.preventDefault(); onBulkToggle(item.id, e); } }
-    : undefined;
+  // Click semantics:
+  //   • Shift+click       → bulk-toggle (no navigation)
+  //   • Click on action btn → handled by the button itself (stopPropagation in ItemActions)
+  //   • Plain click       → open the entry's detail / board page
+  const onClick = (e: React.MouseEvent) => {
+    if (e.shiftKey && onBulkToggle) { e.preventDefault(); onBulkToggle(item.id, e); return; }
+    // Don't navigate if user clicked something interactive inside the card.
+    const tgt = e.target as HTMLElement | null;
+    if (tgt?.closest("button, a, input, textarea")) return;
+    router.push(`/entry/${item.id}`);
+  };
 
   if (large) {
     return (
       <div
         data-entry-id={item.id}
         onClick={onClick}
-        className={`keynote p-6 rounded-xl flex flex-col group relative ${ring} ${onClick ? "cursor-pointer" : ""}`}
+        className={`keynote p-6 rounded-xl flex flex-col group relative cursor-pointer ${ring}`}
       >
         {bulkSelected && (
           <div className="absolute top-3 left-3 w-5 h-5 rounded-full bg-emerald-300 text-emerald-deep flex items-center justify-center pointer-events-none">
@@ -71,13 +81,13 @@ export function ItemCard({
     <div
       data-entry-id={item.id}
       onClick={onClick}
-      className={`group relative flex items-start gap-4 p-4 rounded-lg border transition ${
+      className={`group relative flex items-start gap-4 p-4 rounded-lg border transition cursor-pointer ${
         bulkSelected
           ? "border-emerald-300 bg-emerald-200/[0.06]"
           : selected
           ? "border-gold bg-white/[0.05]"
           : "border-transparent hover:border-white/10 hover:bg-white/[0.03]"
-      } ${onClick ? "cursor-pointer" : ""}`}
+      }`}
     >
       {bulkSelected && (
         <div className="absolute top-3 left-3 w-5 h-5 rounded-full bg-emerald-300 text-emerald-deep flex items-center justify-center pointer-events-none">

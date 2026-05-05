@@ -52,11 +52,13 @@ export function useEntryKeyboardNav(items: Entry[], cb: KeyboardNavCallbacks) {
   useEffect(() => { itemsRef.current = items; }, [items]);
   useEffect(() => { cbRef.current = cb; }, [cb]);
 
-  // Default activate = open URL in new tab if present, else trigger edit.
+  // Default activate = navigate to the entry's detail page (the
+  // interactive board lives there).  External URL opening got moved
+  // onto the detail page itself; Edit modal is still accessible via
+  // the dedicated `e` keystroke.
   const activateDefault = useCallback((item: Entry) => {
     if (cbRef.current.onActivate) { cbRef.current.onActivate(item); return; }
-    if (item.url) window.open(item.url, "_blank", "noopener,noreferrer");
-    else cbRef.current.onEdit(item);
+    if (typeof window !== "undefined") window.location.href = `/entry/${item.id}`;
   }, []);
 
   useEffect(() => {
