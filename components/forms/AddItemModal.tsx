@@ -45,6 +45,13 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
   // og: extraction state — purely advisory UX feedback while the user
   // pastes a link.  The actual fetch happens via /api/extract.
   const [extracting, setExtracting] = useState(false);
+  // For video category: until the URL is pasted (or the user clicks
+  // "fill manually"), the form shows just one URL input.  Other fields
+  // appear after extraction succeeds OR the user opts out of auto-fill.
+  const [videoExpanded, setVideoExpanded] = useState(false);
+  // Carry the extracted preview separately so the user can see what
+  // was pulled even before deciding to edit.
+  const [extractError, setExtractError] = useState<string | null>(null);
   const lastExtractedUrl = useRef<string>("");
   const extractTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -63,9 +70,11 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
 
   // Auto-extract og: meta when the URL field becomes a real URL.
   // Only fills *empty* fields — the user's typing always wins.
+  // For video entries we also pull duration + tags + channel author
+  // (server-side oEmbed fallback covers UA-blocked YouTube pages).
   useEffect(() => {
     const url = form.url.trim();
-    if (!isWeb || url.length < 8) return;
+    if (!(isWeb || isVideo) || url.length < 8) return;
     let parsed: URL | null = null;
     try { parsed = new URL(url); } catch { return; }
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return;
@@ -74,18 +83,42 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
     extractTimer.current = setTimeout(async () => {
       lastExtractedUrl.current = url;
       setExtracting(true);
+      setExtractError(null);
       try {
         const meta = await extractApi.fromUrl(url);
-        if (!meta.hasContent) return;
-        setForm((f) => ({
-          ...f,
-          title: f.title.trim() ? f.title : (meta.title ?? f.title),
-          desc: f.desc.trim() ? f.desc : (meta.description ?? f.desc),
-          thumb: f.thumb.trim() ? f.thumb : (meta.image ?? f.thumb),
-          cover: f.cover.trim() ? f.cover : (meta.image ?? f.cover),
-        }));
+        if (!meta.hasContent) {
+          if (isVideo) {
+            setExtractError("Не удалось подтянуть данные. Заполни поля вручную.");
+            setVideoExpanded(true);
+          }
+          return;
+        }
+        // Reveal the rest of the video form now that we have content to show.
+        if (isVideo) setVideoExpanded(true);
+        setForm((f) => {
+          // For video: prepend channel name to description if we have it
+          // and the user hasn't typed anything yet.
+          const videoDesc = isVideo && meta.author && meta.description
+            ? `Канал: ${meta.author}\n\n${meta.description}`
+            : isVideo && meta.author
+            ? `Канал: ${meta.author}`
+            : meta.description;
+          return {
+            ...f,
+            title: f.title.trim() ? f.title : (meta.title ?? f.title),
+            desc: f.desc.trim() ? f.desc : (videoDesc ?? f.desc),
+            thumb: f.thumb.trim() ? f.thumb : (meta.image ?? f.thumb),
+            cover: f.cover.trim() ? f.cover : (meta.image ?? f.cover),
+            duration: f.duration.trim() ? f.duration : (meta.duration ?? f.duration),
+            tags: f.tags.trim() ? f.tags : ((meta.tags ?? []).slice(0, 8).join(", ") || f.tags),
+          };
+        });
       } catch {
         // Silent — extraction is a nicety, not a feature.
+        if (isVideo) {
+          setExtractError("Сервис извлечения недоступен. Заполни поля вручную.");
+          setVideoExpanded(true);
+        }
       } finally {
         setExtracting(false);
       }
@@ -93,7 +126,7 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
     return () => {
       if (extractTimer.current) clearTimeout(extractTimer.current);
     };
-  }, [form.url, isWeb]);
+  }, [form.url, isWeb, isVideo]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,6 +147,7 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
       if (isVideo) {
         if (form.thumb.trim()) input.thumbUrl = form.thumb.trim();
         if (form.duration.trim()) input.duration = form.duration.trim();
+        if (form.url.trim()) input.url = form.url.trim();
       }
       if (isMedia && form.cover.trim()) input.coverUrl = form.cover.trim();
       if (isImage && form.count) {
@@ -168,27 +202,69 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
         </header>
 
         <form onSubmit={handleSubmit} className="p-7">
-          <Field label="Название" required>
-            <input
-              autoFocus
-              type="text"
-              className="field-input"
-              value={form.title}
-              onChange={set("title")}
-              placeholder={isVideo ? "Например: Theo - обзор Next.js 16" : "Краткий заголовок"}
-            />
-          </Field>
-
-          <Field label="Описание">
-            <textarea
-              className="field-textarea"
-              value={form.desc}
-              onChange={set("desc")}
-              placeholder={isVideo ? "Канал и заметки" : "Что это, зачем сохранил, ключевая мысль…"}
-            />
-          </Field>
-
           {isVideo && (
+            <Field
+              label="Ссылка на видео"
+              hint={
+                extracting
+                  ? "Тяну название, описание, превью, длительность и теги…"
+                  : videoExpanded
+                  ? "Поля ниже подтянулись автоматически — поправь, если что не так"
+                  : "Вставь YouTube-ссылку. Название, описание, превью, длительность и теги заполнятся сами."
+              }
+            >
+              <input
+                autoFocus
+                type="url"
+                className="field-input"
+                value={form.url}
+                onChange={set("url")}
+                placeholder="https://www.youtube.com/watch?v=..."
+              />
+            </Field>
+          )}
+
+          {isVideo && !videoExpanded && extractError && (
+            <div className="mb-4 font-mono text-[11px] text-amber-300/90 flex items-center gap-2">
+              <Icon name="x" size={12} /> {extractError}
+            </div>
+          )}
+
+          {isVideo && !videoExpanded && (
+            <button
+              type="button"
+              onClick={() => setVideoExpanded(true)}
+              className="mb-4 font-mono text-[10px] uppercase tracking-widest text-ivory-mute hover:text-gold transition"
+            >
+              · или заполнить вручную →
+            </button>
+          )}
+
+          {(!isVideo || videoExpanded) && (
+            <>
+              <Field label="Название" required>
+                <input
+                  autoFocus={!isVideo}
+                  type="text"
+                  className="field-input"
+                  value={form.title}
+                  onChange={set("title")}
+                  placeholder={isVideo ? "Подтянется из YouTube — или впиши вручную" : "Краткий заголовок"}
+                />
+              </Field>
+
+              <Field label="Описание">
+                <textarea
+                  className="field-textarea"
+                  value={form.desc}
+                  onChange={set("desc")}
+                  placeholder={isVideo ? "Канал и заметки" : "Что это, зачем сохранил, ключевая мысль…"}
+                />
+              </Field>
+            </>
+          )}
+
+          {isVideo && videoExpanded && (
             <>
               <FileUpload
                 kind="thumbs"
@@ -276,21 +352,25 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
             </Field>
           )}
 
-          <Field label="Теги (через запятую)" hint="Например: frontend, чтение, важное">
-            <input type="text" className="field-input" value={form.tags} onChange={set("tags")} placeholder="tag1, tag2, tag3" />
-          </Field>
+          {(!isVideo || videoExpanded) && (
+            <>
+              <Field label="Теги (через запятую)" hint="Например: frontend, чтение, важное">
+                <input type="text" className="field-input" value={form.tags} onChange={set("tags")} placeholder="tag1, tag2, tag3" />
+              </Field>
 
-          <label className="flex items-center gap-3 mt-2 mb-6 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              className="w-4 h-4 accent-emerald-500"
-              checked={form.pinned}
-              onChange={set("pinned")}
-            />
-            <span className="text-[13px] text-ivory-dim flex items-center gap-1.5">
-              <Icon name="pin" size={13} className="text-gold" /> Закрепить наверху
-            </span>
-          </label>
+              <label className="flex items-center gap-3 mt-2 mb-6 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 accent-emerald-500"
+                  checked={form.pinned}
+                  onChange={set("pinned")}
+                />
+                <span className="text-[13px] text-ivory-dim flex items-center gap-1.5">
+                  <Icon name="pin" size={13} className="text-gold" /> Закрепить наверху
+                </span>
+              </label>
+            </>
+          )}
 
           {duplicate && (
             <div className="mb-4 p-3 rounded-lg border border-gold/40 bg-gold/[0.06] flex items-start gap-3">

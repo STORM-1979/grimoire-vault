@@ -18,10 +18,27 @@ interface VideoCardProps {
 
 export function VideoCard({ item, big, selected, bulkSelected, onBulkToggle, onTogglePin, onDelete, onEdit }: VideoCardProps) {
   const router = useRouter();
-  const onClick = (e: React.MouseEvent) => {
+  // Bulk-select takes priority on shift-click; otherwise the row falls
+  // through to its inner click handlers (thumbnail vs. title).
+  const onCardClick = (e: React.MouseEvent) => {
     if (e.shiftKey && onBulkToggle) { e.preventDefault(); onBulkToggle(item.id, e); return; }
+  };
+  const openExternal = (e: React.MouseEvent) => {
     const tgt = e.target as HTMLElement | null;
     if (tgt?.closest("button, a, input")) return;
+    if (e.shiftKey && onBulkToggle) return; // handled above
+    if (item.url) {
+      window.open(item.url, "_blank", "noopener,noreferrer");
+    } else {
+      // No external link saved → fall back to internal page so the click
+      // still does *something*.
+      router.push(`/entry/${item.id}`);
+    }
+  };
+  const openInternal = (e: React.MouseEvent) => {
+    const tgt = e.target as HTMLElement | null;
+    if (tgt?.closest("button, a, input")) return;
+    if (e.shiftKey && onBulkToggle) return;
     router.push(`/entry/${item.id}`);
   };
   const ring = bulkSelected
@@ -30,9 +47,11 @@ export function VideoCard({ item, big, selected, bulkSelected, onBulkToggle, onT
     ? "ring-2 ring-gold ring-offset-2 ring-offset-emerald-deep"
     : "";
   return (
-    <div data-entry-id={item.id} onClick={onClick} className="cat-card group block cursor-pointer">
+    <div data-entry-id={item.id} onClick={onCardClick} className="cat-card group block">
       <div
-        className={`relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-700 via-emerald-800 to-emerald-deep ${
+        onClick={openExternal}
+        title={item.url ? "Открыть видео" : "Открыть запись"}
+        className={`relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-700 via-emerald-800 to-emerald-deep cursor-pointer ${
           big ? "aspect-[16/8]" : "aspect-video"
         } ${ring}`}
       >
@@ -70,7 +89,7 @@ export function VideoCard({ item, big, selected, bulkSelected, onBulkToggle, onT
           </div>
         )}
       </div>
-      <div className="mt-4">
+      <div className="mt-4 cursor-pointer" onClick={openInternal} title="Открыть запись">
         <h4 className="font-display text-[19px] font-medium leading-tight text-ivory group-hover:text-emerald-200 transition">
           {item.title}
         </h4>

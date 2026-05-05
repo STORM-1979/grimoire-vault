@@ -129,6 +129,9 @@ export interface ExtractedMeta {
   image?: string;
   siteName?: string;
   videoId?: string;
+  author?: string;
+  duration?: string;
+  tags?: string[];
   hasContent: boolean;
 }
 export const extractApi = {

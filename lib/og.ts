@@ -36,6 +36,12 @@ export interface ExtractedMeta {
   siteName?: string;
   /** YouTube / Vimeo / etc. video IDs — bot uses this for category routing. */
   videoId?: string;
+  /** Channel / page author. YouTube oEmbed `author_name`, or `<meta name=author>`. */
+  author?: string;
+  /** Human-formatted runtime: "5:30", "1:02:03". Parsed from ISO 8601 PT-duration. */
+  duration?: string;
+  /** Page keywords / video tags, deduped and trimmed. */
+  tags?: string[];
   /** True if at least title or description was found. */
   hasContent: boolean;
 }
@@ -103,6 +109,47 @@ function decodeEntities(s: string): string {
     .replace(/&nbsp;/g, " ")
     .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
     .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)));
+}
+
+/**
+ * ISO 8601 duration ("PT1H2M3S") → "1:02:03" / "5:30".
+ * YouTube exposes runtime via `<meta itemprop="duration">` in this format.
+ */
+function isoDurationToHuman(iso: string): string | undefined {
+  const m = iso.match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);
+  if (!m) return undefined;
+  const h = Number(m[1] ?? 0);
+  const min = Number(m[2] ?? 0);
+  const s = Number(m[3] ?? 0);
+  if (h === 0 && min === 0 && s === 0) return undefined;
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return h > 0 ? `${h}:${pad(min)}:${pad(s)}` : `${min}:${pad(s)}`;
+}
+
+/** Best-effort YouTube oEmbed lookup. Returns title/author/thumb or null. */
+async function fetchYouTubeOEmbed(videoId: string): Promise<{
+  title?: string; author?: string; image?: string;
+} | null> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 4000);
+  try {
+    const res = await fetch(
+      `https://www.youtube.com/oembed?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3D${videoId}&format=json`,
+      { signal: ctrl.signal }
+    );
+    if (!res.ok) return null;
+    const data = await res.json() as { title?: string; author_name?: string; thumbnail_url?: string };
+    return {
+      title: data.title,
+      author: data.author_name,
+      // Prefer a high-res webp; oEmbed gives a small jpg fallback.
+      image: `https://i.ytimg.com/vi_webp/${videoId}/maxresdefault.webp`,
+    };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Detect well-known video URLs so the caller can route to the right category. */
@@ -210,14 +257,52 @@ export async function extractMetadata(input: string): Promise<ExtractedMeta> {
 
   const siteName = pickMeta(head, "og:site_name");
   const videoId = detectVideoId(url);
+  const author = pickMeta(head, "author") ?? pickMeta(head, "og:video:director");
+
+  // Duration — YouTube exposes it as ISO 8601 in <meta itemprop="duration">.
+  const durationIso =
+    pickMeta(head, "duration") ??
+    head.match(/<meta[^>]+itemprop=["']duration["'][^>]+content=["']([^"']+)["']/i)?.[1] ??
+    head.match(/<meta[^>]+content=["']([^"']+)["'][^>]+itemprop=["']duration["']/i)?.[1];
+  const duration = durationIso ? isoDurationToHuman(durationIso) : undefined;
+
+  // Tags — keywords meta is the only reliable source short of the YT API.
+  const keywords = pickMeta(head, "keywords");
+  const tags = keywords
+    ? Array.from(
+        new Set(
+          keywords
+            .split(",")
+            .map((t) => t.trim())
+            .filter((t) => t.length > 0 && t.length <= 40),
+        ),
+      ).slice(0, 20)
+    : undefined;
+
+  // Final fallback for YouTube: the watch page sometimes serves us a consent
+  // wall or strips og: tags depending on UA — oEmbed is the canonical source.
+  let finalTitle = title;
+  let finalImage = image;
+  let finalAuthor = author;
+  if (videoId && (!finalTitle || !finalImage)) {
+    const oembed = await fetchYouTubeOEmbed(videoId);
+    if (oembed) {
+      finalTitle ??= oembed.title;
+      finalImage ??= oembed.image;
+      finalAuthor ??= oembed.author;
+    }
+  }
 
   return {
     url: finalUrl,
-    title: title?.slice(0, 280),
+    title: finalTitle?.slice(0, 280),
     description: description?.slice(0, 1000),
-    image,
+    image: finalImage,
     siteName,
     videoId,
-    hasContent: Boolean(title || description),
+    author: finalAuthor,
+    duration,
+    tags,
+    hasContent: Boolean(finalTitle || description),
   };
 }
