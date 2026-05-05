@@ -23,10 +23,6 @@ export default function LoginPage() {
             <LoginForm />
           </Suspense>
         </div>
-
-        <p className="mt-6 text-center font-mono text-[10px] uppercase tracking-widest text-ivory-mute">
-          Privately compiled · A.D. MMXXVI
-        </p>
       </div>
     </div>
   );
