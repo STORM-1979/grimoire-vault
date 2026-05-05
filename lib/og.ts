@@ -235,12 +235,12 @@ export async function extractMetadata(input: string): Promise<ExtractedMeta> {
   const headEnd = html.search(/<\/head>/i);
   const head = headEnd > 0 ? html.slice(0, headEnd + 7) : html.slice(0, 64 * 1024);
 
-  const title =
+  let title =
     pickMeta(head, "og:title") ??
     pickMeta(head, "twitter:title") ??
     pickTitle(head);
 
-  const description =
+  let description =
     pickMeta(head, "og:description") ??
     pickMeta(head, "twitter:description") ??
     pickMeta(head, "description");
@@ -257,18 +257,28 @@ export async function extractMetadata(input: string): Promise<ExtractedMeta> {
 
   const siteName = pickMeta(head, "og:site_name");
   const videoId = detectVideoId(url);
-  const author = pickMeta(head, "author") ?? pickMeta(head, "og:video:director");
+  let author = pickMeta(head, "author") ?? pickMeta(head, "og:video:director");
 
   // Duration — YouTube exposes it as ISO 8601 in <meta itemprop="duration">.
+  // On consent-walled responses this tag is absent, so we also try the
+  // `lengthSeconds` integer that YouTube embeds in ytInitialPlayerResponse
+  // inside the body (much further down than the head slice).
   const durationIso =
     pickMeta(head, "duration") ??
     head.match(/<meta[^>]+itemprop=["']duration["'][^>]+content=["']([^"']+)["']/i)?.[1] ??
     head.match(/<meta[^>]+content=["']([^"']+)["'][^>]+itemprop=["']duration["']/i)?.[1];
-  const duration = durationIso ? isoDurationToHuman(durationIso) : undefined;
+  let duration = durationIso ? isoDurationToHuman(durationIso) : undefined;
+  if (!duration && videoId) {
+    // Fall back to the JSON blob — first hit wins.  Cap the body slice
+    // at 256 kB; lengthSeconds is always near the top of the page bundle.
+    const blob = html.slice(0, 256 * 1024);
+    const m = blob.match(/"lengthSeconds"\s*:\s*"(\d+)"/);
+    if (m) duration = secondsToHuman(Number(m[1]));
+  }
 
   // Tags — keywords meta is the only reliable source short of the YT API.
   const keywords = pickMeta(head, "keywords");
-  const tags = keywords
+  let tags = keywords
     ? Array.from(
         new Set(
           keywords
@@ -279,8 +289,43 @@ export async function extractMetadata(input: string): Promise<ExtractedMeta> {
       ).slice(0, 20)
     : undefined;
 
-  // Final fallback for YouTube: the watch page sometimes serves us a consent
-  // wall or strips og: tags depending on UA — oEmbed is the canonical source.
+  // YouTube consent-wall detection.  When the watch page can't be
+  // rendered (cookie consent EU page, age gate, geo restriction, generic
+  // homepage stub for unknown UAs) YouTube returns:
+  //   • title:       " - YouTube" or "YouTube"
+  //   • description: the static "Смотрите любимые видео…" / "Enjoy the
+  //                  videos and music you love…" tagline
+  //   • keywords:    site-wide static list — "видео, поделиться,
+  //                  телефон с камерой" / "video, sharing, camera phone"
+  // Detect any of these and rebuild the metadata from oEmbed.  oEmbed
+  // always returns the real video title + channel name + thumbnail
+  // because it doesn't require rendering the player.
+  if (videoId) {
+    const titleIsGeneric = !title || /^\s*-?\s*YouTube\s*$/i.test(title);
+    const descIsGeneric = description?.startsWith("Смотрите любимые видео")
+      || description?.startsWith("Enjoy the videos and music you love");
+    const tagsAreGeneric = tags
+      && tags.length <= 6
+      && tags.every((t) =>
+        ["видео", "поделиться", "телефон с камерой", "телефон", "видеотелефон",
+         "video", "sharing", "camera phone", "video phone", "free", "upload"]
+          .includes(t.toLowerCase()),
+      );
+    if (titleIsGeneric || descIsGeneric || tagsAreGeneric) {
+      const oembed = await fetchYouTubeOEmbed(videoId);
+      if (oembed) {
+        title = oembed.title ?? title;
+        author = oembed.author ?? author;
+        image = oembed.image ?? image;
+      }
+      if (descIsGeneric) description = undefined;
+      if (tagsAreGeneric) tags = undefined;
+    }
+  }
+
+  // Generic fallback for the rest of YouTube (and any other extractor):
+  // if we still don't have a title or image after the consent-wall path,
+  // give oEmbed one more shot.  Cheap and idempotent.
   let finalTitle = title;
   let finalImage = image;
   let finalAuthor = author;
@@ -305,4 +350,14 @@ export async function extractMetadata(input: string): Promise<ExtractedMeta> {
     tags,
     hasContent: Boolean(finalTitle || description),
   };
+}
+
+/** Plain seconds → "5:30" / "1:02:03" — YouTube's lengthSeconds is an int. */
+function secondsToHuman(total: number): string | undefined {
+  if (!Number.isFinite(total) || total <= 0) return undefined;
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
 }

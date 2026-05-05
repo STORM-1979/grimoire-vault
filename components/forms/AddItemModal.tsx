@@ -130,6 +130,9 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Double-submit guard — disabled buttons are easy to bypass with
+    // Enter on the form, fast double-clicks, or touch double-taps.
+    if (submitting) return;
     setError(null);
     setDuplicate(null);
     if (!form.title.trim()) return;
