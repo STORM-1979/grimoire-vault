@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons/Icon";
 import { Field } from "./Field";
 import { FileUpload } from "./FileUpload";
+import { CollectionSelect } from "./CollectionSelect";
 import { getCategory, isMediaCategory, isVideoCategory } from "@/lib/categories";
 import { extractApi, ApiError } from "@/lib/api-client";
 import { humanSize } from "@/lib/utils";
@@ -477,16 +478,11 @@ export function AddItemModal({
               </Field>
               {collections && collections.length > 0 && (
                 <Field label="Коллекция" hint="Группа внутри YouTube — например «Курсы», «Tech-обзоры»">
-                  <select
-                    className="field-select"
-                    value={collectionId ?? ""}
-                    onChange={(e) => setCollectionId(e.target.value || null)}
-                  >
-                    <option value="">— Без коллекции —</option>
-                    {collections.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
+                  <CollectionSelect
+                    collections={collections}
+                    value={collectionId}
+                    onChange={setCollectionId}
+                  />
                 </Field>
               )}
             </>

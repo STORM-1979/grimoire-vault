@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Icon } from "@/components/icons/Icon";
 import { Field } from "./Field";
 import { FileUpload } from "./FileUpload";
+import { CollectionSelect } from "./CollectionSelect";
 import { getCategory, isMediaCategory, isVideoCategory } from "@/lib/categories";
 import type { Entry, EntryCollection } from "@/lib/types";
 import type { UpdateEntryInput } from "@/lib/schemas/entries";
@@ -140,16 +141,11 @@ export function EditEntryModal({ entry, onClose, onSubmit, collections }: Props)
               </Field>
               {collections && collections.length > 0 && (
                 <Field label="Коллекция" hint="Перенести видео в другую коллекцию или вынести в корень категории">
-                  <select
-                    className="field-select"
-                    value={collectionId ?? ""}
-                    onChange={(e) => setCollectionId(e.target.value || null)}
-                  >
-                    <option value="">— Без коллекции —</option>
-                    {collections.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
+                  <CollectionSelect
+                    collections={collections}
+                    value={collectionId}
+                    onChange={setCollectionId}
+                  />
                 </Field>
               )}
             </>
