@@ -8,6 +8,7 @@ import { FileUpload } from "./FileUpload";
 import { getCategory, isMediaCategory, isVideoCategory } from "@/lib/categories";
 import { extractApi, ApiError } from "@/lib/api-client";
 import { humanSize } from "@/lib/utils";
+import { resolveYouTubeDuration, youtubeVideoId } from "@/lib/youtube-client";
 import type { CategoryId } from "@/lib/types";
 import type { CreateEntryInput } from "@/lib/schemas/entries";
 
@@ -147,6 +148,22 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
             duration: f.duration.trim() ? f.duration : (meta.duration ?? f.duration),
           };
         });
+        // Server-side fallback chain (scrape / oEmbed / innertube /
+        // mobile / Invidious) frequently fails on Vercel because
+        // YouTube and most public mirrors block its egress IPs.  As a
+        // last resort, ask the user's browser to fetch the duration
+        // for us — residential IPs aren't blocked.  Two paths inside
+        // resolveYouTubeDuration: CORS-friendly Invidious first, then
+        // an off-screen YT IFrame Player API call.
+        if (isVideo && !meta.duration && youtubeVideoId(url)) {
+          const dur = await resolveYouTubeDuration(url);
+          if (dur) {
+            setForm((f) => ({
+              ...f,
+              duration: f.duration.trim() ? f.duration : dur,
+            }));
+          }
+        }
       } catch {
         // Silent — extraction is a nicety, not a feature.
         if (isVideo) {
