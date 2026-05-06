@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { YoutubeTranscript } from "youtube-transcript";
 import { requireUser, withErrorHandler, HttpError } from "@/lib/api-helpers";
 import { getEntry, updateEntry } from "@/lib/data/entries";
 import { summarize } from "@/lib/summarize";
+import { fetchYouTubeTranscript } from "@/lib/youtube-transcript-server";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/ratelimit";
 
 /**
@@ -63,30 +63,15 @@ export const POST = withErrorHandler(async (_req: Request, ctx: RouteContext) =>
   const vid = youtubeVideoId(entry.url);
   if (!vid) throw new HttpError("Not a YouTube entry", 400);
 
-  let segments: Array<{ text: string }>;
-  try {
-    segments = await YoutubeTranscript.fetchTranscript(vid);
-  } catch (e) {
-    const msg = (e as Error)?.message ?? "transcript fetch failed";
-    // Most common reason: the video has captions disabled, or YouTube
-    // returned a consent / age-gate page in place of the watch HTML.
-    throw new HttpError(`Транскрипт недоступен: ${msg}`, 422);
+  const transcript = await fetchYouTubeTranscript(vid);
+  if (!transcript) {
+    throw new HttpError(
+      "Транскрипт недоступен (у видео нет субтитров или YouTube заблокировал запрос)",
+      422,
+    );
   }
-  if (!segments?.length) throw new HttpError("Транскрипт пуст", 422);
 
-  // Caption snippets ship with HTML entities (&#39; → '); decode them
-  // before joining so the summarizer sees clean text.
-  const text = segments
-    .map((s) => s.text)
-    .join(" ")
-    .replace(/&amp;#39;/g, "'")
-    .replace(/&amp;quot;/g, '"')
-    .replace(/&amp;amp;/g, "&")
-    .replace(/&amp;/g, "&")
-    .replace(/&#39;/g, "'")
-    .replace(/&quot;/g, '"');
-
-  const theses = summarize(text, 5);
+  const theses = summarize(transcript.text, 5);
   if (theses.length === 0) {
     throw new HttpError("Не удалось выделить тезисы из транскрипта", 422);
   }
