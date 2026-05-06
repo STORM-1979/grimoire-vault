@@ -7,6 +7,7 @@ import { getCategory } from "@/lib/categories";
 import { Icon } from "@/components/icons/Icon";
 import { EntryBoard } from "@/components/entry/EntryBoard";
 import { EntryPrimaryView } from "@/components/entry/EntryPrimaryView";
+import { VideoSummary } from "@/components/entry/VideoSummary";
 
 /**
  * /entry/[id] — full-detail view of one entry, with the interactive
@@ -95,6 +96,18 @@ export default async function EntryPage({
           title={entry.title}
           sizeLabel={entry.sizeLabel}
           duration={entry.duration}
+        />
+      )}
+
+      {/* Thesis summary for YouTube entries — extractive, lazy-fetched
+          via /api/entries/[id]/summarize on first visit and cached in
+          entry.metadata.summary so subsequent loads are instant. */}
+      {entry.url && /(?:youtube\.com|youtu\.be)/.test(entry.url) && (
+        <VideoSummary
+          entryId={entry.id}
+          initial={Array.isArray(entry.metadata?.summary)
+            ? (entry.metadata.summary as string[])
+            : undefined}
         />
       )}
 
