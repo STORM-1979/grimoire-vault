@@ -5,16 +5,20 @@ import { Icon } from "@/components/icons/Icon";
 import { Field } from "./Field";
 import { FileUpload } from "./FileUpload";
 import { getCategory, isMediaCategory, isVideoCategory } from "@/lib/categories";
-import type { Entry } from "@/lib/types";
+import type { Entry, EntryCollection } from "@/lib/types";
 import type { UpdateEntryInput } from "@/lib/schemas/entries";
 
 interface Props {
   entry: Entry;
   onClose: () => void;
   onSubmit: (id: string, input: UpdateEntryInput) => Promise<void>;
+  /** User-defined collections in this entry's category — drives the
+   * "Коллекция" picker for video entries.  Omit / empty array hides
+   * the picker. */
+  collections?: EntryCollection[];
 }
 
-export function EditEntryModal({ entry, onClose, onSubmit }: Props) {
+export function EditEntryModal({ entry, onClose, onSubmit, collections }: Props) {
   const cat = getCategory(entry.categoryId);
   const isVideo = isVideoCategory(entry.categoryId);
   const isMedia = isMediaCategory(entry.categoryId);
@@ -37,6 +41,9 @@ export function EditEntryModal({ entry, onClose, onSubmit }: Props) {
     count: entry.fileCount?.toString() ?? "",
     model: (entry.metadata?.model as string) ?? "",
   });
+  // Collection assignment lives outside `form` because it's only
+  // present for video entries with collections loaded.
+  const [collectionId, setCollectionId] = useState<string | null>(entry.collectionId ?? null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,6 +74,10 @@ export function EditEntryModal({ entry, onClose, onSubmit }: Props) {
       if (isVideo) {
         patch.thumbUrl = form.thumb.trim() || null;
         patch.duration = form.duration.trim() || null;
+        // Collection is patched even when set to null (== move to
+        // root of category) — that's how the user removes a video
+        // from a collection without deleting the collection.
+        patch.collectionId = collectionId;
       }
       if (isMedia) patch.coverUrl = form.cover.trim() || null;
       if (isImage) {
@@ -127,6 +138,20 @@ export function EditEntryModal({ entry, onClose, onSubmit }: Props) {
               <Field label="Длительность">
                 <input type="text" className="field-input" value={form.duration} onChange={set("duration")} placeholder="12:34" />
               </Field>
+              {collections && collections.length > 0 && (
+                <Field label="Коллекция" hint="Перенести видео в другую коллекцию или вынести в корень категории">
+                  <select
+                    className="field-select"
+                    value={collectionId ?? ""}
+                    onChange={(e) => setCollectionId(e.target.value || null)}
+                  >
+                    <option value="">— Без коллекции —</option>
+                    {collections.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </Field>
+              )}
             </>
           )}
 

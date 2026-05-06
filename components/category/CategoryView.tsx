@@ -172,6 +172,7 @@ export function CategoryView({ category, initialItems }: Props) {
           entry={editing}
           onClose={() => setEditing(null)}
           onSubmit={async (id, patch) => { await update(id, patch); }}
+          collections={showCollections ? collections : undefined}
         />
       )}
 

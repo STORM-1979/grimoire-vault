@@ -178,15 +178,6 @@ export function CollectionsTabs({
           );
         })}
 
-        <button
-          type="button"
-          onClick={() => onSelect("none")}
-          className={chipClass(selected === "none")}
-          title="Записи без коллекции"
-        >
-          · без коллекции
-        </button>
-
         {creating ? (
           <span className="inline-flex items-center gap-1">
             <input
