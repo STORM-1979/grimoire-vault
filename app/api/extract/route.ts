@@ -28,5 +28,17 @@ export const POST = withErrorHandler(async (request: Request) => {
   if (limited) return limited;
   const { url } = await parseBody(request, extractSchema);
   const meta = await extractMetadata(url);
+  // Surface the diagnostic breadcrumbs in Vercel logs so we can see
+  // which fallback path filled (or didn't fill) duration without
+  // having to look at the user's DevTools.  Cheap one-line summary.
+  console.log(JSON.stringify({
+    msg: "extract.result",
+    url,
+    videoId: meta.videoId,
+    hasContent: meta.hasContent,
+    duration: meta.duration ?? null,
+    hasDescription: Boolean(meta.description),
+    diag: meta._diag,
+  }));
   return NextResponse.json(meta);
 });
