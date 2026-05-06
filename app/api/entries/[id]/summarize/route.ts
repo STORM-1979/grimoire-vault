@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireUser, withErrorHandler, HttpError } from "@/lib/api-helpers";
 import { getEntry, updateEntry } from "@/lib/data/entries";
 import { summarize } from "@/lib/summarize";
-import { fetchYouTubeTranscript } from "@/lib/youtube-transcript-server";
+import { fetchYouTubeTranscript, looksLikeTranscriptError } from "@/lib/youtube-transcript-server";
 import { translateArrayToRussian, looksRussian } from "@/lib/translate";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/ratelimit";
 
@@ -60,10 +60,26 @@ export const POST = withErrorHandler(async (_req: Request, ctx: RouteContext) =>
   // Return cached summary regardless of source (extractive or LLM).
   // The client checks `source` on its end and triggers /polish when
   // an upgrade is available.
+  //
+  // BUT: if the cached summary was generated from a kome.ai error
+  // response (e.g. "Стенограммы недоступны…"), invalidate it.  We
+  // detect by checking whether the joined cached lines match the
+  // transcript-error pattern, OR whether the cached transcript
+  // itself looks like an error stub.
   const cached = entry.metadata?.summary as unknown;
   const cachedSource = entry.metadata?.summarySource as unknown;
-  if (
+  const cachedTranscript = entry.metadata?.transcript as unknown;
+  const transcriptIsBad =
+    typeof cachedTranscript === "string" && looksLikeTranscriptError(cachedTranscript);
+  const summaryIsBad =
     Array.isArray(cached)
+    && cached.length > 0
+    && cached.every((x) => typeof x === "string")
+    && looksLikeTranscriptError(cached.join(" "));
+  if (
+    !transcriptIsBad
+    && !summaryIsBad
+    && Array.isArray(cached)
     && cached.length > 0
     && cached.every((x) => typeof x === "string")
   ) {
@@ -93,6 +109,15 @@ export const POST = withErrorHandler(async (_req: Request, ctx: RouteContext) =>
 
   const transcript = await fetchYouTubeTranscript(vid);
   if (!transcript) {
+    // Drop any previously-saved bad transcript / summary so the next
+    // view doesn't serve the apology stub from cache.
+    if (transcriptIsBad || summaryIsBad) {
+      const m: Record<string, unknown> = { ...(entry.metadata ?? {}) };
+      delete m.transcript;
+      delete m.summary;
+      delete m.summarySource;
+      await updateEntry(id, { metadata: m });
+    }
     throw new HttpError(
       "Транскрипт недоступен (у видео нет субтитров или YouTube заблокировал запрос)",
       422,

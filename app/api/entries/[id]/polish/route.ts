@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireUser, withErrorHandler, HttpError } from "@/lib/api-helpers";
 import { getEntry, updateEntry } from "@/lib/data/entries";
-import { fetchYouTubeTranscript } from "@/lib/youtube-transcript-server";
+import { fetchYouTubeTranscript, looksLikeTranscriptError } from "@/lib/youtube-transcript-server";
 import { translateArrayToRussian, looksRussian } from "@/lib/translate";
 import { polishWithLLM } from "@/lib/llm-polish";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/ratelimit";
@@ -87,19 +87,38 @@ export const POST = withErrorHandler(async (_req: Request, ctx: RouteContext) =>
 
   // Prefer cached transcript so we don't re-hit kome.ai for a polish
   // call that already saw a /summarize round-trip.  Fall back to fresh
-  // fetch if the cache is missing (someone called /polish without ever
-  // hitting /summarize first, or metadata was reset).
-  let transcriptText = (entry.metadata?.transcript as unknown) as string | undefined;
-  if (!transcriptText || typeof transcriptText !== "string" || transcriptText.length < 50) {
+  // fetch if the cache is missing OR if the cached transcript turns
+  // out to be the YouTube "no captions" apology stub (kome.ai
+  // sometimes returns those when rate-limited — see error pattern).
+  const cachedTranscriptRaw = entry.metadata?.transcript as unknown;
+  let transcriptText: string | undefined =
+    typeof cachedTranscriptRaw === "string" ? cachedTranscriptRaw : undefined;
+  const transcriptCacheBad =
+    !transcriptText
+    || transcriptText.length < 50
+    || looksLikeTranscriptError(transcriptText);
+  if (transcriptCacheBad) {
     if (!entry.url) throw new HttpError("Entry has no URL", 400);
     const vid = youtubeVideoId(entry.url);
     if (!vid) throw new HttpError("Not a YouTube entry", 400);
     const fetched = await fetchYouTubeTranscript(vid);
     if (!fetched) {
-      throw new HttpError("Транскрипт недоступен", 422);
+      // Drop the bad cached transcript + summary so the UI doesn't
+      // keep showing the "Стенограммы недоступны…" apology bullets.
+      const m: Record<string, unknown> = { ...(entry.metadata ?? {}) };
+      delete m.transcript;
+      delete m.summary;
+      delete m.summarySource;
+      m.polishFailedAt = new Date().toISOString();
+      await updateEntry(id, { metadata: m });
+      throw new HttpError("Транскрипт недоступен (у видео нет субтитров)", 422);
     }
     transcriptText = fetched.text;
   }
+
+  // After the cache-bad branch above transcriptText is guaranteed
+  // to be a usable string; the type narrows here.
+  if (!transcriptText) throw new HttpError("Транскрипт недоступен", 422);
 
   const polished = await polishWithLLM(transcriptText);
   if (!polished || polished.length < 3) {

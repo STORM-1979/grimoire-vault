@@ -243,6 +243,25 @@ function decodeEntities(s: string): string {
  * If their service ever goes away the function returns null and we
  * fall through to the YouTube-direct paths below.
  */
+/**
+ * Heuristic: does this string look like a YouTube / kome.ai error
+ * message rather than a real transcript?  When kome.ai is rate-limited
+ * or YouTube returns the "no captions available" stub, the API still
+ * answers HTTP 200 with a tiny `transcript` body containing the error
+ * text — and our pipeline used to summarise that nonsense as if it
+ * were the video's content.  Catch the common phrases here so we
+ * fall through to YouTube-direct paths instead.
+ */
+export function looksLikeTranscriptError(text: string): boolean {
+  if (!text) return false;
+  // Real transcripts for any non-tiny video are well above 800 chars;
+  // the YouTube/kome apology is ~150 chars.  Below 600 + matching the
+  // error pattern is a near-certain hit.
+  if (text.length > 1200) return false;
+  return /transcripts?\s+(?:for\s+this\s+video\s+)?(?:are|is)\s+unavailable|publisher\s+may\s+have\s+restricted|we\s+apologi[sz]e\s+for|no\s+transcripts?\s+(?:are\s+)?available|captions?\s+(?:are\s+)?(?:disabled|unavailable)|this\s+video\s+does\s+not\s+have|transcript\s+not\s+found|стенограммы?\s+.*?недоступн/i
+    .test(text);
+}
+
 async function fetchTranscriptViaKomeAi(videoId: string, attempts: string[]): Promise<string | null> {
   try {
     const ctrl = new AbortController();
@@ -261,9 +280,7 @@ async function fetchTranscriptViaKomeAi(videoId: string, attempts: string[]): Pr
     if (!res.ok) return null;
     const data = await res.json() as { transcript?: string };
     if (typeof data.transcript === "string" && data.transcript.length >= 50) {
-      attempts.push(`kome.ai: ${data.transcript.length} chars`);
-      // Decode any HTML entities and normalise whitespace.
-      return data.transcript
+      const cleaned = data.transcript
         .replace(/&amp;#39;/g, "'")
         .replace(/&amp;quot;/g, '"')
         .replace(/&amp;/g, "&")
@@ -271,6 +288,14 @@ async function fetchTranscriptViaKomeAi(videoId: string, attempts: string[]): Pr
         .replace(/&quot;/g, '"')
         .replace(/\s+/g, " ")
         .trim();
+      // Reject the apology / "no captions available" stub before it
+      // contaminates the summary pipeline.
+      if (looksLikeTranscriptError(cleaned)) {
+        attempts.push(`kome.ai: error response detected (${cleaned.length} chars)`);
+        return null;
+      }
+      attempts.push(`kome.ai: ${cleaned.length} chars`);
+      return cleaned;
     }
     attempts.push("kome.ai: empty transcript field");
   } catch (e) {
