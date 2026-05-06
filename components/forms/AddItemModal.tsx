@@ -37,6 +37,15 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
   const isLocal = categoryId === "local";
   const isPrompt = categoryId === "prompts";
   const isImage = categoryId === "images";
+  // Text-first categories — no built-in URL or file extractor of their
+  // own, but we still expose an optional "Источник (URL)" input at the
+  // top.  Pasting any link runs the same /api/extract pipeline used by
+  // Web/YouTube and pre-fills title/description/tags so the user only
+  // tweaks what's wrong.  Empty fields only — manual edits always win.
+  const isText = categoryId === "skills"
+    || categoryId === "prompts"
+    || categoryId === "ideas"
+    || categoryId === "misc";
 
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [submitting, setSubmitting] = useState(false);
@@ -100,7 +109,7 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
     // URL changed — clear the "this URL already failed to save" marker
     // so close-with-pending can try again on the new value.
     if (failedUrl.current && failedUrl.current !== url) failedUrl.current = null;
-    if (!(isWeb || isVideo) || url.length < 8) return;
+    if (!(isWeb || isVideo || isText) || url.length < 8) return;
     let parsed: URL | null = null;
     try { parsed = new URL(url); } catch { return; }
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return;
@@ -152,7 +161,7 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
     return () => {
       if (extractTimer.current) clearTimeout(extractTimer.current);
     };
-  }, [form.url, isWeb, isVideo]);
+  }, [form.url, isWeb, isVideo, isText]);
 
   /**
    * Build the CreateEntryInput payload from the current form state and
@@ -184,7 +193,7 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
       const n = parseInt(form.count, 10);
       if (!isNaN(n)) input.fileCount = n;
     }
-    if (isWeb && form.url.trim()) input.url = form.url.trim();
+    if ((isWeb || isText) && form.url.trim()) input.url = form.url.trim();
     if ((isDoc || isLocal) && form.size.trim()) input.sizeLabel = form.size.trim();
     if (isPrompt && form.model.trim()) input.metadata = { ...input.metadata, model: form.model.trim() };
 
@@ -375,16 +384,35 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
             </button>
           )}
 
+          {isText && (
+            <Field
+              label="Источник (необязательно)"
+              hint={
+                extracting
+                  ? "Подтягиваю заголовок, описание и теги со страницы…"
+                  : "Вставь ссылку — заголовок, описание и теги заполнятся сами"
+              }
+            >
+              <input
+                type="url"
+                className="field-input"
+                value={form.url}
+                onChange={set("url")}
+                placeholder="https://… (статья, туториал, репозиторий)"
+              />
+            </Field>
+          )}
+
           {(!isVideo || videoExpanded) && (
             <>
               <Field label="Название" required>
                 <input
-                  autoFocus={!isVideo}
+                  autoFocus={!isVideo && !isText}
                   type="text"
                   className="field-input"
                   value={form.title}
                   onChange={set("title")}
-                  placeholder={isVideo ? "Подтянется из YouTube — или впиши вручную" : "Краткий заголовок"}
+                  placeholder={isVideo ? "Подтянется из YouTube — или впиши вручную" : isText ? "Подтянется из URL — или впиши вручную" : "Краткий заголовок"}
                 />
               </Field>
 
@@ -393,7 +421,7 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
                   className="field-textarea"
                   value={form.desc}
                   onChange={set("desc")}
-                  placeholder={isVideo ? "Канал и заметки" : "Что это, зачем сохранил, ключевая мысль…"}
+                  placeholder={isVideo ? "Канал и заметки" : isText ? "Подтянется из URL — или впиши вручную" : "Что это, зачем сохранил, ключевая мысль…"}
                 />
               </Field>
             </>
@@ -429,6 +457,15 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
                 maxBytes={10 * 1024 * 1024}
                 value={form.cover}
                 onChange={(url) => setForm((f) => ({ ...f, cover: url }))}
+                onMeta={(meta) => {
+                  // Cover-image filename → entry title — same logic as
+                  // the document/local upload, just for media categories
+                  // (designs / images / portfolio). Empty-only fill.
+                  setForm((f) => ({
+                    ...f,
+                    title: f.title.trim() ? f.title : (meta.suggestedTitle ?? ""),
+                  }));
+                }}
                 label="Обложка — загрузить"
                 hint="WebP / JPEG / PNG · до 10 MB. Или вставь URL ниже."
               />
