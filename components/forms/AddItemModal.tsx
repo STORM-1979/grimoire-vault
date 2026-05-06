@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons/Icon";
 import { Field } from "./Field";
 import { FileUpload } from "./FileUpload";
@@ -30,6 +31,7 @@ const EMPTY_FORM = {
 };
 
 export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
+  const router = useRouter();
   const cat = getCategory(categoryId);
   const isVideo = isVideoCategory(categoryId);
   const isMedia = isMediaCategory(categoryId);
@@ -230,8 +232,18 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
       if (err instanceof ApiError && err.status === 409) {
         const body = err.body as { existing?: DuplicateInfo } | null;
         if (body?.existing?.id) {
+          // Server already has this URL.  Surface the banner briefly,
+          // then auto-navigate to the existing entry — matches user
+          // intent ("I want to see this video") and avoids the case
+          // where the duplicate banner gets lost below the fold of a
+          // long modal.
           setDuplicate(body.existing);
           failedUrl.current = form.url.trim() || null;
+          const targetId = body.existing.id;
+          setTimeout(() => {
+            onClose();
+            router.push(`/entry/${targetId}`);
+          }, 1500);
           return { ok: false };
         }
       }
@@ -554,22 +566,22 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
           )}
 
           {duplicate && (
-            <div className="mb-4 p-3 rounded-lg border border-gold/40 bg-gold/[0.06] flex items-start gap-3">
+            <div className="mb-4 p-3 rounded-lg border border-gold/40 bg-gold/[0.06] flex items-start gap-3 sticky bottom-3 z-10 backdrop-blur">
               <Icon name="check" size={14} className="text-gold mt-0.5 flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-1">
-                  Уже сохранено · № {getCategory(duplicate.categoryId as CategoryId)?.no} · {getCategory(duplicate.categoryId as CategoryId)?.en}
+                  Уже сохранено · № {getCategory(duplicate.categoryId as CategoryId)?.no} · {getCategory(duplicate.categoryId as CategoryId)?.en} · перехожу к записи…
                 </div>
                 <div className="font-display text-[15px] font-medium leading-tight truncate mb-2">
                   «{duplicate.title}»
                 </div>
                 <div className="flex items-center gap-2">
                   <Link
-                    href={`/category/${duplicate.categoryId}`}
+                    href={`/entry/${duplicate.id}`}
                     onClick={onClose}
                     className="font-mono text-[10px] uppercase tracking-widest px-3 py-1 rounded-full border border-gold/40 text-gold hover:bg-gold hover:text-emerald-deep transition flex items-center gap-1.5"
                   >
-                    <Icon name="arrow" size={11} /> Открыть
+                    <Icon name="arrow" size={11} /> Открыть сейчас
                   </Link>
                   <button
                     type="button"

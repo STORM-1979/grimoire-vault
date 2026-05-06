@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons/Icon";
 import { ItemActions } from "./ItemActions";
+import { formatDateTime } from "@/lib/utils";
 import type { Entry } from "@/lib/types";
 
 interface VideoCardProps {
@@ -101,7 +102,7 @@ export function VideoCard({ item, big, selected, bulkSelected, onBulkToggle, onT
             {item.tags.slice(0, 3).map((t) => <span key={t} className="tag-soft">{t}</span>)}
           </div>
           <span className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute">
-            {item.createdAt.slice(0, 10)}
+            {formatDateTime(item.createdAt)}
           </span>
         </div>
       </div>

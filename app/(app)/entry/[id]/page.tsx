@@ -5,6 +5,7 @@ import { rowToEntry } from "@/lib/data/mappers";
 import { listAttachments } from "@/lib/data/attachments";
 import { getCategory } from "@/lib/categories";
 import { Icon } from "@/components/icons/Icon";
+import { formatDateTime } from "@/lib/utils";
 import { EntryBoard } from "@/components/entry/EntryBoard";
 import { EntryPrimaryView } from "@/components/entry/EntryPrimaryView";
 import { VideoSummary } from "@/components/entry/VideoSummary";
@@ -62,6 +63,7 @@ export default async function EntryPage({
                 <span className="ml-3 text-emerald-200">· {entry.sizeLabel}</span>
               )}
               {entry.pinned && <span className="ml-3 text-emerald-200">· закреплено</span>}
+              <span className="ml-3 text-ivory-mute normal-case tracking-normal">· добавлено {formatDateTime(entry.createdAt)}</span>
             </div>
             <h1 className="font-display text-[56px] font-light leading-[0.95] tracking-tightest mb-3">
               {entry.title}

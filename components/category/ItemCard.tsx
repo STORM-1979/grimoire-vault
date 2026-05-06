@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons/Icon";
 import { ItemActions } from "./ItemActions";
+import { formatDateTime } from "@/lib/utils";
 import type { Entry, Category } from "@/lib/types";
 
 interface ItemCardProps {
@@ -93,7 +94,7 @@ export function ItemCard({
           {item.tags.map((t) => <span key={t} className="tag">{t}</span>)}
         </div>
         <div className="mt-auto flex items-center justify-between pt-3 border-t border-white/10">
-          <span className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute">{item.createdAt.slice(0, 10)}</span>
+          <span className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute">{formatDateTime(item.createdAt)}</span>
           <span className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute">{meta}</span>
         </div>
       </div>
@@ -150,7 +151,7 @@ export function ItemCard({
         )}
       </div>
       <div className="flex-shrink-0 text-right">
-        <div className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute">{item.createdAt.slice(0, 10)}</div>
+        <div className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute">{formatDateTime(item.createdAt)}</div>
         {meta && <div className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute mt-1">{meta}</div>}
       </div>
     </div>

@@ -32,3 +32,20 @@ export function humanSize(bytes: number | null | undefined): string {
 export function isoDate(d: Date | string | number = new Date()): string {
   return new Date(d).toISOString().slice(0, 10);
 }
+
+/**
+ * Format an ISO timestamp into '2026-05-04 14:32' for compact display
+ * on cards / detail pages.  Uses the user's local timezone — server
+ * stores UTC but rendering is per-viewer so the time matches their
+ * clock, not the server's.  Returns the date-only fragment if the
+ * input is missing time-of-day info or fails to parse.
+ */
+export function formatDateTime(input: string | Date | number | null | undefined): string {
+  if (!input) return "";
+  const d = new Date(input);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${date} ${time}`;
+}

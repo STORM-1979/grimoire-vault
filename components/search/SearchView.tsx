@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Icon } from "@/components/icons/Icon";
 import { CATEGORIES, getCategory } from "@/lib/categories";
 import { searchApi, entriesApi, type SearchHit } from "@/lib/api-client";
+import { formatDateTime } from "@/lib/utils";
 import { BulkActionsBar } from "@/components/category/BulkActionsBar";
 import { useLocalStorageState } from "@/lib/hooks/useLocalStorageState";
 import type { CategoryId } from "@/lib/types";
@@ -426,7 +427,7 @@ export function SearchView() {
                         </div>
                       </div>
                       <div className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute mt-1 flex-shrink-0">
-                        {hit.entry.createdAt.slice(0, 10)}
+                        {formatDateTime(hit.entry.createdAt)}
                       </div>
                     </Link>
                   );
