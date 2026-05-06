@@ -197,6 +197,10 @@ async function fetchYouTubeInnertube(videoId: string): Promise<InnertubeMeta | n
           "Content-Type": "application/json",
           "User-Agent": USER_AGENT,
           "Accept-Language": "en-US,en;q=0.9",
+          "X-YouTube-Client-Name": "1",
+          "X-YouTube-Client-Version": "2.20240101.00.00",
+          "Origin": "https://www.youtube.com",
+          "Referer": "https://www.youtube.com/",
         },
         body: JSON.stringify({
           videoId,
@@ -227,8 +231,6 @@ async function fetchYouTubeInnertube(videoId: string): Promise<InnertubeMeta | n
     if (!v) return null;
     const seconds = v.lengthSeconds ? parseInt(v.lengthSeconds, 10) : 0;
     const thumbs = v.thumbnail?.thumbnails ?? [];
-    // Pick the largest thumb innertube returned.  These are usually
-    // i.ytimg.com URLs at hqdefault / sddefault / maxresdefault.
     const bestThumb = thumbs.length
       ? thumbs.reduce((a, b) => ((b.width ?? 0) > (a.width ?? 0) ? b : a)).url
       : `https://i.ytimg.com/vi_webp/${videoId}/maxresdefault.webp`;

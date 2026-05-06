@@ -64,21 +64,12 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
   // Carry the extracted preview separately so the user can see what
   // was pulled even before deciding to edit.
   const [extractError, setExtractError] = useState<string | null>(null);
-  // Chain-mode toast: title of the previous successfully-saved video,
-  // shown above the URL field after submit so the user sees the cycle
-  // worked before pasting the next link.
-  const [lastSavedTitle, setLastSavedTitle] = useState<string | null>(null);
-  // Number of entries saved in this modal session — only used to feed
-  // the chain-mode toast / CTA.
-  const [chainCount, setChainCount] = useState(0);
   const lastExtractedUrl = useRef<string>("");
   const extractTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // After a failed save (409 duplicate or any error) we remember the URL
   // that failed so close-with-pending doesn't loop into the same error
   // again.  Cleared whenever the user changes the URL.
   const failedUrl = useRef<string | null>(null);
-  // Lets resetForNext() / chain-mode programmatically refocus the URL
-  // input — autoFocus only fires on initial mount, not on form reset.
   const urlInputRef = useRef<HTMLInputElement>(null);
 
   const set = (k: keyof typeof form) =>
@@ -223,27 +214,6 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
     }
   };
 
-  /**
-   * Chain-mode reset: after a successful video save, clear the form
-   * back to URL-only state so the user can paste the next link.  Keeps
-   * the modal mounted and refocuses the URL input on next tick.  Used
-   * by the submit handler when the category is video; non-video
-   * categories close after submit as before.
-   */
-  const resetForNext = (savedTitle: string) => {
-    setForm({ ...EMPTY_FORM });
-    setVideoExpanded(false);
-    setExtractError(null);
-    setDuplicate(null);
-    setError(null);
-    lastExtractedUrl.current = "";
-    failedUrl.current = null;
-    setLastSavedTitle(savedTitle);
-    setChainCount((n) => n + 1);
-    // autoFocus only fires on initial mount — refocus by hand.
-    setTimeout(() => urlInputRef.current?.focus(), 0);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     // Double-submit guard — disabled buttons are easy to bypass with
@@ -256,15 +226,11 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
     const result = await submitInput();
     setSubmitting(false);
     if (!result.ok) return;
-    // Chain mode for video: keep the modal open and reset to URL-only
-    // so the next paste continues the cycle.  All other categories
-    // close on success — there's no "add another" affordance for
-    // file-upload / model-picker / cover-picker forms.
-    if (isVideo) {
-      resetForNext(result.savedTitle ?? "");
-    } else {
-      onClose();
-    }
+    // Save closes the modal for every category — including video.
+    // Chain mode (keeping the modal open after each save) was a brief
+    // experiment that confused users; auto-save-on-close still
+    // catches a forgotten pending URL when they Esc out.
+    onClose();
   };
 
   /**
@@ -322,12 +288,7 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
           <div>
             <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-2">№ {cat.no} · {cat.en}</div>
             <h3 className="font-display text-[32px] font-medium leading-none">{cta}</h3>
-            <div className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute mt-2">
-              {cat.ru}
-              {isVideo && chainCount > 0 && (
-                <span className="ml-2 text-emerald-300">· сохранено в этой сессии: {chainCount}</span>
-              )}
-            </div>
+            <div className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute mt-2">{cat.ru}</div>
           </div>
           <button onClick={() => void requestClose()} className="item-actions-btn" title="Закрыть (Esc)">
             <Icon name="x" size={14} />
@@ -335,22 +296,6 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
         </header>
 
         <form onSubmit={handleSubmit} className="p-7">
-          {isVideo && !videoExpanded && lastSavedTitle && (
-            <div className="mb-4 p-3 rounded-lg border border-emerald-300/40 bg-emerald-300/[0.06] flex items-start gap-3">
-              <Icon name="check" size={14} className="text-emerald-300 mt-0.5 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="font-mono text-[10px] uppercase tracking-widest text-emerald-300 mb-1">
-                  Добавлено в базу
-                </div>
-                <div className="font-display text-[14px] font-medium leading-tight truncate">
-                  «{lastSavedTitle}»
-                </div>
-                <div className="font-mono text-[10px] text-ivory-mute mt-1">
-                  Вставь следующую ссылку или закрой окно — текущая черновая запись допишется сама.
-                </div>
-              </div>
-            </div>
-          )}
           {isVideo && (
             <Field
               label="Ссылка на видео"
@@ -359,8 +304,6 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
                   ? "Тяну название, описание, превью и длительность…"
                   : videoExpanded
                   ? "Поля ниже подтянулись автоматически — поправь, если что не так"
-                  : lastSavedTitle
-                  ? "Цепочка: вставь следующий URL или закрой — пендинг сохранится."
                   : "Вставь YouTube-ссылку. Название, описание, превью и длительность заполнятся сами. Теги добавь руками."
               }
             >
@@ -603,21 +546,16 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
               type="button"
               onClick={() => void requestClose()}
               className="border border-white/20 text-ivory-dim px-5 py-2.5 rounded-full font-medium tracking-tight hover:border-white/40 hover:text-ivory transition"
-              title={
-                isVideo && form.url.trim() && form.title.trim()
-                  ? "Сохранить пендинг и закрыть"
-                  : "Закрыть"
-              }
+              title="Закрыть"
             >
-              {isVideo && form.url.trim() && form.title.trim() ? "Сохранить и закрыть" : "Отмена"}
+              Отмена
             </button>
             <button
               type="submit"
               disabled={titleDisabled}
               className="bg-ivory text-emerald-950 px-6 py-2.5 rounded-full font-medium tracking-tight hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-2"
-              title={isVideo ? "Сохранить и вставить следующую ссылку" : undefined}
             >
-              <Icon name="add" size={16} /> {submitting ? "..." : isVideo ? "Добавить и продолжить" : cta}
+              <Icon name="add" size={16} /> {submitting ? "..." : cta}
             </button>
           </div>
         </form>
