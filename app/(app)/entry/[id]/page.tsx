@@ -108,6 +108,9 @@ export default async function EntryPage({
           initial={Array.isArray(entry.metadata?.summary)
             ? (entry.metadata.summary as string[])
             : undefined}
+          initialSource={typeof entry.metadata?.summarySource === "string"
+            ? entry.metadata.summarySource
+            : undefined}
         />
       )}
 

@@ -4,28 +4,25 @@ import { getEntry, updateEntry } from "@/lib/data/entries";
 import { summarize } from "@/lib/summarize";
 import { fetchYouTubeTranscript } from "@/lib/youtube-transcript-server";
 import { translateArrayToRussian, looksRussian } from "@/lib/translate";
-import { polishWithLLM } from "@/lib/llm-polish";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/ratelimit";
-
-// Pollinations' free `openai-fast` model takes 30–55 s for a typical
-// transcript.  Vercel's default 10 s function timeout would kill it
-// long before the LLM responds, so we lift the cap to 60 s — the
-// hobby-tier maximum.  If the LLM doesn't respond in time we fall
-// through to extractive output and the request still succeeds.
-export const maxDuration = 60;
 
 /**
  * POST /api/entries/[id]/summarize
  *
- * Pulls the YouTube transcript via the `youtube-transcript` npm package
- * (server-side scrape of the watch page → caption baseUrl → XML parse),
- * runs an extractive summarizer over the joined text, and stores up to
- * five thesis sentences in `entry.metadata.summary`.  Cached on first
- * successful call so subsequent visits to the entry detail page don't
- * re-fetch the transcript.
+ * FAST PATH — returns an extractive summary in ~2–4 seconds:
+ *   1. If `metadata.summary` is cached, return it immediately.
+ *   2. Otherwise fetch the transcript (kome.ai → ~1–2 s), run the
+ *      extractive summarizer (instant), translate to Russian if
+ *      needed (Google ~300 ms × 5 in parallel), persist, return.
  *
- * Auth-gated.  Returns 400 for non-YouTube entries, 422 if the video
- * has no captions enabled, 500 if scraping fails.
+ * The LLM-polished version is built separately by POST .../polish so
+ * the user sees content right away and the abstractive upgrade lands
+ * in a follow-up render.  Both endpoints share the same
+ * `metadata.summary` field — polish overwrites with `summarySource:
+ * "llm"`.
+ *
+ * The transcript itself is cached into `metadata.transcript` so the
+ * /polish endpoint can skip the kome.ai round-trip on second call.
  */
 
 function youtubeVideoId(url: string): string | null {
@@ -52,8 +49,6 @@ interface RouteContext {
 
 export const POST = withErrorHandler(async (_req: Request, ctx: RouteContext) => {
   const user = await requireUser();
-  // Same bucket as og-extract — both make outbound calls to YouTube
-  // and shouldn't be hammered.  30/min plenty for a personal vault.
   const limited = await checkRateLimit(user.id, "og-extract", RATE_LIMITS.ogExtract);
   if (limited) return limited;
 
@@ -62,29 +57,33 @@ export const POST = withErrorHandler(async (_req: Request, ctx: RouteContext) =>
   if (!entry) throw new HttpError("Not found", 404);
   if (entry.userId !== user.id) throw new HttpError("Forbidden", 403);
 
-  // Cached?  Return immediately — but only if the cached version was
-  // produced by the LLM polish path.  Older entries cached before the
-  // LLM step landed (or where the LLM timed out) carry an extractive
-  // summary; on next access we force a re-polish so the user sees the
-  // upgraded output.  metadata.summarySource records which path won.
+  // Return cached summary regardless of source (extractive or LLM).
+  // The client checks `source` on its end and triggers /polish when
+  // an upgrade is available.
   const cached = entry.metadata?.summary as unknown;
   const cachedSource = entry.metadata?.summarySource as unknown;
   if (
     Array.isArray(cached)
     && cached.length > 0
     && cached.every((x) => typeof x === "string")
-    && cachedSource === "llm"
   ) {
     const cachedStrs = cached as string[];
     if (looksRussian(cachedStrs[0])) {
-      return NextResponse.json({ summary: cachedStrs, cached: true, source: "llm" });
+      return NextResponse.json({
+        summary: cachedStrs,
+        cached: true,
+        source: cachedSource === "llm" ? "llm" : "extractive",
+      });
     }
-    // Polished but somehow non-Russian → translate and persist.
+    // Older cache in non-Russian — translate and re-save once.
     const translatedCached = await translateArrayToRussian(cachedStrs);
     const nextMetaCached = { ...(entry.metadata ?? {}), summary: translatedCached };
     await updateEntry(id, { metadata: nextMetaCached });
     return NextResponse.json({
-      summary: translatedCached, cached: true, translated: true, source: "llm",
+      summary: translatedCached,
+      cached: true,
+      translated: true,
+      source: cachedSource === "llm" ? "llm" : "extractive",
     });
   }
 
@@ -105,54 +104,40 @@ export const POST = withErrorHandler(async (_req: Request, ctx: RouteContext) =>
     throw new HttpError("Не удалось выделить тезисы из транскрипта", 422);
   }
 
-  // Try LLM polish first — Pollinations' free `openai-fast` model
-  // produces a real abstractive summary in proper Russian (5 polished
-  // bullet sentences) instead of the spoken-fragment chunks the
-  // extractive pass picks from auto-generated captions.  Up to ~50 s
-  // wait; on timeout / failure we fall back to extractive.
-  const polished = await polishWithLLM(transcript.text);
-  let source: "llm" | "extractive" = "extractive";
-  let finalTheses: string[];
+  // Translate the extractive theses into Russian if the transcript was
+  // in another language.
+  let finalTheses = rawTheses;
   let translated = false;
-
-  if (polished && polished.length >= 3) {
-    finalTheses = polished.slice(0, 5);
-    source = "llm";
-    // Pollinations should already produce Russian when prompted in
-    // Russian.  Belt-and-braces translate if it slipped (rare).
-    if (!looksRussian(finalTheses[0])) {
-      finalTheses = await translateArrayToRussian(finalTheses);
-      translated = true;
-    }
-  } else {
-    // Extractive fallback — picks raw sentences from the transcript,
-    // translates if not Russian.
-    finalTheses = rawTheses;
-    if (!looksRussian(rawTheses[0])) {
-      finalTheses = await translateArrayToRussian(rawTheses);
-      translated = true;
-    }
+  if (!looksRussian(rawTheses[0])) {
+    finalTheses = await translateArrayToRussian(rawTheses);
+    translated = true;
   }
 
   console.log(JSON.stringify({
     msg: "summarize.result",
     videoId: vid,
     theses: finalTheses.length,
-    source,
+    source: "extractive",
     translated,
     transcriptLen: transcript.text.length,
   }));
 
-  // Persist into entry.metadata so the next request returns instantly.
-  // Spread to keep any existing keys (model, source, etc.) intact.
-  // summarySource lets the cached path tell extractive vs LLM apart
-  // and re-polish the former on next access.
+  // Save extractive output AND the transcript itself.  /polish reads
+  // metadata.transcript to skip the kome.ai round-trip on its first
+  // call.  Source flagged as "extractive" so the client knows to
+  // request a polish upgrade.
   const nextMeta = {
     ...(entry.metadata ?? {}),
     summary: finalTheses,
-    summarySource: source,
+    summarySource: "extractive",
+    transcript: transcript.text,
   };
   await updateEntry(id, { metadata: nextMeta });
 
-  return NextResponse.json({ summary: finalTheses, cached: false, translated, source });
+  return NextResponse.json({
+    summary: finalTheses,
+    cached: false,
+    translated,
+    source: "extractive",
+  });
 });
