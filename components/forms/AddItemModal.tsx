@@ -11,6 +11,7 @@ import { getCategory, isMediaCategory, isVideoCategory } from "@/lib/categories"
 import { extractApi, ApiError } from "@/lib/api-client";
 import { humanSize } from "@/lib/utils";
 import { resolveYouTubeDuration, youtubeVideoId } from "@/lib/youtube-client";
+import { siteScreenshot } from "@/lib/screenshot";
 import type { CategoryId, EntryCollection } from "@/lib/types";
 import type { CreateEntryInput } from "@/lib/schemas/entries";
 
@@ -168,12 +169,22 @@ export function AddItemModal({
           // is the same generic site-wide list ("видео, поделиться,
           // телефон с камерой") for almost every video.  User decides
           // what's worth tagging.
+          // Designs: when the page has no og:image, fall back to a
+          // free hero-block screenshot via WordPress mShots so the
+          // card never lands with an empty cover rectangle.
+          // Description for designs is intentionally NOT autofilled
+          // (user request — they want title + cover, nothing else).
+          const designFallback = isDesign && !meta.image ? siteScreenshot(url) : null;
           return {
             ...f,
             title: f.title.trim() ? f.title : (meta.title ?? f.title),
-            desc: f.desc.trim() ? f.desc : (videoDesc ?? f.desc),
+            desc: isDesign
+              ? f.desc
+              : (f.desc.trim() ? f.desc : (videoDesc ?? f.desc)),
             thumb: f.thumb.trim() ? f.thumb : (meta.image ?? f.thumb),
-            cover: f.cover.trim() ? f.cover : (meta.image ?? f.cover),
+            cover: f.cover.trim()
+              ? f.cover
+              : (meta.image ?? designFallback ?? f.cover),
             duration: f.duration.trim() ? f.duration : (meta.duration ?? f.duration),
           };
         });

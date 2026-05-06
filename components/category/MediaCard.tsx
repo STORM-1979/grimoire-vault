@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons/Icon";
 import { ItemActions } from "./ItemActions";
 import { formatDateTime } from "@/lib/utils";
+import { siteScreenshot } from "@/lib/screenshot";
 import type { Entry } from "@/lib/types";
 
 interface MediaCardProps {
@@ -25,6 +26,15 @@ export function MediaCard({ item, big, selected, bulkSelected, onBulkToggle, onT
     if (tgt?.closest("button, a, input")) return;
     router.push(`/entry/${item.id}`);
   };
+  // Designs entries that came in without an og:image (results-factory.com,
+  // single-page studios, etc.) used to render with an empty rectangle.
+  // Self-heal at view time by falling back to a free WordPress mShots
+  // hero-block screenshot derived from item.url.  Deterministic URL —
+  // no API call from us, the browser fetches once, mShots caches.
+  const designFallback = item.categoryId === "designs" && !item.coverUrl && item.url
+    ? siteScreenshot(item.url)
+    : null;
+  const cover = item.coverUrl || designFallback;
   const ring = bulkSelected
     ? "ring-2 ring-emerald-300 ring-offset-2 ring-offset-emerald-deep"
     : selected
@@ -43,10 +53,10 @@ export function MediaCard({ item, big, selected, bulkSelected, onBulkToggle, onT
           </div>
         )}
         <ItemActions item={item} onTogglePin={onTogglePin} onDelete={onDelete} onEdit={onEdit} />
-        {item.coverUrl && (
+        {cover && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={item.coverUrl}
+            src={cover}
             alt=""
             loading="lazy"
             decoding="async"
@@ -65,9 +75,9 @@ export function MediaCard({ item, big, selected, bulkSelected, onBulkToggle, onT
             <Icon name="pin" size={10} /> Pinned
           </div>
         )}
-        {item.coverUrl && (
+        {cover && (
           <div className="absolute bottom-3 left-3 font-mono text-[9px] uppercase tracking-widest text-ivory-mute/90">
-            webp
+            {designFallback && !item.coverUrl ? "screenshot" : "webp"}
           </div>
         )}
       </div>
