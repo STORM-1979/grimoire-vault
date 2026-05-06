@@ -476,15 +476,6 @@ export function AddItemModal({
                 <input type="text" className="field-input" value={form.duration} onChange={set("duration")}
                   placeholder="12:34" />
               </Field>
-              {collections && collections.length > 0 && (
-                <Field label="Коллекция" hint="Группа внутри YouTube — например «Курсы», «Tech-обзоры»">
-                  <CollectionSelect
-                    collections={collections}
-                    value={collectionId}
-                    onChange={setCollectionId}
-                  />
-                </Field>
-              )}
             </>
           )}
 
@@ -576,6 +567,16 @@ export function AddItemModal({
 
           {(!isVideo || videoExpanded) && (
             <>
+              {collections && collections.length > 0 && (
+                <Field label="Коллекция" hint="Группа внутри текущей категории">
+                  <CollectionSelect
+                    collections={collections}
+                    value={collectionId}
+                    onChange={setCollectionId}
+                  />
+                </Field>
+              )}
+
               <Field label="Теги (через запятую)" hint="Например: frontend, чтение, важное">
                 <input type="text" className="field-input" value={form.tags} onChange={set("tags")} placeholder="tag1, tag2, tag3" />
               </Field>

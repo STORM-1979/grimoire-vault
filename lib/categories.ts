@@ -44,3 +44,51 @@ export function isCredentialsCategory(id: CategoryId) {
 export function isKanbanCategory(id: CategoryId) {
   return id === "kanban";
 }
+
+/**
+ * User-defined collections (sub-folders) are exposed for every
+ * category EXCEPT Kanban (its own column structure is the
+ * organisation model) and Credentials (its own per-record types).
+ *
+ * The `entry_collections` table itself accepts any `category_id`,
+ * so flipping a category on or off here is purely a UI gate.
+ */
+export function categorySupportsCollections(id: CategoryId): boolean {
+  return id !== "kanban" && id !== "credentials";
+}
+
+/**
+ * Curated default collections per category — used as one-click
+ * suggestions when the user opens a category for the first time
+ * and there are no collections yet.  Names follow the most common
+ * organisational patterns found in:
+ *
+ *   • PARA / Zettelkasten (Ideas, Misc, Skills)
+ *   • Pocket / Raindrop / Pinboard (Web Resources)
+ *   • Notion / Obsidian / Apple Notes folders (Documents, Local)
+ *   • Behance / Dribbble (Designs)
+ *   • Pinterest boards (Images)
+ *   • Anthropic / OpenAI prompt-library structure (Prompts)
+ *   • GitHub / Behance portfolio sections (Portfolio)
+ *   • YouTube content categories (YouTube)
+ *
+ * Russian names because the rest of the UI is Russian; collection
+ * slugs are auto-derived server-side.
+ */
+export const DEFAULT_COLLECTIONS: Partial<Record<CategoryId, string[]>> = {
+  documents: ["Договоры", "Чеки", "Инструкции", "Отчёты", "Налоги", "Личное"],
+  web: ["Прочитать позже", "Туториалы", "Инструменты", "Референсы", "Вдохновение", "Закладки"],
+  youtube: ["Курсы", "Tech-обзоры", "Туториалы", "Развлечения", "Документалки", "Подкасты"],
+  local: ["Бэкапы", "Архивы", "Исходники", "Конфиги", "Личное"],
+  designs: ["UI/UX", "Логотипы", "Постеры", "Типографика", "Мокапы", "Иллюстрации"],
+  images: ["Фото", "Скриншоты", "Обои", "Референсы", "Мемы", "Сгенерировано"],
+  skills: ["Frontend", "Backend", "DevOps", "Soft Skills", "Языки", "Инструменты"],
+  prompts: ["Кодинг", "Тексты", "Анализ", "Креатив", "Системные", "Персоны"],
+  ideas: ["Продукт", "Бизнес", "Креатив", "Tech", "Личное", "Research"],
+  portfolio: ["Web-приложения", "Mobile", "Open Source", "Клиентские", "Кейсы"],
+  misc: ["Путешествия", "Еда", "Книги", "Хобби", "Здоровье", "Финансы"],
+};
+
+export function defaultCollectionsFor(id: CategoryId): string[] {
+  return DEFAULT_COLLECTIONS[id] ?? [];
+}

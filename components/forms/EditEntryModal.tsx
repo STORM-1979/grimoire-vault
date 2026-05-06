@@ -75,9 +75,12 @@ export function EditEntryModal({ entry, onClose, onSubmit, collections }: Props)
       if (isVideo) {
         patch.thumbUrl = form.thumb.trim() || null;
         patch.duration = form.duration.trim() || null;
-        // Collection is patched even when set to null (== move to
-        // root of category) — that's how the user removes a video
-        // from a collection without deleting the collection.
+      }
+      // Collection patch flows for every collectable category.
+      // Explicit null is the wire format for "remove from current
+      // collection / move to category root" — letting null pass
+      // through is intentional.
+      if (collections && collections.length > 0) {
         patch.collectionId = collectionId;
       }
       if (isMedia) patch.coverUrl = form.cover.trim() || null;
@@ -139,15 +142,6 @@ export function EditEntryModal({ entry, onClose, onSubmit, collections }: Props)
               <Field label="Длительность">
                 <input type="text" className="field-input" value={form.duration} onChange={set("duration")} placeholder="12:34" />
               </Field>
-              {collections && collections.length > 0 && (
-                <Field label="Коллекция" hint="Перенести видео в другую коллекцию или вынести в корень категории">
-                  <CollectionSelect
-                    collections={collections}
-                    value={collectionId}
-                    onChange={setCollectionId}
-                  />
-                </Field>
-              )}
             </>
           )}
 
@@ -195,6 +189,16 @@ export function EditEntryModal({ entry, onClose, onSubmit, collections }: Props)
                 <option value="GPT-5">GPT-5</option>
                 <option value="Gemini 2.5">Gemini 2.5</option>
               </select>
+            </Field>
+          )}
+
+          {collections && collections.length > 0 && (
+            <Field label="Коллекция" hint="Перенести запись в другую коллекцию или вынести в корень категории">
+              <CollectionSelect
+                collections={collections}
+                value={collectionId}
+                onChange={setCollectionId}
+              />
             </Field>
           )}
 

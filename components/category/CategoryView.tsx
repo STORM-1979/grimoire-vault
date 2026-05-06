@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useEntries } from "@/lib/hooks/useEntries";
 import { useEntryKeyboardNav } from "@/lib/hooks/useEntryKeyboardNav";
-import { isMediaCategory, isVideoCategory } from "@/lib/categories";
+import { isMediaCategory, isVideoCategory, categorySupportsCollections } from "@/lib/categories";
 import { entriesApi } from "@/lib/api-client";
 import { Icon } from "@/components/icons/Icon";
 import { ItemCard } from "./ItemCard";
@@ -46,9 +46,9 @@ export function CategoryView({ category, initialItems }: Props) {
 
   const isVideo = isVideoCategory(category.id);
   const isMedia = isMediaCategory(category.id);
-  // Collections currently exposed for YouTube only — schema supports
-  // every category but the UI is gated to keep the chip row tidy.
-  const showCollections = isVideo;
+  // Every system category except Kanban (column-based) and
+  // Credentials (record-typed) supports user-defined collections.
+  const showCollections = categorySupportsCollections(category.id);
 
   // Build a "selected + descendants" id-set so picking a parent chip
   // also surfaces entries assigned to its sub-collections.  Cheap —

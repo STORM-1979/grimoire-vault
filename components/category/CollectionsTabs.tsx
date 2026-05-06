@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Icon } from "@/components/icons/Icon";
 import { collectionsApi, ApiError } from "@/lib/api-client";
+import { defaultCollectionsFor } from "@/lib/categories";
 import type { CategoryId, EntryCollection } from "@/lib/types";
 
 /**
@@ -96,6 +97,15 @@ export function CollectionsTabs({
     return { topLevel: top, byParent: map, byId: idLookup };
   }, [collections]);
 
+  // Curated suggestions for this category.  Filtered against existing
+  // names so already-created defaults don't show up as offers.
+  const suggestions = useMemo(() => {
+    const allDefaults = defaultCollectionsFor(categoryId);
+    if (allDefaults.length === 0) return [];
+    const taken = new Set((collections ?? []).map((c) => c.name.toLowerCase()));
+    return allDefaults.filter((n) => !taken.has(n.toLowerCase()));
+  }, [categoryId, collections]);
+
   // Walk parents up to the root so we can highlight the active top-
   // level chip even when a deep sub is selected.
   const activeRootId = useMemo(() => {
@@ -112,6 +122,46 @@ export function CollectionsTabs({
   // Without this the row was chicken-and-egg: it only appeared after
   // a child existed, but there was no way to create one.
   const showSubRow = !!activeRootId;
+
+  // Quick-create from the curated suggestion list.  Adds the named
+  // collection at top level (parent_id null), broadcasts the new
+  // list, and selects it so the user can immediately drop entries
+  // into it.  No-op if a collection with that name already exists.
+  const quickCreate = async (name: string) => {
+    setError(null);
+    if ((collections ?? []).some((c) => c.name.toLowerCase() === name.toLowerCase())) {
+      return;
+    }
+    try {
+      const created = await collectionsApi.create({ categoryId, name });
+      broadcast([...(collections ?? []), created]);
+      onSelect(created.id);
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : (e as Error).message;
+      setError(msg);
+    }
+  };
+
+  // Bulk-create the entire suggestion list — sequential to avoid
+  // hammering the rate limiter and to surface any 409s clearly.
+  const quickCreateAll = async () => {
+    setError(null);
+    const existingNames = new Set((collections ?? []).map((c) => c.name.toLowerCase()));
+    const next = [...(collections ?? [])];
+    for (const name of suggestions) {
+      if (existingNames.has(name.toLowerCase())) continue;
+      try {
+        const created = await collectionsApi.create({ categoryId, name });
+        next.push(created);
+        existingNames.add(name.toLowerCase());
+      } catch (e) {
+        // Keep going on per-item failures — the user gets at least
+        // the partial list.  Last error wins in the banner.
+        setError(e instanceof Error ? e.message : "create failed");
+      }
+    }
+    broadcast(next);
+  };
 
   const handleCreate = async () => {
     if (!creating) return;
@@ -265,6 +315,37 @@ export function CollectionsTabs({
               <Icon name="add" size={10} /> Новая подкатегория
             </button>
           )}
+        </div>
+      )}
+
+      {/* Suggestion row — only when the user has no collections at all
+          AND we have curated defaults for this category.  Disappears
+          as soon as anything exists so it doesn't crowd the chip row
+          forever. */}
+      {(collections?.length ?? 0) === 0 && suggestions.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5 items-center">
+          <span className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute pr-1">
+            популярные →
+          </span>
+          {suggestions.map((name) => (
+            <button
+              key={name}
+              type="button"
+              onClick={() => void quickCreate(name)}
+              className="font-mono text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-full border border-emerald-300/25 text-emerald-200/80 hover:border-emerald-300 hover:bg-emerald-300/[0.06] transition flex items-center gap-1"
+              title={`Создать «${name}» одним кликом`}
+            >
+              <Icon name="add" size={10} /> {name}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => void quickCreateAll()}
+            className="font-mono text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-full border border-gold/40 text-gold hover:bg-gold hover:text-emerald-deep transition"
+            title="Создать сразу весь набор"
+          >
+            создать всё
+          </button>
         </div>
       )}
 
