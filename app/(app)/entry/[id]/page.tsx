@@ -107,6 +107,7 @@ export default async function EntryPage({
       {entry.url && /(?:youtube\.com|youtu\.be)/.test(entry.url) && (
         <VideoSummary
           entryId={entry.id}
+          videoUrl={entry.url}
           initial={Array.isArray(entry.metadata?.summary)
             ? (entry.metadata.summary as string[])
             : undefined}
