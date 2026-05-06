@@ -200,24 +200,6 @@ body {
 .fade-in { animation: fadeIn 400ms ease-out; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
-/* ===== Gradient shimmer for web-resource accent block =====
-   Used by ItemCard when category=web — instead of a thumbnail we
-   render a small rectangle with a deterministic per-entry gradient
-   that drifts across its 200% backing canvas. Eight seconds is slow
-   enough not to become annoying when many cards are on screen. */
-@keyframes gvShimmer {
-  0%   { background-position:   0% 50%; }
-  50%  { background-position: 100% 50%; }
-  100% { background-position:   0% 50%; }
-}
-.gv-shimmer {
-  background-size: 200% 200%;
-  animation: gvShimmer 8s ease-in-out infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .gv-shimmer { animation: none; }
-}
-
 /* Custom scrollbars */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
