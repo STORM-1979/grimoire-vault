@@ -133,6 +133,13 @@ export interface ExtractedMeta {
   duration?: string;
   tags?: string[];
   hasContent: boolean;
+  /** Diagnostic breadcrumbs — visible in DevTools network panel. */
+  _diag?: {
+    scrape?: { ok: boolean; status?: number };
+    oembed?: "skipped" | "ok" | "fail";
+    innertube?: "skipped" | "ok" | "fail";
+    consentWall?: boolean;
+  };
 }
 export const extractApi = {
   fromUrl: (url: string) =>

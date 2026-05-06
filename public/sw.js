@@ -8,7 +8,7 @@
  *   - API: network-only (no caching of mutating data)
  */
 
-const VERSION = "v1.1.0";
+const VERSION = "v1.2.0";
 const STATIC_CACHE = `gv-static-${VERSION}`;
 const PAGE_CACHE = `gv-pages-${VERSION}`;
 const IMG_CACHE = `gv-images-${VERSION}`;

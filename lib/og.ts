@@ -44,6 +44,17 @@ export interface ExtractedMeta {
   tags?: string[];
   /** True if at least title or description was found. */
   hasContent: boolean;
+  /**
+   * Diagnostic breadcrumbs.  Visible in the network panel when debugging
+   * autofill on a real deployment.  Each step's source is recorded so we
+   * can tell whether innertube actually fired and what it gave us.
+   */
+  _diag?: {
+    scrape?: { ok: boolean; status?: number };
+    oembed?: "skipped" | "ok" | "fail";
+    innertube?: "skipped" | "ok" | "fail";
+    consentWall?: boolean;
+  };
 }
 
 /**
@@ -303,6 +314,12 @@ export async function extractMetadata(input: string): Promise<ExtractedMeta> {
   const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
   let html = "";
   let finalUrl = url.toString();
+  const diag: NonNullable<ExtractedMeta["_diag"]> = {
+    scrape: { ok: false },
+    oembed: "skipped",
+    innertube: "skipped",
+    consentWall: false,
+  };
   try {
     const res = await fetch(url.toString(), {
       redirect: "follow",
@@ -315,12 +332,13 @@ export async function extractMetadata(input: string): Promise<ExtractedMeta> {
         "Accept-Language": "ru,en;q=0.9",
       },
     });
-    if (!res.ok) return { url: finalUrl, hasContent: false };
+    diag.scrape = { ok: res.ok, status: res.status };
+    if (!res.ok) return { url: finalUrl, hasContent: false, _diag: diag };
     finalUrl = res.url || finalUrl;
     const ct = res.headers.get("content-type") || "";
     // Skip binary / non-HTML responses — nothing useful to parse.
     if (!ct.includes("html") && !ct.includes("xml") && !ct.includes("text/")) {
-      return { url: finalUrl, hasContent: false };
+      return { url: finalUrl, hasContent: false, _diag: diag };
     }
     // Stream up to MAX_BYTES; truncate the rest.
     const reader = res.body?.getReader();
@@ -346,7 +364,7 @@ export async function extractMetadata(input: string): Promise<ExtractedMeta> {
       html = new TextDecoder("utf-8", { fatal: false }).decode(merged);
     }
   } catch {
-    return { url: finalUrl, hasContent: false };
+    return { url: finalUrl, hasContent: false, _diag: diag };
   } finally {
     clearTimeout(timer);
   }
@@ -432,7 +450,9 @@ export async function extractMetadata(input: string): Promise<ExtractedMeta> {
           .includes(t.toLowerCase()),
       );
     if (titleIsGeneric || descIsGeneric || tagsAreGeneric) {
+      diag.consentWall = true;
       const oembed = await fetchYouTubeOEmbed(videoId);
+      diag.oembed = oembed ? "ok" : "fail";
       if (oembed) {
         title = oembed.title ?? title;
         author = oembed.author ?? author;
@@ -451,6 +471,7 @@ export async function extractMetadata(input: string): Promise<ExtractedMeta> {
   let finalAuthor = author;
   if (videoId && (!finalTitle || !finalImage)) {
     const oembed = await fetchYouTubeOEmbed(videoId);
+    if (diag.oembed === "skipped") diag.oembed = oembed ? "ok" : "fail";
     if (oembed) {
       finalTitle ??= oembed.title;
       finalImage ??= oembed.image;
@@ -467,6 +488,7 @@ export async function extractMetadata(input: string): Promise<ExtractedMeta> {
   let finalDescription = description;
   if (videoId) {
     const it = await fetchYouTubeInnertube(videoId);
+    diag.innertube = it ? "ok" : "fail";
     if (it) {
       finalTitle ??= it.title;
       finalAuthor ??= it.author;
@@ -493,6 +515,7 @@ export async function extractMetadata(input: string): Promise<ExtractedMeta> {
     duration,
     tags,
     hasContent: Boolean(finalTitle || finalDescription),
+    _diag: diag,
   };
 }
 
