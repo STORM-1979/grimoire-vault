@@ -138,6 +138,8 @@ export interface ExtractedMeta {
     scrape?: { ok: boolean; status?: number };
     oembed?: "skipped" | "ok" | "fail";
     innertube?: "skipped" | "ok" | "fail";
+    mobile?: "skipped" | "ok" | "fail";
+    invidious?: "skipped" | "ok" | "fail";
     consentWall?: boolean;
   };
 }

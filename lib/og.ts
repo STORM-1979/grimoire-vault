@@ -54,6 +54,7 @@ export interface ExtractedMeta {
     oembed?: "skipped" | "ok" | "fail";
     innertube?: "skipped" | "ok" | "fail";
     mobile?: "skipped" | "ok" | "fail";
+    invidious?: "skipped" | "ok" | "fail";
     consentWall?: boolean;
   };
 }
@@ -353,6 +354,79 @@ async function fetchYouTubeMobileScrape(videoId: string): Promise<{
   }
 }
 
+/**
+ * Invidious fallback — public mirrors of YouTube's Data API.  Used when
+ * everything else upstream failed to deliver a duration (Vercel IPs
+ * intermittently get rate-limited on innertube and the m.youtube.com
+ * scrape, leaving entries with NULL duration).  Invidious nodes are
+ * volunteer-run and die regularly, so we try a list in order and take
+ * the first one that returns lengthSeconds.
+ *
+ * No auth needed; the `/api/v1/videos/<id>` endpoint is public.  Field
+ * filter narrows the response to the bits we care about so we don't
+ * waste bandwidth on caption tracks / format URLs / recommended lists.
+ */
+const INVIDIOUS_INSTANCES = [
+  "https://invidious.f5.si",
+  "https://invidious.materialio.us",
+  "https://yewtu.be",
+  "https://invidious.no-logs.com",
+  "https://invidious.tiekoetter.com",
+  "https://inv.nadeko.net",
+  "https://invidious.privacyredirect.com",
+];
+
+interface InvidiousMeta {
+  duration?: string;
+  title?: string;
+  description?: string;
+  image?: string;
+  author?: string;
+}
+
+async function fetchYouTubeInvidious(videoId: string): Promise<InvidiousMeta | null> {
+  for (const base of INVIDIOUS_INSTANCES) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 4000);
+    try {
+      const res = await fetch(
+        `${base}/api/v1/videos/${videoId}?fields=lengthSeconds,title,author,description,videoThumbnails`,
+        {
+          signal: ctrl.signal,
+          headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+        },
+      );
+      clearTimeout(timer);
+      if (!res.ok) continue;
+      const data = await res.json() as {
+        lengthSeconds?: number;
+        title?: string;
+        author?: string;
+        description?: string;
+        videoThumbnails?: Array<{ url: string; width?: number; height?: number; quality?: string }>;
+      };
+      if (typeof data.lengthSeconds !== "number" || data.lengthSeconds <= 0) continue;
+      // Pick the largest thumbnail; quality "maxresdefault" if present.
+      const thumbs = data.videoThumbnails ?? [];
+      let best = thumbs.find((t) => t.quality === "maxresdefault");
+      if (!best && thumbs.length) {
+        best = thumbs.reduce((a, b) => ((b.width ?? 0) > (a.width ?? 0) ? b : a));
+      }
+      return {
+        duration: secondsToHuman(data.lengthSeconds),
+        title: data.title,
+        author: data.author,
+        description: data.description ? truncateDescription(data.description) : undefined,
+        image: best?.url ?? `https://i.ytimg.com/vi_webp/${videoId}/maxresdefault.webp`,
+      };
+    } catch {
+      clearTimeout(timer);
+      continue;
+    }
+  }
+  return null;
+}
+
 /** Detect well-known video URLs so the caller can route to the right category. */
 function detectVideoId(u: URL): string | undefined {
   const h = u.hostname.replace(/^www\./, "");
@@ -389,6 +463,7 @@ export async function extractMetadata(input: string): Promise<ExtractedMeta> {
     oembed: "skipped",
     innertube: "skipped",
     mobile: "skipped",
+    invidious: "skipped",
     consentWall: false,
   };
   try {
@@ -594,6 +669,25 @@ export async function extractMetadata(input: string): Promise<ExtractedMeta> {
       finalImage ??= mob.image;
       if (!finalDescription?.trim() && mob.description) {
         finalDescription = mob.description;
+      }
+    }
+  }
+
+  // If even mobile scrape didn't give us a duration (Vercel runtime
+  // can't reach youtube.com from its IP, or the response shape changed
+  // again), pivot to a public Invidious instance — they're independent
+  // YouTube mirrors that expose lengthSeconds via /api/v1/videos/<id>.
+  // Volunteer-run, so we walk a small list and take the first hit.
+  if (videoId && !duration) {
+    const inv = await fetchYouTubeInvidious(videoId);
+    diag.invidious = inv ? "ok" : "fail";
+    if (inv) {
+      duration ??= inv.duration;
+      finalTitle ??= inv.title;
+      finalAuthor ??= inv.author;
+      finalImage ??= inv.image;
+      if (!finalDescription?.trim() && inv.description) {
+        finalDescription = inv.description;
       }
     }
   }
