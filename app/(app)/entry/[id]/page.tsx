@@ -6,6 +6,7 @@ import { listAttachments } from "@/lib/data/attachments";
 import { getCategory } from "@/lib/categories";
 import { Icon } from "@/components/icons/Icon";
 import { EntryBoard } from "@/components/entry/EntryBoard";
+import { EntryPrimaryView } from "@/components/entry/EntryPrimaryView";
 
 /**
  * /entry/[id] — full-detail view of one entry, with the interactive
@@ -79,6 +80,14 @@ export default async function EntryPage({
           </div>
         </div>
       </section>
+
+      {entry.url && (
+        <EntryPrimaryView
+          url={entry.url}
+          title={entry.title}
+          sizeLabel={entry.sizeLabel}
+        />
+      )}
 
       <EntryBoard entry={entry} initial={attachments} />
     </div>

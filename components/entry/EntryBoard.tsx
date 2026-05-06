@@ -203,94 +203,98 @@ function Toolbar({
   const [urlDraft, setUrlDraft] = useState("");
 
   return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <span className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute mr-1">
-        Доска ·
-      </span>
+    <div>
+      <div className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute mb-2">
+        Доска · добавить блок к этой записи:
+      </div>
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Image upload */}
+        <label className={btnPrimary(busy === "image")} title="Добавить новую картинку к доске">
+          <Icon name="images" size={13} /> {busy === "image" ? "Загружаю…" : "+ Картинка"}
+          <input
+            type="file" accept="image/*" className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void onUpload("image", f);
+              e.currentTarget.value = "";
+            }}
+          />
+        </label>
 
-      {/* Image upload */}
-      <label className={btnPrimary(busy === "image")}>
-        <Icon name="images" size={13} /> {busy === "image" ? "Загружаю…" : "Картинка"}
-        <input
-          type="file" accept="image/*" className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) void onUpload("image", f);
-            e.currentTarget.value = "";
-          }}
-        />
-      </label>
+        {/* Video URL */}
+        {urlOpen === "video" ? (
+          <UrlPopover
+            placeholder="YouTube / Vimeo / mp4 URL"
+            busy={busy === "video"}
+            value={urlDraft}
+            onChange={setUrlDraft}
+            onSubmit={async () => {
+              await onUrl("video", urlDraft);
+              setUrlDraft("");
+              setUrlOpen(null);
+            }}
+            onCancel={() => { setUrlOpen(null); setUrlDraft(""); }}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setUrlOpen("video")}
+            className={btnSecondary()}
+            title="Добавить видео-блок (вставить URL)"
+          >
+            <Icon name="play" size={13} /> + Видео
+          </button>
+        )}
 
-      {/* Video URL */}
-      {urlOpen === "video" ? (
-        <UrlPopover
-          placeholder="YouTube / Vimeo / mp4 URL"
-          busy={busy === "video"}
-          value={urlDraft}
-          onChange={setUrlDraft}
-          onSubmit={async () => {
-            await onUrl("video", urlDraft);
-            setUrlDraft("");
-            setUrlOpen(null);
-          }}
-          onCancel={() => { setUrlOpen(null); setUrlDraft(""); }}
-        />
-      ) : (
+        {/* Link URL */}
+        {urlOpen === "link" ? (
+          <UrlPopover
+            placeholder="https://example.com — подтянем заголовок"
+            busy={busy === "link"}
+            value={urlDraft}
+            onChange={setUrlDraft}
+            onSubmit={async () => {
+              await onUrl("link", urlDraft);
+              setUrlDraft("");
+              setUrlOpen(null);
+            }}
+            onCancel={() => { setUrlOpen(null); setUrlDraft(""); }}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setUrlOpen("link")}
+            className={btnSecondary()}
+            title="Добавить ссылку с превью"
+          >
+            <Icon name="web" size={13} /> + Ссылка
+          </button>
+        )}
+
+        {/* File upload */}
+        <label className={btnSecondary()} title="Прикрепить файл к доске (PDF / архив / документ)">
+          <Icon name="documents" size={13} /> {busy === "file" ? "Загружаю…" : "+ Файл"}
+          <input
+            type="file" className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void onUpload("file", f);
+              e.currentTarget.value = "";
+            }}
+          />
+        </label>
+
+        {/* Note */}
         <button
           type="button"
-          onClick={() => setUrlOpen("video")}
+          onClick={onNote}
+          disabled={busy === "note"}
           className={btnSecondary()}
+          title="Добавить пустую текстовую заметку"
         >
-          <Icon name="play" size={13} /> Видео
+          <Icon name="prompts" size={13} /> {busy === "note" ? "…" : "+ Заметка"}
         </button>
-      )}
-
-      {/* Link URL */}
-      {urlOpen === "link" ? (
-        <UrlPopover
-          placeholder="https://example.com — подтянем заголовок"
-          busy={busy === "link"}
-          value={urlDraft}
-          onChange={setUrlDraft}
-          onSubmit={async () => {
-            await onUrl("link", urlDraft);
-            setUrlDraft("");
-            setUrlOpen(null);
-          }}
-          onCancel={() => { setUrlOpen(null); setUrlDraft(""); }}
-        />
-      ) : (
-        <button
-          type="button"
-          onClick={() => setUrlOpen("link")}
-          className={btnSecondary()}
-        >
-          <Icon name="web" size={13} /> Ссылка
-        </button>
-      )}
-
-      {/* File upload */}
-      <label className={btnSecondary()}>
-        <Icon name="documents" size={13} /> {busy === "file" ? "Загружаю…" : "Файл"}
-        <input
-          type="file" className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) void onUpload("file", f);
-            e.currentTarget.value = "";
-          }}
-        />
-      </label>
-
-      {/* Note */}
-      <button
-        type="button"
-        onClick={onNote}
-        disabled={busy === "note"}
-        className={btnSecondary()}
-      >
-        <Icon name="prompts" size={13} /> {busy === "note" ? "…" : "Заметка"}
-      </button>
+      </div>
     </div>
   );
 }
