@@ -1,116 +1,57 @@
 /**
- * Grimoire Vault — Service Worker
+ * Grimoire Vault — Service Worker (v2.0 — passthrough)
  *
- * Strategy:
- *   - HTML pages: network-first (fall back to cached shell on offline)
- *   - Static /_next/static/*: cache-first, immutable
- *   - Images (Unsplash, ytimg, R2 proxy): cache-first with stale-while-revalidate
- *   - API: network-only (no caching of mutating data)
+ * Earlier versions tried to act as a clever offline cache (cache-first on
+ * /_next/static/*, network-first on HTML, stale-while-revalidate on
+ * images).  In practice this trapped users on stale JS bundles after
+ * every deploy: the cached HTML referenced old chunk URLs, and the SW
+ * itself didn't always update fast enough to deliver the new ones.
+ *
+ * v2 strips all caching.  No fetch handler at all — the browser hits
+ * Vercel's edge CDN directly with its built-in HTTP cache, which respects
+ * the right `Cache-Control` headers Next.js already emits and never
+ * outlives a deploy.  Push notifications still work because the push /
+ * notificationclick listeners stay intact.
+ *
+ * The activate handler also performs a one-shot cleanup: deletes every
+ * cache the previous SW left behind (gv-static-*, gv-pages-*, gv-images-*)
+ * and forces every open tab to reload, so users on stale bundles pick up
+ * the new code without manual Ctrl+F5.
  */
 
-const VERSION = "v1.2.0";
-const STATIC_CACHE = `gv-static-${VERSION}`;
-const PAGE_CACHE = `gv-pages-${VERSION}`;
-const IMG_CACHE = `gv-images-${VERSION}`;
-
-const PRECACHE = [
-  "/",
-  "/manifest.json",
-  "/icons/icon-192.svg",
-  "/icons/icon-512.svg",
-  "/icon.svg",
-];
-
 self.addEventListener("install", (e) => {
-  e.waitUntil(
-    caches.open(STATIC_CACHE).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting())
-  );
+  // Activate immediately — we want the new (passthrough) SW running on
+  // the next event loop, not waiting for every controlled tab to close.
+  e.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener("activate", (e) => {
-  e.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((k) => ![STATIC_CACHE, PAGE_CACHE, IMG_CACHE].includes(k))
-          .map((k) => caches.delete(k))
-      )
-    ).then(() => self.clients.claim())
-  );
+  e.waitUntil((async () => {
+    // Drop every cache we ever made. The names always start with "gv-".
+    const keys = await caches.keys();
+    await Promise.all(
+      keys.filter((k) => k.startsWith("gv-")).map((k) => caches.delete(k)),
+    );
+    // Take control of all currently-loaded tabs so the navigate() below
+    // hits this SW (and our absent fetch handler).
+    await self.clients.claim();
+    // Force-reload open windows once so they drop the stale JS chunks
+    // that are still running in memory from the previous SW's cache.
+    const wins = await self.clients.matchAll({ type: "window" });
+    for (const c of wins) {
+      try {
+        if ("navigate" in c && typeof c.navigate === "function") {
+          await c.navigate(c.url);
+        }
+      } catch {
+        /* navigation may fail on cross-origin frames — fine, ignore */
+      }
+    }
+  })());
 });
 
-function isImage(url) {
-  return /\.(webp|jpe?g|png|avif|gif|svg)(\?|$)/i.test(url) ||
-         /^https:\/\/images\.unsplash\.com/.test(url) ||
-         /^https:\/\/i\.ytimg\.com/.test(url) ||
-         /\/api\/r2\/object\//.test(url);
-}
-
-function isStatic(url, pathname) {
-  return pathname.startsWith("/_next/static/") || pathname.startsWith("/icons/") || pathname === "/manifest.json";
-}
-
-self.addEventListener("fetch", (event) => {
-  const req = event.request;
-  if (req.method !== "GET") return;
-
-  const url = new URL(req.url);
-  const sameOrigin = url.origin === self.location.origin;
-  const isApi = sameOrigin && url.pathname.startsWith("/api/");
-  const isAuth = sameOrigin && (url.pathname.startsWith("/login") || url.pathname.startsWith("/auth/"));
-
-  if (isApi || isAuth) return; // do not intercept
-
-  if (isStatic(req.url, url.pathname)) {
-    event.respondWith(cacheFirst(req, STATIC_CACHE));
-    return;
-  }
-
-  if (isImage(req.url)) {
-    event.respondWith(staleWhileRevalidate(req, IMG_CACHE));
-    return;
-  }
-
-  // HTML / page navigation: network-first with offline fallback
-  if (req.mode === "navigate" || req.headers.get("accept")?.includes("text/html")) {
-    event.respondWith(networkFirst(req, PAGE_CACHE));
-  }
-});
-
-async function cacheFirst(req, cacheName) {
-  const cache = await caches.open(cacheName);
-  const cached = await cache.match(req);
-  if (cached) return cached;
-  const fresh = await fetch(req);
-  if (fresh.ok) cache.put(req, fresh.clone());
-  return fresh;
-}
-
-async function networkFirst(req, cacheName) {
-  const cache = await caches.open(cacheName);
-  try {
-    const fresh = await fetch(req);
-    if (fresh.ok && req.method === "GET") cache.put(req, fresh.clone());
-    return fresh;
-  } catch {
-    const cached = await cache.match(req);
-    if (cached) return cached;
-    // Last resort: cached app shell
-    const shell = await cache.match("/");
-    if (shell) return shell;
-    throw new Error("offline");
-  }
-}
-
-async function staleWhileRevalidate(req, cacheName) {
-  const cache = await caches.open(cacheName);
-  const cached = await cache.match(req);
-  const fetchPromise = fetch(req).then((fresh) => {
-    if (fresh.ok) cache.put(req, fresh.clone());
-    return fresh;
-  }).catch(() => cached);
-  return cached || fetchPromise;
-}
+/* No fetch handler.  Browser handles HTTP caching itself with the
+   Cache-Control headers Next emits per asset class. */
 
 /* -------------------- Web Push -------------------- */
 /**
@@ -131,10 +72,9 @@ self.addEventListener("push", (event) => {
     body: data.body,
     icon: data.icon || "/icons/icon-192.svg",
     badge: data.badge || "/icons/icon-192.svg",
-    tag: data.tag,                 // dedup key — repeats replace prior un-clicked
+    tag: data.tag,
     renotify: !!data.tag,
     data: { url: data.url || "/" },
-    // Cross-origin compat: vibrate is iOS-friendly hint
     vibrate: [80, 40, 80],
   };
   event.waitUntil(self.registration.showNotification(data.title, opts));
@@ -145,7 +85,6 @@ self.addEventListener("notificationclick", (event) => {
   const target = event.notification.data?.url || "/";
   event.waitUntil((async () => {
     const all = await clients.matchAll({ type: "window", includeUncontrolled: true });
-    // Reuse a same-origin tab if one is already open.
     for (const c of all) {
       try {
         const u = new URL(c.url);
