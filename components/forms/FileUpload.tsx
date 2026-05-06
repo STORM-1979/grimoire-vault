@@ -4,6 +4,20 @@ import { useRef, useState } from "react";
 import { Icon } from "@/components/icons/Icon";
 import { humanFileSize, uploadToR2, type UploadKind, type UploadProgress } from "@/lib/upload";
 
+/**
+ * Metadata about the picked file.  Surfaced BEFORE the upload starts so
+ * the parent form can pre-fill title / size fields even if the upload
+ * itself fails (e.g. unsupported MIME) — that way the user doesn't have
+ * to retype after fixing the issue.
+ */
+export interface FileMeta {
+  name: string;
+  size: number;
+  type: string;
+  /** Best-effort document title: PDF /Title metadata, or cleaned filename. */
+  suggestedTitle?: string;
+}
+
 interface FileUploadProps {
   /** Storage tier on R2 */
   kind: UploadKind;
@@ -15,12 +29,14 @@ interface FileUploadProps {
   value: string;
   /** Called with the new public URL once upload finishes */
   onChange: (url: string) => void;
+  /** Optional: receives metadata about the selected file before upload */
+  onMeta?: (meta: FileMeta) => void;
   label?: string;
   hint?: string;
 }
 
 export function FileUpload({
-  kind, accept, maxBytes, value, onChange, label = "Файл", hint,
+  kind, accept, maxBytes, value, onChange, onMeta, label = "Файл", hint,
 }: FileUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -34,6 +50,14 @@ export function FileUpload({
     if (maxBytes && file.size > maxBytes) {
       setError(`Файл больше ${humanFileSize(maxBytes)}`);
       return;
+    }
+    // Surface metadata before the network call so the parent can
+    // pre-fill title/size even if R2 rejects the MIME later.  Title
+    // extraction from PDF metadata is best-effort; fallback is the
+    // cleaned filename.
+    if (onMeta) {
+      const suggestedTitle = await suggestTitle(file);
+      onMeta({ name: file.name, size: file.size, type: file.type, suggestedTitle });
     }
     setBusy(true);
     setProgress({ loaded: 0, total: file.size, percent: 0 });
@@ -57,8 +81,15 @@ export function FileUpload({
 
   const fileLabel = kind === "thumbs" ? "превью видео" : kind === "covers" ? "обложку" : "файл";
 
+  // NOTE: this used to be a <label> wrapping everything.  HTML labels
+  // with a nested form control auto-forward clicks to that control —
+  // which meant clicking ANYWHERE inside this widget (preview image,
+  // "Удалить" button, even the heading) re-opened the OS file picker.
+  // A plain <div> root removes that surprise; the explicit "click drop
+  // zone / click Заменить" handlers are the only ways to open the
+  // picker now.
   return (
-    <label className="block mb-4">
+    <div className="block mb-4">
       <div className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute mb-1.5">{label}</div>
 
       <input
@@ -139,6 +170,81 @@ export function FileUpload({
           <Icon name="x" size={11} /> {error}
         </div>
       )}
-    </label>
+    </div>
   );
+}
+
+/* ---------- Helpers ---------- */
+
+/** Cleaned-up filename → "Sambo Boy Iskusstvo" from "sambo_boy_iskusstvo.pdf". */
+function filenameToTitle(name: string): string {
+  return name
+    .replace(/\.[^.]+$/, "")        // strip last extension
+    .replace(/[_\-.]+/g, " ")       // separators → spaces
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^./, (c) => c.toUpperCase());
+}
+
+/**
+ * Best-effort PDF title extraction.  Reads the first 64 KB of the file
+ * (the catalog + xref + first object stream usually fit), and looks for
+ * a `/Title (...)` literal or `/Title <hex...>` form in the metadata
+ * dictionary.  Returns undefined on any parse failure — the caller
+ * should fall back to the cleaned filename.
+ *
+ * This is intentionally crude: a real PDF parser (pdfjs-dist) would
+ * pull in ~1 MB of JS for one string.  For the long tail of PDFs the
+ * /Title is plain ASCII or UTF-16BE prefixed with the BOM, both of
+ * which the regex below catches.
+ */
+async function readPdfTitle(file: File): Promise<string | undefined> {
+  if (!file.name.toLowerCase().endsWith(".pdf")) return undefined;
+  try {
+    const buf = await file.slice(0, 64 * 1024).arrayBuffer();
+    const text = new TextDecoder("latin1").decode(buf);
+    // Form 1: /Title (literal text). The body matches either a
+    // non-special char or a `\X` escape sequence — that way `\(` and
+    // `\)` inside the title don't terminate the capture early.
+    const lit = text.match(/\/Title\s*\(((?:[^()\\]|\\.){2,300})\)/);
+    if (lit) {
+      const t = lit[1].trim();
+      // PDF literal strings can have escape sequences like \( and \\.
+      // Decode the common ones; most titles don't need anything fancy.
+      const decoded = t
+        .replace(/\\\(/g, "(")
+        .replace(/\\\)/g, ")")
+        .replace(/\\\\/g, "\\")
+        .trim();
+      if (decoded && decoded.length >= 2) return decoded;
+    }
+    // Form 2: /Title <FEFF...> — UTF-16BE hex-encoded, BOM-prefixed.
+    const hex = text.match(/\/Title\s*<([0-9A-Fa-f]+)>/);
+    if (hex) {
+      const h = hex[1];
+      let result = "";
+      if (h.toUpperCase().startsWith("FEFF") && h.length % 4 === 0) {
+        for (let i = 4; i < h.length; i += 4) {
+          const code = parseInt(h.slice(i, i + 4), 16);
+          if (code) result += String.fromCharCode(code);
+        }
+      } else {
+        for (let i = 0; i < h.length; i += 2) {
+          const code = parseInt(h.slice(i, i + 2), 16);
+          if (code) result += String.fromCharCode(code);
+        }
+      }
+      const trimmed = result.trim();
+      if (trimmed.length >= 2) return trimmed;
+    }
+  } catch {
+    /* ignore — caller falls back to filename */
+  }
+  return undefined;
+}
+
+/** Suggest a human-friendly title: PDF metadata first, filename otherwise. */
+async function suggestTitle(file: File): Promise<string> {
+  const fromPdf = await readPdfTitle(file);
+  return fromPdf ?? filenameToTitle(file.name);
 }

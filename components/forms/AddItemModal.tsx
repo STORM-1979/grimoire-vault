@@ -7,6 +7,7 @@ import { Field } from "./Field";
 import { FileUpload } from "./FileUpload";
 import { getCategory, isMediaCategory, isVideoCategory } from "@/lib/categories";
 import { extractApi, ApiError } from "@/lib/api-client";
+import { humanSize } from "@/lib/utils";
 import type { CategoryId } from "@/lib/types";
 import type { CreateEntryInput } from "@/lib/schemas/entries";
 
@@ -464,6 +465,17 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
                 maxBytes={100 * 1024 * 1024}
                 value={form.url}
                 onChange={(url) => setForm((f) => ({ ...f, url }))}
+                onMeta={(meta) => {
+                  // Pre-fill title and size on file selection — runs
+                  // BEFORE the upload, so the user gets the autofill
+                  // even if R2 rejects the MIME and we have to retry.
+                  // Only fills empty fields — manual edits always win.
+                  setForm((f) => ({
+                    ...f,
+                    title: f.title.trim() ? f.title : (meta.suggestedTitle ?? ""),
+                    size: f.size.trim() ? f.size : humanSize(meta.size),
+                  }));
+                }}
                 label="Файл — загрузить"
                 hint="PDF · DjVu · DOC/DOCX/XLSX/PPTX · ZIP/RAR/7z · EPUB/MOBI/FB2 · video/audio/image · до 100 MB"
               />
