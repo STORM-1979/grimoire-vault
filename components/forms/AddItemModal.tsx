@@ -10,7 +10,7 @@ import { getCategory, isMediaCategory, isVideoCategory } from "@/lib/categories"
 import { extractApi, ApiError } from "@/lib/api-client";
 import { humanSize } from "@/lib/utils";
 import { resolveYouTubeDuration, youtubeVideoId } from "@/lib/youtube-client";
-import type { CategoryId } from "@/lib/types";
+import type { CategoryId, EntryCollection } from "@/lib/types";
 import type { CreateEntryInput } from "@/lib/schemas/entries";
 
 interface DuplicateInfo {
@@ -23,6 +23,13 @@ interface Props {
   categoryId: CategoryId;
   onClose: () => void;
   onSubmit: (input: CreateEntryInput) => Promise<void>;
+  /** User-defined collections inside this category, if the parent
+   * already loaded them.  Optional — when omitted (or empty), the
+   * collection picker is hidden. */
+  collections?: EntryCollection[];
+  /** Pre-select this collection in the picker — passes through the
+   * currently active collection chip from the category page. */
+  defaultCollectionId?: string | null;
 }
 
 const EMPTY_FORM = {
@@ -30,7 +37,9 @@ const EMPTY_FORM = {
   url: "", thumb: "", cover: "", duration: "", size: "", count: "", model: "",
 };
 
-export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
+export function AddItemModal({
+  categoryId, onClose, onSubmit, collections, defaultCollectionId,
+}: Props) {
   const router = useRouter();
   const cat = getCategory(categoryId);
   const isVideo = isVideoCategory(categoryId);
@@ -51,6 +60,12 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
     || categoryId === "misc";
 
   const [form, setForm] = useState({ ...EMPTY_FORM });
+  // Collection picker state — separate from `form` because it's only
+  // present for categories that have collections, and we don't want
+  // to widen EMPTY_FORM with a field most categories never use.
+  const [collectionId, setCollectionId] = useState<string | null>(
+    defaultCollectionId && defaultCollectionId !== "none" ? defaultCollectionId : null,
+  );
   const [submitting, setSubmitting] = useState(false);
   // Ref mirror of the submit flag — synchronous guard against true
   // rapid-fire clicks that beat React's state batching (touch
@@ -213,6 +228,9 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
     // had a real R2 file but entry.url stayed empty, so the detail
     // page couldn't render the inline preview.
     if (form.url.trim()) input.url = form.url.trim();
+    // Collection assignment — only persisted when the picker is
+    // visible (collections were passed in) and a real id is selected.
+    if (collectionId) input.collectionId = collectionId;
     if (isVideo) {
       if (form.thumb.trim()) input.thumbUrl = form.thumb.trim();
       if (form.duration.trim()) input.duration = form.duration.trim();
@@ -457,6 +475,20 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
                 <input type="text" className="field-input" value={form.duration} onChange={set("duration")}
                   placeholder="12:34" />
               </Field>
+              {collections && collections.length > 0 && (
+                <Field label="Коллекция" hint="Группа внутри YouTube — например «Курсы», «Tech-обзоры»">
+                  <select
+                    className="field-select"
+                    value={collectionId ?? ""}
+                    onChange={(e) => setCollectionId(e.target.value || null)}
+                  >
+                    <option value="">— Без коллекции —</option>
+                    {collections.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </Field>
+              )}
             </>
           )}
 

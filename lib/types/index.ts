@@ -100,7 +100,30 @@ export interface Entry {
    * vault (read + write per RLS).
    */
   vaultId?: string | null;
+  /**
+   * User-defined collection inside the system category (e.g. a
+   * "Курсы" sub-folder under YouTube).  Null = unassigned, lives at
+   * the root of the category.
+   */
+  collectionId?: string | null;
   createdAt: string;                // ISO timestamp
+  updatedAt: string;
+}
+
+/**
+ * User-defined sub-folder inside a system category.  Created and
+ * managed via the collections API.  parent_id supports two-level
+ * nesting in the schema; the initial UI uses a flat list.
+ */
+export interface EntryCollection {
+  id: string;
+  userId: string;
+  categoryId: CategoryId;
+  parentId?: string | null;
+  name: string;
+  slug: string;
+  position: number;
+  createdAt: string;
   updatedAt: string;
 }
 

@@ -28,6 +28,8 @@ export async function listEntries(query: ListEntriesQuery): Promise<{ items: Ent
   if (query.importedVia) q = q.eq("imported_via", query.importedVia);
   if (query.vaultId === "personal") q = q.is("vault_id", null);
   else if (query.vaultId) q = q.eq("vault_id", query.vaultId);
+  if (query.collectionId === "none") q = q.is("collection_id", null);
+  else if (query.collectionId) q = q.eq("collection_id", query.collectionId);
   if (query.triage === "untriaged") q = q.is("triaged_at", null);
   // PostgREST: `triaged_at=not.is.null` is the canonical "is not null".
   // supabase-js's `.not('col','is',null)` would coerce null to undefined

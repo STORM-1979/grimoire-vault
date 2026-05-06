@@ -2,10 +2,11 @@
  * Typed fetch wrappers around our /api routes.
  * Used by client components and React hooks.
  */
-import type { Entry, KanbanCard, KanbanColumn, CredentialRecord } from "@/lib/types";
+import type { Entry, KanbanCard, KanbanColumn, CredentialRecord, EntryCollection, CategoryId } from "@/lib/types";
 import type { CreateEntryInput, UpdateEntryInput, ListEntriesQuery } from "@/lib/schemas/entries";
 import type { CreateKanbanInput, UpdateKanbanInput, ReorderKanbanInput } from "@/lib/schemas/kanban";
 import type { CreateCredentialInput, UpdateCredentialInput } from "@/lib/schemas/credentials";
+import type { CreateCollectionInput, UpdateCollectionInput } from "@/lib/schemas/collections";
 
 export class ApiError extends Error {
   constructor(message: string, public status: number, public body?: unknown) {
@@ -163,6 +164,18 @@ export const r2Api = {
     contentLength: number;
   }) =>
     call<PresignedUpload>("/api/r2/presign", { method: "POST", body: JSON.stringify(input) }),
+};
+
+/* ---------- COLLECTIONS ---------- */
+export const collectionsApi = {
+  list: (categoryId: CategoryId) =>
+    call<{ items: EntryCollection[] }>(`/api/collections?categoryId=${categoryId}`),
+  create: (input: CreateCollectionInput) =>
+    call<EntryCollection>("/api/collections", { method: "POST", body: JSON.stringify(input) }),
+  update: (id: string, input: UpdateCollectionInput) =>
+    call<EntryCollection>(`/api/collections/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
+  delete: (id: string) =>
+    call<void>(`/api/collections/${id}`, { method: "DELETE" }),
 };
 
 /* ---------- KANBAN ---------- */

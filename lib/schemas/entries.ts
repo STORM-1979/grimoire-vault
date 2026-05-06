@@ -48,6 +48,8 @@ export const createEntrySchema = z.object({
   importedVia: z.enum(["web", "bot", "cli", "api"]).default("web"),
   /** Null / omitted → personal mode.  Otherwise must be a UUID of a vault the user is a member of (RLS enforces). */
   vaultId: z.string().uuid().optional().nullable(),
+  /** User-defined sub-folder inside the system category. */
+  collectionId: z.string().uuid().optional().nullable(),
 }).strict();
 
 /**
@@ -86,6 +88,8 @@ export const updateEntrySchema = z.object({
   // Move between vaults (or to personal via null).  RLS enforces that
   // the caller belongs to the destination vault.
   vaultId: z.string().uuid().optional().nullable(),
+  /** Move into / out of a user-defined collection. */
+  collectionId: z.string().uuid().optional().nullable(),
 }).strict();
 
 /** Query string for GET /api/entries */
@@ -106,6 +110,9 @@ export const listEntriesQuerySchema = z.object({
    *   • <uuid>     → vault_id = <uuid>
    */
   vaultId: z.union([z.literal("personal"), z.string().uuid()]).optional(),
+  /** Filter by user-defined collection.  "none" → entries with NULL
+   *  collection_id; UUID → entries in that collection; omitted → all. */
+  collectionId: z.union([z.literal("none"), z.string().uuid()]).optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
   offset: z.coerce.number().int().min(0).default(0),
 });

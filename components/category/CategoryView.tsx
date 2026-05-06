@@ -11,7 +11,8 @@ import { ItemCard } from "./ItemCard";
 import { VideoCard } from "./VideoCard";
 import { MediaCard } from "./MediaCard";
 import { BulkActionsBar } from "./BulkActionsBar";
-import type { Category, CategoryId, Entry } from "@/lib/types";
+import { CollectionsTabs } from "./CollectionsTabs";
+import type { Category, CategoryId, Entry, EntryCollection } from "@/lib/types";
 
 // Lazy-load modals: both pull in FileUpload + XHR helpers (~6 KB each).
 // They're rarely opened on a page visit, so we keep them out of the
@@ -39,11 +40,27 @@ export function CategoryView({ category, initialItems }: Props) {
   const [editing, setEditing] = useState<Entry | null>(null);
   const [bulkIds, setBulkIds] = useState<Set<string>>(new Set());
   const [bulkError, setBulkError] = useState<string | null>(null);
+  // Collections sub-filter — null = all, "none" = uncategorised, uuid = that collection.
+  const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
+  const [collections, setCollections] = useState<EntryCollection[]>([]);
 
-  const pinned = items.filter((it) => it.pinned);
-  const others = items.filter((it) => !it.pinned);
   const isVideo = isVideoCategory(category.id);
   const isMedia = isMediaCategory(category.id);
+  // Collections currently exposed for YouTube only — schema supports
+  // every category but the UI is gated to keep the chip row tidy.
+  const showCollections = isVideo;
+
+  // Apply the collections filter before pinned/others split so all
+  // downstream code (cards, keyboard nav, bulk ops) sees a consistent
+  // already-filtered list.
+  const filtered = !showCollections || selectedCollection === null
+    ? items
+    : selectedCollection === "none"
+    ? items.filter((it) => !it.collectionId)
+    : items.filter((it) => it.collectionId === selectedCollection);
+
+  const pinned = filtered.filter((it) => it.pinned);
+  const others = filtered.filter((it) => !it.pinned);
 
   // Keyboard nav operates on the visual order (pinned first, then others).
   const flat = useMemo(() => [...pinned, ...others], [pinned, others]);
@@ -145,6 +162,8 @@ export function CategoryView({ category, initialItems }: Props) {
           categoryId={category.id}
           onClose={() => setShowAdd(false)}
           onSubmit={async (input) => { await create(input); }}
+          collections={showCollections ? collections : undefined}
+          defaultCollectionId={showCollections ? selectedCollection : null}
         />
       )}
 
@@ -160,6 +179,15 @@ export function CategoryView({ category, initialItems }: Props) {
         <div className="max-w-[1480px] mx-auto px-10 mb-6 font-mono text-[11px] text-red-400 flex items-center gap-2">
           <Icon name="x" size={12} /> {bulkError ?? error}
         </div>
+      )}
+
+      {showCollections && (
+        <CollectionsTabs
+          categoryId={category.id}
+          selected={selectedCollection}
+          onSelect={setSelectedCollection}
+          onCollectionsChange={setCollections}
+        />
       )}
 
       {/* Pinned section */}
