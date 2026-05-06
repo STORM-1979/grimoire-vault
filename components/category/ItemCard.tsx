@@ -47,15 +47,14 @@ export function ItemCard({
   };
 
   // Prefer thumb (used by video category) over cover (used by media);
-  // either may live on a non-video / non-media entry too — e.g. a Web
-  // entry built from a YouTube paste, where og:image got pulled into
-  // both fields.  Fall back to category icon when there's nothing.
-  // Web is special-cased: by request, web entries do NOT show a
-  // thumbnail — they get an animated, deterministic gradient block
-  // instead, derived from the entry id so colours never repeat.
+  // either may live on a non-video / non-media entry too — e.g. a
+  // Skills/Ideas/Misc entry built from an article paste, where
+  // og:image got pulled into both fields.  Web entries intentionally
+  // skip the thumbnail — by request the row stays minimal (icon +
+  // title) without any decorative accent.  Fall back to the category
+  // icon when there's no preview.
   const isWeb = category.id === "web";
   const thumb = !isWeb ? (item.thumbUrl || item.coverUrl || null) : null;
-  const gradient = isWeb ? gradientStyle(item.id) : null;
 
   if (large) {
     return (
@@ -70,15 +69,7 @@ export function ItemCard({
           </div>
         )}
         <ItemActions item={item} onTogglePin={onTogglePin} onDelete={onDelete} onEdit={onEdit} />
-        {gradient ? (
-          // Site-themed accent — small centred rectangle, not a full
-          // hero strip.  Stays decorative, doesn't crowd the title.
-          <div
-            aria-hidden="true"
-            style={gradient}
-            className="w-32 h-12 rounded-md mx-auto mb-4 border border-white/10 shadow-md"
-          />
-        ) : thumb && (
+        {thumb && (
           // Hero strip on the pinned/large variant.  16:9 to match the
           // shape of og:image / YouTube thumbs without distorting.
           // eslint-disable-next-line @next/next/no-img-element
@@ -129,18 +120,6 @@ export function ItemCard({
       <ItemActions item={item} onTogglePin={onTogglePin} onDelete={onDelete} onEdit={onEdit} />
       {/* Left slot: small category icon. */}
       <div className="text-emerald-200 mt-1 flex-shrink-0"><Icon name={category.icon} size={20} /></div>
-      {/* Centred gradient accent for web entries — absolutely
-          positioned so the surrounding content keeps its natural
-          flex-flow while the rectangle lands at the geometrical
-          horizontal centre of the card.  pointer-events-none so it
-          never eats clicks meant for the row. */}
-      {gradient && (
-        <div
-          aria-hidden="true"
-          style={gradient}
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-12 rounded-md border border-white/10 shadow-md pointer-events-none"
-        />
-      )}
       <div className="flex-1 min-w-0 pr-20 flex items-center gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5">
@@ -154,10 +133,11 @@ export function ItemCard({
             {item.tags.map((t) => <span key={t} className="tag-soft">{t}</span>)}
           </div>
         </div>
-        {!gradient && thumb && (
+        {thumb && (
           // 128×72 16:9 thumbnail for non-web categories that have
           // og:image — Skills/Ideas/Misc/Documents/Local benefit from
-          // a quick visual without reading the title.
+          // a quick visual without reading the title.  Web is excluded
+          // by the `thumb` derivation above and stays icon-only.
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={thumb}
@@ -175,49 +155,4 @@ export function ItemCard({
       </div>
     </div>
   );
-}
-
-/* ---------- helpers ---------- */
-
-/**
- * Deterministic per-entry gradient for the web-resource accent block.
- * Uses a 32-bit FNV-like hash of the entry id to derive three HSL hues
- * that drift across the colour wheel — first hue from the hash, second
- * +90° (analogous-ish), third +205° (near-complement) so adjacent cards
- * never look the same.  Saturation/lightness are pinned to a tasteful
- * range so the gradient stays vibrant without being garish.
- */
-/**
- * Site-themed gradient palette — every pair is built from emerald,
- * gold, ivory and their tonal cousins so the accent block never
- * clashes with the rest of the page.  Order is intentional: adjacent
- * indices avoid using the same dominant colour, which means even a
- * small ids → mod-N collision still gives visible variety in the
- * list.  No animation — just a static linear gradient.
- */
-const WEB_PALETTES: ReadonlyArray<readonly [string, string]> = [
-  ["#0a5f43", "#d4b76a"], // emerald-700 → gold
-  ["#d4b76a", "#a7e8c7"], // gold       → emerald-200
-  ["#0f8a5c", "#e8d29c"], // emerald-500 → gold-soft
-  ["#9a8047", "#a7e8c7"], // gold-deep  → emerald-200
-  ["#064e3b", "#e8d29c"], // emerald-800 → gold-soft
-  ["#26a373", "#faf6e9"], // emerald-400 → ivory
-  ["#03311f", "#d4b76a"], // emerald-900 → gold
-  ["#0a6b4a", "#e8d29c"], // emerald-600 → gold-soft
-] as const;
-
-function gradientStyle(id: string): React.CSSProperties {
-  // FNV-1a 32-bit avalanche — mixes every byte hard so two ids that
-  // share most of their length (sequential slugs, very-similar UUIDs)
-  // still pick distant palette indices.  Math.imul keeps the multiply
-  // 32-bit-safe in JS.
-  let h = 2166136261;
-  for (let i = 0; i < id.length; i++) {
-    h ^= id.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  const [a, b] = WEB_PALETTES[Math.abs(h) % WEB_PALETTES.length];
-  return {
-    backgroundImage: `linear-gradient(135deg, ${a} 0%, ${b} 100%)`,
-  };
 }
