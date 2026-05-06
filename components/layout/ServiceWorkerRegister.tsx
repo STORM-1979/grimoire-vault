@@ -12,9 +12,41 @@ export function ServiceWorkerRegister() {
 
     // Register only in production — Turbopack HMR + SW = pain in dev
     if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch((e) => {
-        console.warn("SW register failed:", e);
-      });
+      (async () => {
+        try {
+          const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+
+          // If a new SW finished installing while the page is open, reload
+          // immediately — this is the path that previously left users on
+          // stale JS for hours after a deploy.  Browser flag to avoid
+          // looping if the new SW also points to a cached old chunk.
+          let reloaded = false;
+          const reloadOnce = () => {
+            if (reloaded) return;
+            reloaded = true;
+            window.location.reload();
+          };
+
+          reg.addEventListener("updatefound", () => {
+            const newSw = reg.installing;
+            if (!newSw) return;
+            newSw.addEventListener("statechange", () => {
+              if (newSw.state === "activated") reloadOnce();
+            });
+          });
+
+          // Active SW was just swapped (controller change) — typical when
+          // a new SW called skipWaiting + clients.claim — reload to drop
+          // the stale chunks running in this tab.
+          navigator.serviceWorker.addEventListener("controllerchange", reloadOnce);
+
+          // Ask the browser to check for an updated SW now (it's lazy
+          // about this otherwise — sometimes 24h before it'd notice).
+          await reg.update().catch(() => {});
+        } catch (e) {
+          console.warn("SW register failed:", e);
+        }
+      })();
     }
 
     const onOnline = () => setOnline(true);
