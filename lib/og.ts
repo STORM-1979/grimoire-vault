@@ -152,6 +152,124 @@ async function fetchYouTubeOEmbed(videoId: string): Promise<{
   }
 }
 
+/**
+ * YouTube Innertube player query.  Returns the actual videoDetails
+ * payload — title, channel, full description, lengthSeconds, thumbnail
+ * sizes — without needing a Data API key or any auth.
+ *
+ * Why we go here instead of just scraping the watch page:
+ *   • The watch HTML is consent-walled / age-gated / geo-blocked for
+ *     plenty of videos when fetched without a session.  Innertube
+ *     returns the metadata anyway because it's the same backend the
+ *     mobile clients hit, and it doesn't render the player.
+ *   • shortDescription gives us the real video description (what we
+ *     show as the "выжимка" / summary).  og:description on YouTube is
+ *     limited to ~150 chars and frequently absent.
+ *   • lengthSeconds is the canonical video duration.  itemprop=duration
+ *     and the inline lengthSeconds JSON only appear on the rendered
+ *     watch page; here we get it on every call.
+ *
+ * The INNERTUBE_API_KEY is the public WEB-client key embedded on every
+ * youtube.com page and used by yt-dlp / Invidious / etc. for years.
+ * If YouTube rotates it the function returns null and the caller falls
+ * back to oEmbed + scrape data.
+ */
+const INNERTUBE_KEY = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
+
+interface InnertubeMeta {
+  title?: string;
+  author?: string;
+  description?: string;
+  duration?: string;
+  image?: string;
+}
+
+async function fetchYouTubeInnertube(videoId: string): Promise<InnertubeMeta | null> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 5000);
+  try {
+    const res = await fetch(
+      `https://www.youtube.com/youtubei/v1/player?key=${INNERTUBE_KEY}&prettyPrint=false`,
+      {
+        method: "POST",
+        signal: ctrl.signal,
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent": USER_AGENT,
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+        body: JSON.stringify({
+          videoId,
+          context: {
+            client: {
+              clientName: "WEB",
+              clientVersion: "2.20240101.00.00",
+              hl: "ru",
+              gl: "RU",
+            },
+          },
+        }),
+      },
+    );
+    if (!res.ok) return null;
+    const data = await res.json() as {
+      videoDetails?: {
+        title?: string;
+        author?: string;
+        lengthSeconds?: string;
+        shortDescription?: string;
+        thumbnail?: { thumbnails?: Array<{ url: string; width?: number; height?: number }> };
+      };
+      playabilityStatus?: { status?: string };
+    };
+    if (data.playabilityStatus?.status === "ERROR") return null;
+    const v = data.videoDetails;
+    if (!v) return null;
+    const seconds = v.lengthSeconds ? parseInt(v.lengthSeconds, 10) : 0;
+    const thumbs = v.thumbnail?.thumbnails ?? [];
+    // Pick the largest thumb innertube returned.  These are usually
+    // i.ytimg.com URLs at hqdefault / sddefault / maxresdefault.
+    const bestThumb = thumbs.length
+      ? thumbs.reduce((a, b) => ((b.width ?? 0) > (a.width ?? 0) ? b : a)).url
+      : `https://i.ytimg.com/vi_webp/${videoId}/maxresdefault.webp`;
+    return {
+      title: v.title,
+      author: v.author,
+      description: v.shortDescription ? truncateDescription(v.shortDescription) : undefined,
+      duration: seconds > 0 ? secondsToHuman(seconds) : undefined,
+      image: bestThumb,
+    };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Trim a YouTube `shortDescription` down to a 500-char "выжимка".
+ * Most YT descriptions start with the actual blurb and then drop into
+ * timestamps / sponsor / links / hashtags — taking the first paragraph
+ * (or first 500 chars, whichever wins) keeps the meaningful intro and
+ * skips the tail.  Newlines collapsed to single line breaks so the
+ * field renders cleanly in the modal textarea.
+ */
+function truncateDescription(raw: string): string {
+  const trimmed = raw.trim();
+  // First, try to cut at the first run of two-or-more blank lines —
+  // that's usually the boundary between the intro and timestamps/links.
+  const firstSection = trimmed.split(/\n{2,}/)[0]?.trim() ?? "";
+  // Pick the shorter of (first section) and (first 500 chars).
+  const cap = 500;
+  let out = firstSection.length > 0 && firstSection.length <= cap
+    ? firstSection
+    : trimmed.slice(0, cap);
+  // Collapse runs of single newlines + trim trailing junk.
+  out = out.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  if (out.length < trimmed.length) out += "…";
+  return out;
+}
+
 /** Detect well-known video URLs so the caller can route to the right category. */
 function detectVideoId(u: URL): string | undefined {
   const h = u.hostname.replace(/^www\./, "");
@@ -338,17 +456,41 @@ export async function extractMetadata(input: string): Promise<ExtractedMeta> {
     }
   }
 
+  // Innertube top-up for YouTube videos.  The watch-page scrape can be
+  // missing duration (consent walls strip itemprop=duration and the
+  // lengthSeconds JSON blob both) and rarely carries the full video
+  // description — but the internal player API has both.  Run it as a
+  // last enrichment step so duration / description always land when
+  // they're available, regardless of how the HTML scrape went.
+  let finalDescription = description;
+  if (videoId) {
+    const it = await fetchYouTubeInnertube(videoId);
+    if (it) {
+      finalTitle ??= it.title;
+      finalAuthor ??= it.author;
+      finalImage ??= it.image;
+      duration ??= it.duration;
+      // Replace generic / missing description with the real video
+      // description.  The og:description on YouTube is typically a
+      // truncated single-sentence string; innertube gives the full
+      // text which we already trimmed to ~500 chars in the fetcher.
+      if (!finalDescription?.trim() && it.description) {
+        finalDescription = it.description;
+      }
+    }
+  }
+
   return {
     url: finalUrl,
     title: finalTitle?.slice(0, 280),
-    description: description?.slice(0, 1000),
+    description: finalDescription?.slice(0, 1000),
     image: finalImage,
     siteName,
     videoId,
     author: finalAuthor,
     duration,
     tags,
-    hasContent: Boolean(finalTitle || description),
+    hasContent: Boolean(finalTitle || finalDescription),
   };
 }
 
