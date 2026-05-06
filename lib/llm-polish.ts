@@ -143,7 +143,17 @@ export async function polishWithLLM(transcript: string): Promise<string[] | null
     }));
   }
 
-  // Attempt 2 — smaller sample, in case the first hit a length wall.
+  // 429 = rate-limited.  Retrying immediately would just burn another
+  // bucket entry against the same wall, so we give up here and let the
+  // caller fall back to extractive output.  Same for any other 4xx —
+  // the request shape isn't going to fix itself in 0 ms.
+  if (res1.status === 429 || (res1.status >= 400 && res1.status < 500)) {
+    console.log(JSON.stringify({ msg: "polish.attempts", attempts, finalBullets: 0, gaveUp: `status ${res1.status}` }));
+    return null;
+  }
+
+  // Attempt 2 — smaller sample, only when the first attempt was a
+  // genuine "succeeded but the model misformatted" or a transient 5xx.
   const trimmed = smartSample(transcript, RETRY_INPUT_BYTES);
   const prompt2 = buildPrompt(trimmed, isLong);
   const res2 = await callPollinations(prompt2);

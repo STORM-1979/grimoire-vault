@@ -232,18 +232,19 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
       if (err instanceof ApiError && err.status === 409) {
         const body = err.body as { existing?: DuplicateInfo } | null;
         if (body?.existing?.id) {
-          // Server already has this URL.  Surface the banner briefly,
-          // then auto-navigate to the existing entry — matches user
-          // intent ("I want to see this video") and avoids the case
-          // where the duplicate banner gets lost below the fold of a
-          // long modal.
+          // Server already has this URL.  Surface the banner clearly,
+          // then auto-navigate to the existing entry after 3.5 s —
+          // matches user intent ("I want to see this video") and gives
+          // them time to read what's happening before the redirect.
+          // The banner itself is sticky to the bottom of the modal so
+          // it can't get lost below the fold.
           setDuplicate(body.existing);
           failedUrl.current = form.url.trim() || null;
           const targetId = body.existing.id;
           setTimeout(() => {
             onClose();
             router.push(`/entry/${targetId}`);
-          }, 1500);
+          }, 3500);
           return { ok: false };
         }
       }

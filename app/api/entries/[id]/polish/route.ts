@@ -69,6 +69,22 @@ export const POST = withErrorHandler(async (_req: Request, ctx: RouteContext) =>
     return NextResponse.json({ summary: cached as string[], cached: true, source: "llm" });
   }
 
+  // Cool-down guard.  If our last polish attempt failed with rate-limit
+  // / quota error, skip retry for 10 minutes so we don't keep burning
+  // the rate limit bucket on every page view.  Polished output is a
+  // nice-to-have, not blocking for the user — extractive is fine
+  // until the cool-down expires.
+  const lastFailedAt = entry.metadata?.polishFailedAt as unknown;
+  if (typeof lastFailedAt === "string") {
+    const elapsedMs = Date.now() - new Date(lastFailedAt).getTime();
+    if (Number.isFinite(elapsedMs) && elapsedMs < 10 * 60 * 1000) {
+      throw new HttpError(
+        "Лимит нейросети — повторная попытка через несколько минут",
+        503,
+      );
+    }
+  }
+
   // Prefer cached transcript so we don't re-hit kome.ai for a polish
   // call that already saw a /summarize round-trip.  Fall back to fresh
   // fetch if the cache is missing (someone called /polish without ever
@@ -93,6 +109,15 @@ export const POST = withErrorHandler(async (_req: Request, ctx: RouteContext) =>
       ok: false,
       transcriptLen: transcriptText.length,
     }));
+    // Stamp metadata.polishFailedAt so the cool-down kicks in on the
+    // next view.  We persist transcript regardless so a future polish
+    // attempt skips the kome.ai round-trip.
+    const failMeta = {
+      ...(entry.metadata ?? {}),
+      transcript: transcriptText,
+      polishFailedAt: new Date().toISOString(),
+    };
+    await updateEntry(id, { metadata: failMeta });
     throw new HttpError("LLM не отдал тезисы — оставляю extractive", 503);
   }
 
@@ -114,8 +139,12 @@ export const POST = withErrorHandler(async (_req: Request, ctx: RouteContext) =>
     transcriptLen: transcriptText.length,
   }));
 
+  // Drop any prior polishFailedAt timestamp on success — we're past
+  // the cool-down regardless of when it was set.
+  const prevMeta: Record<string, unknown> = { ...(entry.metadata ?? {}) };
+  delete prevMeta.polishFailedAt;
   const nextMeta = {
-    ...(entry.metadata ?? {}),
+    ...prevMeta,
     summary: finalTheses,
     summarySource: "llm",
     transcript: transcriptText,

@@ -33,6 +33,7 @@ export function VideoSummary({
   const [source, setSource] = useState<string>(initialSource ?? "");
   const [loading, setLoading] = useState(!theses);
   const [polishing, setPolishing] = useState(false);
+  const [polishError, setPolishError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Stage 1 — fast extractive (or cached).
@@ -74,7 +75,11 @@ export function VideoSummary({
         const res = await fetch(`/api/entries/${entryId}/polish`, { method: "POST" });
         if (cancelled) return;
         if (!res.ok) {
-          // Polish failed — keep showing extractive, no error banner.
+          // Polish failed — keep showing extractive but tell the user
+          // an upgrade was attempted and didn't land, so they don't
+          // wonder why the "AI" badge never appeared.
+          const body = await res.json().catch(() => ({}));
+          setPolishError(body?.error ?? "AI-выжимка пока недоступна");
           return;
         }
         const data = await res.json() as { summary?: string[]; source?: string };
@@ -106,6 +111,11 @@ export function VideoSummary({
         {polishing && (
           <span className="ml-2 normal-case tracking-normal text-ivory-mute font-light">
             · обновляю выжимку через нейросеть…
+          </span>
+        )}
+        {!polishing && polishError && source !== "llm" && (
+          <span className="ml-2 normal-case tracking-normal text-amber-300/80 font-light">
+            · {polishError}
           </span>
         )}
       </div>
