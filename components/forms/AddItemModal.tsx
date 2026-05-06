@@ -465,7 +465,7 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
                 value={form.url}
                 onChange={(url) => setForm((f) => ({ ...f, url }))}
                 label="Файл — загрузить"
-                hint="PDF / DOCX / ZIP / video / audio / image · до 100 MB"
+                hint="PDF · DjVu · DOC/DOCX/XLSX/PPTX · ZIP/RAR/7z · EPUB/MOBI/FB2 · video/audio/image · до 100 MB"
               />
               <Field label="Размер (display label)">
                 <input type="text" className="field-input" value={form.size} onChange={set("size")} placeholder="2.4 MB" />

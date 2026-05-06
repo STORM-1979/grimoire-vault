@@ -182,17 +182,82 @@ export function publicUrl(key: string): string {
 /* ---------- Validation ---------- */
 export const ALLOWED_KINDS: AssetKind[] = ["originals", "covers", "thumbs"];
 
+/**
+ * MIME allowlist per kind.
+ *
+ * For `originals` we accept the long tail of formats users actually drop
+ * into a personal knowledge vault: documents, archives, ebooks, audio/
+ * video, plus the noisy aliases different OSes attach to the same file.
+ *
+ * Why aliases matter:
+ *   • Windows shows ZIPs as "application/x-zip-compressed", macOS sends
+ *     "application/zip", Firefox sometimes sends "application/x-zip".
+ *     All three are the same archive — we accept all three.
+ *   • DjVu (.djvu) has at least three competing MIME strings in the wild
+ *     (image/vnd.djvu, image/x-djvu, image/djvu) and none are official
+ *     IANA-registered — most browsers fall back to octet-stream.
+ *   • Old .doc / .xls / .ppt have separate MIMEs from their .docx / .xlsx
+ *     siblings; users may upload either.
+ */
 export const ALLOWED_MIME: Record<AssetKind, string[]> = {
   thumbs: ["image/webp", "image/jpeg", "image/png", "image/avif", "image/gif"],
   covers: ["image/webp", "image/jpeg", "image/png", "image/avif", "image/gif"],
   originals: [
+    // images
     "image/webp", "image/jpeg", "image/png", "image/avif", "image/gif",
-    "video/mp4", "video/webm", "video/quicktime",
-    "audio/mpeg", "audio/wav", "audio/x-m4a",
-    "application/pdf",
-    "text/plain", "text/markdown",
-    "application/zip",
+    "image/svg+xml", "image/bmp", "image/tiff", "image/heic", "image/heif",
+    // DjVu — three flavours seen in the wild
+    "image/vnd.djvu", "image/x-djvu", "image/djvu",
+    // video
+    "video/mp4", "video/webm", "video/quicktime", "video/x-matroska",
+    "video/x-msvideo", "video/avi", "video/x-ms-wmv", "video/3gpp",
+    // audio
+    "audio/mpeg", "audio/wav", "audio/x-wav", "audio/x-m4a", "audio/mp4",
+    "audio/ogg", "audio/flac", "audio/aac", "audio/webm",
+    // PDF / plain text
+    "application/pdf", "text/plain", "text/markdown", "text/x-markdown",
+    "text/csv", "application/json", "text/rtf", "application/rtf",
+    // archives — every alias browsers send
+    "application/zip", "application/x-zip-compressed", "application/x-zip",
+    "application/x-rar-compressed", "application/vnd.rar",
+    "application/x-7z-compressed", "application/x-tar",
+    "application/gzip", "application/x-gzip", "application/x-bzip2",
+    // Microsoft Office (legacy + OOXML)
+    "application/msword",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    // OpenDocument
+    "application/vnd.oasis.opendocument.text",
+    "application/vnd.oasis.opendocument.spreadsheet",
+    "application/vnd.oasis.opendocument.presentation",
+    // ebooks
+    "application/epub+zip", "application/x-mobipocket-ebook",
+    "application/vnd.amazon.ebook", "application/x-fictionbook+xml",
+  ],
+};
+
+/**
+ * Extension-based fallback used when the browser sends `application/
+ * octet-stream` (frequent for DjVu, FB2, MOBI, MKV on Windows) or some
+ * other unknown MIME.  We trust the extension here because R2 is private
+ * and we've already auth-gated the route.
+ */
+export const ALLOWED_EXT: Record<AssetKind, string[]> = {
+  thumbs: ["webp", "jpg", "jpeg", "png", "avif", "gif"],
+  covers: ["webp", "jpg", "jpeg", "png", "avif", "gif"],
+  originals: [
+    "webp", "jpg", "jpeg", "png", "avif", "gif", "svg", "bmp", "tif", "tiff", "heic", "heif",
+    "djvu", "djv",
+    "mp4", "webm", "mov", "mkv", "avi", "wmv", "3gp",
+    "mp3", "wav", "m4a", "ogg", "flac", "aac",
+    "pdf", "txt", "md", "markdown", "csv", "json", "rtf",
+    "zip", "rar", "7z", "tar", "gz", "tgz", "bz2",
+    "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+    "odt", "ods", "odp",
+    "epub", "mobi", "azw", "azw3", "fb2",
   ],
 };
 
@@ -202,9 +267,43 @@ export const MAX_BYTES: Record<AssetKind, number> = {
   originals: 100 * 1024 * 1024,   // 100 MB
 };
 
-export function validateUpload(kind: AssetKind, contentType: string, contentLength: number): string | null {
+/** Lowercase extension (without dot) or "" if the name has none. */
+function extOf(fileName: string): string {
+  const m = fileName.match(/\.([a-z0-9]+)$/i);
+  return m ? m[1].toLowerCase() : "";
+}
+
+/**
+ * Validate the upload request.  Accept either:
+ *   • a known MIME (case-insensitive comparison — some browsers shout)
+ *   • OR a known file extension when the MIME is generic (octet-stream,
+ *     application/binary) — the file extension wins.
+ *
+ * `fileName` is optional so older callers (and Telegram-bot uploads
+ * that go through a different path) keep working.
+ */
+export function validateUpload(
+  kind: AssetKind,
+  contentType: string,
+  contentLength: number,
+  fileName?: string,
+): string | null {
   if (!ALLOWED_KINDS.includes(kind)) return `Unknown kind: ${kind}`;
-  if (!ALLOWED_MIME[kind].includes(contentType)) return `Тип ${contentType} не разрешён для ${kind}`;
+  const mime = (contentType || "").toLowerCase().trim();
+  const allowedMime = ALLOWED_MIME[kind].map((s) => s.toLowerCase());
+  const mimeOk = allowedMime.includes(mime);
+  // Generic / missing MIME → fall back to the file extension.  Matches
+  // Windows behaviour for DjVu / MKV / FB2 / MOBI which often arrive as
+  // application/octet-stream or empty.
+  const isGenericMime = !mime
+    || mime === "application/octet-stream"
+    || mime === "application/binary"
+    || mime === "binary/octet-stream";
+  const ext = fileName ? extOf(fileName) : "";
+  const extOk = ext && ALLOWED_EXT[kind].includes(ext);
+  if (!mimeOk && !(isGenericMime && extOk)) {
+    return `Тип ${contentType || "(не указан)"} не разрешён для ${kind}`;
+  }
   if (contentLength <= 0) return "File is empty";
   if (contentLength > MAX_BYTES[kind]) {
     return `Файл больше лимита (${(MAX_BYTES[kind] / 1024 / 1024).toFixed(0)} MB)`;

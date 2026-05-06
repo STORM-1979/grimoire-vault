@@ -7,7 +7,7 @@ export const POST = withErrorHandler(async (request: Request) => {
   const user = await requireUser();
   const input = await parseBody(request, presignUploadSchema);
 
-  const validationError = validateUpload(input.kind, input.contentType, input.contentLength);
+  const validationError = validateUpload(input.kind, input.contentType, input.contentLength, input.fileName);
   if (validationError) throw new HttpError(validationError, 400);
 
   const presigned = await presignUpload({
