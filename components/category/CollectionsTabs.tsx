@@ -106,7 +106,12 @@ export function CollectionsTabs({
   }, [selected, byId]);
 
   const subRow = activeRootId ? byParent.get(activeRootId) ?? [] : [];
-  const showSubRow = activeRootId && (subRow.length > 0 || creating?.parentId === activeRootId);
+  // Sub-row visible whenever a parent is on the selection path —
+  // even if it has no children yet — so the user has a discoverable
+  // entry point ("+ Новая подкатегория") for the FIRST sub-collection.
+  // Without this the row was chicken-and-egg: it only appeared after
+  // a child existed, but there was no way to create one.
+  const showSubRow = !!activeRootId;
 
   const handleCreate = async () => {
     if (!creating) return;
