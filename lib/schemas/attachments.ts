@@ -10,27 +10,38 @@ import { z } from "zod";
 
 export const attachmentKindSchema = z.enum(["image", "video", "link", "note", "file"]);
 
-const urlOrEmpty = z.string().url().or(z.literal("")).optional().nullable();
+/**
+ * URL validator that accepts absolute http(s) URLs OR our internal
+ * `/api/r2/object/...` paths.  R2 uploads return the latter (the
+ * browser is same-origin) and the default `z.string().url()` rejects
+ * them because they have no scheme — which gave us "Invalid request
+ * body" 400s when adding image/file blocks to the board.
+ */
+const looseUrl = z.string().refine(
+  (s) => /^(https?:\/\/|\/api\/r2\/)/.test(s),
+  { message: "Must be an absolute URL or /api/r2/* path" },
+);
+const urlOrEmpty = looseUrl.or(z.literal("")).optional().nullable();
 
 /** POST /api/entries/[id]/attachments */
 export const createAttachmentSchema = z.discriminatedUnion("kind", [
   // Image / video / file: URL is required, caption optional.
   z.object({
     kind: z.literal("image"),
-    url: z.string().url(),
+    url: looseUrl,
     caption: z.string().max(280).optional().nullable(),
     metadata: z.record(z.string(), z.unknown()).optional(),
   }).strict(),
   z.object({
     kind: z.literal("video"),
-    url: z.string().url(),
+    url: looseUrl,
     caption: z.string().max(280).optional().nullable(),
     thumbUrl: urlOrEmpty,
     metadata: z.record(z.string(), z.unknown()).optional(),
   }).strict(),
   z.object({
     kind: z.literal("file"),
-    url: z.string().url(),
+    url: looseUrl,
     caption: z.string().max(280).optional().nullable(),
     metadata: z.record(z.string(), z.unknown()).optional(),
   }).strict(),
@@ -39,7 +50,7 @@ export const createAttachmentSchema = z.discriminatedUnion("kind", [
   //  the client first to keep this snappy).
   z.object({
     kind: z.literal("link"),
-    url: z.string().url(),
+    url: looseUrl,
     caption: z.string().max(280).optional().nullable(),
     body: z.string().max(2000).optional().nullable(),
     thumbUrl: urlOrEmpty,

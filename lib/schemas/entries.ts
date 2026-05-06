@@ -11,7 +11,19 @@ export const categoryIdSchema = z.enum([
   "skills", "prompts", "kanban", "ideas", "portfolio", "misc", "credentials",
 ]);
 
-const urlOrEmpty = z.string().url().or(z.literal("")).optional().nullable();
+/**
+ * URL or empty.  Accepts either:
+ *   • absolute http(s) URLs (Unsplash, og:image extractions, etc.)
+ *   • our internal `/api/r2/object/...` paths from FileUpload — these
+ *     are server-rendered and stay relative because the browser hits
+ *     the same origin.  Plain `z.string().url()` rejects them because
+ *     there's no scheme.
+ */
+const looseUrl = z.string().refine(
+  (s) => /^(https?:\/\/|\/api\/r2\/)/.test(s),
+  { message: "Must be an absolute URL or /api/r2/* path" },
+);
+const urlOrEmpty = looseUrl.or(z.literal("")).optional().nullable();
 
 const tagList = z.array(z.string().min(1).max(40)).max(20).default([]);
 

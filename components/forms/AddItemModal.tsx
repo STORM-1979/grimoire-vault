@@ -183,17 +183,21 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
       metadata: {},
       importedVia: "web",
     };
+    // Always preserve a non-empty url — the field is hooked up to
+    // FileUpload (documents/local), the URL input (web/text/video),
+    // and Cover URL (media).  Without this, document/local entries
+    // had a real R2 file but entry.url stayed empty, so the detail
+    // page couldn't render the inline preview.
+    if (form.url.trim()) input.url = form.url.trim();
     if (isVideo) {
       if (form.thumb.trim()) input.thumbUrl = form.thumb.trim();
       if (form.duration.trim()) input.duration = form.duration.trim();
-      if (form.url.trim()) input.url = form.url.trim();
     }
     if (isMedia && form.cover.trim()) input.coverUrl = form.cover.trim();
     if (isImage && form.count) {
       const n = parseInt(form.count, 10);
       if (!isNaN(n)) input.fileCount = n;
     }
-    if ((isWeb || isText) && form.url.trim()) input.url = form.url.trim();
     if ((isDoc || isLocal) && form.size.trim()) input.sizeLabel = form.size.trim();
     if (isPrompt && form.model.trim()) input.metadata = { ...input.metadata, model: form.model.trim() };
 
