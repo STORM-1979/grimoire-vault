@@ -1,29 +1,46 @@
 /**
  * Free, key-less website screenshot URLs.
  *
- * `WordPress mShots` (s.wordpress.com/mshots/v1) is a long-running
- * public service used by WordPress.com / Tumblr / Akismet for site
- * thumbnails.  No auth, no rate limit beyond fair-use.  First request
- * for a given URL returns a tiny placeholder while the screenshot is
- * generated server-side (~5–15 s); subsequent loads are CDN-cached
- * and instant.
+ * Provider: **Microlink** (`api.microlink.io`).  Their public
+ * endpoint serves actual hero-block screenshots at runtime — the
+ * `embed=screenshot.url` mode bypasses the JSON layer and replies
+ * with `Content-Type: image/png` directly, so the URL plugs into
+ * `<img src>` natively.  Free tier ≈ 50 requests/day per IP without
+ * an account; for personal-vault traffic that's plenty.  Screenshots
+ * are CDN-cached after first generation.
  *
- * Used as a fallback when og:image is missing for "designs" entries,
- * where the cover is meant to be a hero-block screenshot of the
- * pasted website.  Hero block in mShots maps to the top of the page
- * — exactly the framing the user expects for design-portfolio cards.
+ * We previously used WordPress mShots, but it returned a long-lived
+ * "Generating Preview…" placeholder for sites whose crawlers it
+ * couldn't reach (results-factory.com being one) and the placeholder
+ * itself was 200-OK so the browser couldn't tell it had failed.
+ * Microlink generates synchronously and returns a real frame — no
+ * placeholder problem.
  */
 
-const MSHOTS_BASE = "https://s.wordpress.com/mshots/v1";
+const MICROLINK_BASE = "https://api.microlink.io/";
 
-/** Build a deterministic mShots URL for the given page. */
+/**
+ * Build a deterministic Microlink URL that serves a PNG screenshot
+ * of `pageUrl` directly.  Embed mode = the response is the image.
+ */
 export function siteScreenshot(
   pageUrl: string,
   width = 1200,
-  height = 800,
+  // height kept in the signature for compatibility / future tuning;
+  // Microlink controls aspect via the page's render and we don't
+  // need to force it.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _height = 800,
 ): string | null {
   if (!pageUrl) return null;
-  // Only http(s) URLs make sense for screenshotting.
   if (!/^https?:\/\//i.test(pageUrl)) return null;
-  return `${MSHOTS_BASE}/${encodeURIComponent(pageUrl)}?w=${width}&h=${height}`;
+  const params = new URLSearchParams({
+    url: pageUrl,
+    screenshot: "true",
+    meta: "false",
+    embed: "screenshot.url",
+    "viewport.width": String(width),
+    waitFor: "1500",
+  });
+  return `${MICROLINK_BASE}?${params.toString()}`;
 }
