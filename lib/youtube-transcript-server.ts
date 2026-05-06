@@ -235,8 +235,66 @@ function decodeEntities(s: string): string {
     .replace(/&nbsp;/g, " ");
 }
 
+/**
+ * Try kome.ai's public transcript endpoint as the primary path —
+ * they run their own residential-proxy scraping and return the
+ * transcript as a plain newline-joined string in JSON.  Free, no auth.
+ *
+ * If their service ever goes away the function returns null and we
+ * fall through to the YouTube-direct paths below.
+ */
+async function fetchTranscriptViaKomeAi(videoId: string, attempts: string[]): Promise<string | null> {
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    const res = await fetch("https://kome.ai/api/transcript", {
+      method: "POST",
+      signal: ctrl.signal,
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": USER_AGENT_DESKTOP,
+      },
+      body: JSON.stringify({ video_id: videoId, format: true }),
+    });
+    clearTimeout(timer);
+    attempts.push(`kome.ai: HTTP ${res.status}`);
+    if (!res.ok) return null;
+    const data = await res.json() as { transcript?: string };
+    if (typeof data.transcript === "string" && data.transcript.length >= 50) {
+      attempts.push(`kome.ai: ${data.transcript.length} chars`);
+      // Decode any HTML entities and normalise whitespace.
+      return data.transcript
+        .replace(/&amp;#39;/g, "'")
+        .replace(/&amp;quot;/g, '"')
+        .replace(/&amp;/g, "&")
+        .replace(/&#39;/g, "'")
+        .replace(/&quot;/g, '"')
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+    attempts.push("kome.ai: empty transcript field");
+  } catch (e) {
+    attempts.push(`kome.ai: exception ${(e as Error).message}`);
+  }
+  return null;
+}
+
 export async function fetchYouTubeTranscript(videoId: string): Promise<TranscriptResult | null> {
   const attempts: string[] = [];
+
+  // 0. Public free transcript proxy — kome.ai has been the most
+  // reliable path for cloud IPs because they do the scraping with
+  // their own residential addresses.
+  const fromKome = await fetchTranscriptViaKomeAi(videoId, attempts);
+  if (fromKome) {
+    console.log(JSON.stringify({ msg: "transcript.attempts", videoId, attempts, source: "kome.ai", sourceLen: fromKome.length }));
+    return { text: fromKome, lang: "en", source: "scrape", attempts };
+  }
+
+  // 1-3. Fall back to direct YouTube paths — captionTracks via watch
+  // page or innertube, then fetch the signed timedtext URL with
+  // multiple format variants.  Less reliable from Vercel IPs but kept
+  // around for the day kome.ai goes offline.
   const trackSet = await fetchCaptionTracks(videoId, attempts);
   if (!trackSet) {
     attempts.push("FINAL: no captionTracks found anywhere");
@@ -251,6 +309,6 @@ export async function fetchYouTubeTranscript(videoId: string): Promise<Transcrip
     console.log(JSON.stringify({ msg: "transcript.attempts", videoId, attempts }));
     return null;
   }
-  console.log(JSON.stringify({ msg: "transcript.attempts", videoId, attempts, sourceLen: text.length }));
+  console.log(JSON.stringify({ msg: "transcript.attempts", videoId, attempts, source: "youtube-direct", sourceLen: text.length }));
   return { text, lang: track.languageCode, source: trackSet.source, attempts };
 }
