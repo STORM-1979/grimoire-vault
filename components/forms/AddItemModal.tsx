@@ -50,6 +50,11 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
 
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [submitting, setSubmitting] = useState(false);
+  // Ref mirror of the submit flag — synchronous guard against true
+  // rapid-fire clicks that beat React's state batching (touch
+  // double-tap, accidental Enter+click, etc).  Avoids creating two
+  // entries for one user intent.
+  const submittingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   // Set when the server rejects with 409 (unique content_hash hit).
   // The modal stays open and replaces the error banner with a CTA that
@@ -238,20 +243,23 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Double-submit guard — disabled buttons are easy to bypass with
-    // Enter on the form, fast double-clicks, or touch double-taps.
-    if (submitting) return;
+    // Double-submit guard.  Both the React state and the ref are
+    // checked: state covers the common case, ref catches racy clicks
+    // that fire before setSubmitting takes effect (touch double-tap,
+    // Enter+click).  Disabled buttons alone are easy to bypass.
+    if (submitting || submittingRef.current) return;
+    submittingRef.current = true;
     setError(null);
     setDuplicate(null);
-    if (!form.title.trim()) return;
+    if (!form.title.trim()) {
+      submittingRef.current = false;
+      return;
+    }
     setSubmitting(true);
     const result = await submitInput();
     setSubmitting(false);
+    submittingRef.current = false;
     if (!result.ok) return;
-    // Save closes the modal for every category — including video.
-    // Chain mode (keeping the modal open after each save) was a brief
-    // experiment that confused users; auto-save-on-close still
-    // catches a forgotten pending URL when they Esc out.
     onClose();
   };
 
@@ -264,41 +272,44 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
    * failed (no retry loops), or if a save is already in flight.
    */
   const requestClose = async () => {
-    if (submitting) return;
-    // If the autofill extraction is mid-flight, wait it out before
-    // deciding whether there's anything to save.  Without this guard,
-    // a Cancel/Esc one second after pasting a YouTube URL would race
-    // the /api/extract response and persist an entry without duration
-    // / description even though they were a moment away from filling.
-    // Cap the wait at 8s so a stalled network never freezes the close.
-    // Polled via the ref because state values are captured in this
-    // closure and never update inside an async loop.
+    if (submitting || submittingRef.current) return;
+    const pendingUrl = form.url.trim();
+    // Fast-close paths: when there's already a banner up (the user has
+    // SEEN the result of the previous submit) OR this URL has already
+    // failed once, there's nothing to auto-save — close immediately
+    // without waiting for any background extraction.  Without this
+    // guard the IFrame-Player-API duration fetcher (which can run for
+    // up to 6 s after paste) makes the modal feel frozen on Cancel.
+    if (duplicate || error || failedUrl.current === pendingUrl) {
+      onClose();
+      return;
+    }
+    // Otherwise wait for in-flight extraction so auto-save sees the
+    // final form state (duration / description / etc).  Polled via a
+    // ref — state values are captured in this closure and never
+    // update inside an async loop.  8 s cap so a stalled network
+    // doesn't freeze the close indefinitely.
     if (extractingRef.current) {
       const startedAt = Date.now();
       while (extractingRef.current && Date.now() - startedAt < 8000) {
         await new Promise((r) => setTimeout(r, 100));
       }
     }
-    const pendingUrl = form.url.trim();
     const pendingTitle = form.title.trim();
-    const hasPending =
-      isVideo
-      && !!pendingUrl
-      && !!pendingTitle
-      && !duplicate
-      && !error
-      && failedUrl.current !== pendingUrl;
+    const hasPending = isVideo && !!pendingUrl && !!pendingTitle;
     if (!hasPending) {
       onClose();
       return;
     }
+    submittingRef.current = true;
     setSubmitting(true);
     const result = await submitInput();
     setSubmitting(false);
+    submittingRef.current = false;
     if (result.ok) onClose();
-    // On failure: banner is now visible, modal stays open.  User can
-    // dismiss the banner and click Cancel again — second time we hit
-    // the failedUrl guard above and just close.
+    // On failure: banner is now visible, modal stays open.  Next
+    // Cancel hits the fast-close path above (duplicate/error set)
+    // and dismisses cleanly.
   };
 
   // Keep the ref pointing at the latest closure so the Esc listener
