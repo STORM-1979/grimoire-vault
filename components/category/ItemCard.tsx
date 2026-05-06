@@ -46,6 +46,12 @@ export function ItemCard({
     router.push(`/entry/${item.id}`);
   };
 
+  // Prefer thumb (used by video category) over cover (used by media);
+  // either may live on a non-video / non-media entry too — e.g. a Web
+  // entry built from a YouTube paste, where og:image got pulled into
+  // both fields.  Fall back to category icon when there's nothing.
+  const thumb = item.thumbUrl || item.coverUrl || null;
+
   if (large) {
     return (
       <div
@@ -54,11 +60,24 @@ export function ItemCard({
         className={`keynote p-6 rounded-xl flex flex-col group relative cursor-pointer ${ring}`}
       >
         {bulkSelected && (
-          <div className="absolute top-3 left-3 w-5 h-5 rounded-full bg-emerald-300 text-emerald-deep flex items-center justify-center pointer-events-none">
+          <div className="absolute top-3 left-3 z-10 w-5 h-5 rounded-full bg-emerald-300 text-emerald-deep flex items-center justify-center pointer-events-none">
             <Icon name="check" size={11} />
           </div>
         )}
         <ItemActions item={item} onTogglePin={onTogglePin} onDelete={onDelete} onEdit={onEdit} />
+        {thumb && (
+          // Hero strip on the pinned/large variant.  16:9 to match the
+          // shape of og:image / YouTube thumbs without distorting.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={thumb}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="w-full aspect-[16/9] object-cover rounded-lg mb-4 border border-white/10"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+          />
+        )}
         <div className="flex justify-between items-start mb-3">
           <h4 className="font-display text-[24px] font-medium leading-tight flex-1 mr-4">{item.title}</h4>
           {item.pinned && <Icon name="pinFilled" size={16} className="text-gold flex-shrink-0" />}
@@ -90,19 +109,34 @@ export function ItemCard({
       }`}
     >
       {bulkSelected && (
-        <div className="absolute top-3 left-3 w-5 h-5 rounded-full bg-emerald-300 text-emerald-deep flex items-center justify-center pointer-events-none">
+        <div className="absolute top-3 left-3 z-10 w-5 h-5 rounded-full bg-emerald-300 text-emerald-deep flex items-center justify-center pointer-events-none">
           <Icon name="check" size={11} />
         </div>
       )}
       <ItemActions item={item} onTogglePin={onTogglePin} onDelete={onDelete} onEdit={onEdit} />
-      <div className="text-emerald-200 mt-1 flex-shrink-0"><Icon name={category.icon} size={20} /></div>
+      {thumb ? (
+        // 128×72 16:9 thumbnail when we have one — the reason this exists
+        // is that Web/YouTube/article entries carry og:image and seeing
+        // the visual at a glance is faster than reading the title.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={thumb}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          className="w-32 aspect-[16/9] object-cover rounded-md flex-shrink-0 border border-white/10"
+          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+        />
+      ) : (
+        <div className="text-emerald-200 mt-1 flex-shrink-0"><Icon name={category.icon} size={20} /></div>
+      )}
       <div className="flex-1 min-w-0 pr-20">
         <div className="flex items-center gap-2 mb-0.5">
           <h4 className="font-medium text-[15px] truncate">{item.title}</h4>
           {item.pinned && <Icon name="pinFilled" size={12} className="text-gold flex-shrink-0" />}
         </div>
         {item.description && (
-          <p className="text-[13px] text-ivory-dim leading-snug font-light mb-2">{item.description}</p>
+          <p className="text-[13px] text-ivory-dim leading-snug font-light mb-2 line-clamp-2">{item.description}</p>
         )}
         <div className="flex items-center gap-2 flex-wrap">
           {item.tags.map((t) => <span key={t} className="tag-soft">{t}</span>)}

@@ -138,6 +138,11 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
             : isVideo && meta.author
             ? `Канал: ${meta.author}`
             : meta.description;
+          // Tags intentionally NOT auto-filled — `meta.tags` for video
+          // pages comes from `<meta name="keywords">` which on YouTube
+          // is the same generic site-wide list ("видео, поделиться,
+          // телефон с камерой") for almost every video.  User decides
+          // what's worth tagging.
           return {
             ...f,
             title: f.title.trim() ? f.title : (meta.title ?? f.title),
@@ -145,7 +150,6 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
             thumb: f.thumb.trim() ? f.thumb : (meta.image ?? f.thumb),
             cover: f.cover.trim() ? f.cover : (meta.image ?? f.cover),
             duration: f.duration.trim() ? f.duration : (meta.duration ?? f.duration),
-            tags: f.tags.trim() ? f.tags : ((meta.tags ?? []).slice(0, 8).join(", ") || f.tags),
           };
         });
       } catch {
@@ -352,12 +356,12 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
               label="Ссылка на видео"
               hint={
                 extracting
-                  ? "Тяну название, описание, превью, длительность и теги…"
+                  ? "Тяну название, описание, превью и длительность…"
                   : videoExpanded
                   ? "Поля ниже подтянулись автоматически — поправь, если что не так"
                   : lastSavedTitle
                   ? "Цепочка: вставь следующий URL или закрой — пендинг сохранится."
-                  : "Вставь YouTube-ссылку. Название, описание, превью, длительность и теги заполнятся сами."
+                  : "Вставь YouTube-ссылку. Название, описание, превью и длительность заполнятся сами. Теги добавь руками."
               }
             >
               <input
@@ -393,8 +397,8 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
               label="Источник (необязательно)"
               hint={
                 extracting
-                  ? "Подтягиваю заголовок, описание и теги со страницы…"
-                  : "Вставь ссылку — заголовок, описание и теги заполнятся сами"
+                  ? "Подтягиваю заголовок и описание со страницы…"
+                  : "Вставь ссылку — заголовок и описание заполнятся сами. Теги добавь руками."
               }
             >
               <input
