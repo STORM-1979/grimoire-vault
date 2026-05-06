@@ -23,11 +23,12 @@ import { Icon } from "@/components/icons/Icon";
  *                        natively land here)
  */
 export function EntryPrimaryView({
-  url, title, sizeLabel,
+  url, title, sizeLabel, duration,
 }: {
   url: string;
   title: string;
   sizeLabel?: string | null;
+  duration?: string | null;
 }) {
   // Defence in depth — only render http(s) and our own /api/r2/* paths.
   // Anything else (data:, javascript:, file:) is a no-op.
@@ -38,7 +39,7 @@ export function EntryPrimaryView({
   const yt = ytId(url);
   if (yt) {
     return (
-      <Container label={`YouTube · ${title}`}>
+      <Container label={`YouTube${duration ? ` · ${duration}` : ""} · ${title}`}>
         <iframe
           src={`https://www.youtube.com/embed/${yt}`}
           title={title}
@@ -53,7 +54,7 @@ export function EntryPrimaryView({
   const vm = vimeoId(url);
   if (vm) {
     return (
-      <Container label={`Vimeo · ${title}`}>
+      <Container label={`Vimeo${duration ? ` · ${duration}` : ""} · ${title}`}>
         <iframe
           src={`https://player.vimeo.com/video/${vm}`}
           title={title}
@@ -102,7 +103,7 @@ export function EntryPrimaryView({
 
   if (VIDEO_EXTS.includes(ext)) {
     return (
-      <Container label={`Видео · ${ext.toUpperCase()}${sizeLabel ? ` · ${sizeLabel}` : ""}`}>
+      <Container label={`Видео · ${ext.toUpperCase()}${duration ? ` · ${duration}` : ""}${sizeLabel ? ` · ${sizeLabel}` : ""}`}>
         <video
           src={url}
           controls
@@ -115,7 +116,7 @@ export function EntryPrimaryView({
 
   if (AUDIO_EXTS.includes(ext)) {
     return (
-      <Container label={`Аудио · ${ext.toUpperCase()}${sizeLabel ? ` · ${sizeLabel}` : ""}`}>
+      <Container label={`Аудио · ${ext.toUpperCase()}${duration ? ` · ${duration}` : ""}${sizeLabel ? ` · ${sizeLabel}` : ""}`}>
         <audio
           src={url}
           controls

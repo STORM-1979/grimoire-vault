@@ -52,6 +52,14 @@ export default async function EntryPage({
           <div className="flex-1 min-w-0">
             <div className="font-mono text-[11px] uppercase tracking-widest text-gold mb-2">
               № {cat.no} · {cat.en}
+              {entry.duration && (
+                <span className="ml-3 inline-flex items-center gap-1 text-emerald-200">
+                  <Icon name="play" size={11} /> {entry.duration}
+                </span>
+              )}
+              {entry.sizeLabel && !entry.duration && (
+                <span className="ml-3 text-emerald-200">· {entry.sizeLabel}</span>
+              )}
               {entry.pinned && <span className="ml-3 text-emerald-200">· закреплено</span>}
             </div>
             <h1 className="font-display text-[56px] font-light leading-[0.95] tracking-tightest mb-3">
@@ -86,6 +94,7 @@ export default async function EntryPage({
           url={entry.url}
           title={entry.title}
           sizeLabel={entry.sizeLabel}
+          duration={entry.duration}
         />
       )}
 
