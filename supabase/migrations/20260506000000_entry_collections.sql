@@ -95,6 +95,6 @@ create policy entry_collections_delete
 
 -- ---- Migration log -----------------------------------------
 
-insert into public.schema_migrations (version, applied_at)
-values ('20260506000000_entry_collections', now())
-on conflict (version) do nothing;
+insert into public.schema_migrations (name, applied_at, applied_by)
+values ('20260506000000_entry_collections', now(), 'manual')
+on conflict (name) do nothing;
