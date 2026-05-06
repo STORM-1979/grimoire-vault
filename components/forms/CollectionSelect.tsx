@@ -29,16 +29,33 @@ export function CollectionSelect({
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const id = useId();
 
-  // Build the option list with the "no collection" sentinel first.
+  // Build the option list with the "no collection" sentinel first,
+  // then walk the parent → children tree depth-first so children
+  // appear right under their parent with a visual indent.
   // Memoised so effect deps below don't churn on every render.
-  type Opt = { id: string | null; label: string };
-  const opts: Opt[] = useMemo(
-    () => [
-      { id: null, label: "— Без коллекции —" } as Opt,
-      ...collections.map((c) => ({ id: c.id as string | null, label: c.name })),
-    ],
-    [collections],
-  );
+  type Opt = { id: string | null; label: string; depth: number };
+  const opts: Opt[] = useMemo(() => {
+    const childrenByParent = new Map<string | null, EntryCollection[]>();
+    for (const c of collections) {
+      const key = c.parentId ?? null;
+      const arr = childrenByParent.get(key) ?? [];
+      arr.push(c);
+      childrenByParent.set(key, arr);
+    }
+    const sort = (a: EntryCollection, b: EntryCollection) =>
+      a.position - b.position || a.name.localeCompare(b.name);
+    for (const arr of childrenByParent.values()) arr.sort(sort);
+
+    const out: Opt[] = [{ id: null, label: "— Без коллекции —", depth: 0 }];
+    const visit = (parentId: string | null, depth: number) => {
+      for (const c of childrenByParent.get(parentId) ?? []) {
+        out.push({ id: c.id, label: c.name, depth });
+        visit(c.id, depth + 1);
+      }
+    };
+    visit(null, 0);
+    return out;
+  }, [collections]);
   const selected = opts.find((o) => o.id === value) ?? opts[0];
 
   // Track active highlight in sync with the current value when reopened.
@@ -118,18 +135,24 @@ export function CollectionSelect({
                   onChange(o.id);
                   setOpen(false);
                 }}
+                style={{ paddingLeft: `${0.75 + o.depth * 1.25}rem` }}
                 className={
-                  "px-3 py-2 cursor-pointer text-[13px] flex items-center gap-2 transition " +
+                  "py-2 pr-3 cursor-pointer text-[13px] flex items-center gap-2 transition " +
                   (isActive
                     ? "bg-gold/15 text-ivory"
                     : "text-ivory-dim hover:text-ivory") +
                   (o.id === null ? " italic" : "")
                 }
               >
-                {isSelected && (
-                  <span aria-hidden className="text-gold">•</span>
+                {o.depth > 0 && (
+                  <span aria-hidden className="text-ivory-mute/60">↳</span>
                 )}
-                <span className={isSelected ? "" : "ml-3"}>{o.label}</span>
+                {isSelected ? (
+                  <span aria-hidden className="text-gold">•</span>
+                ) : (
+                  <span aria-hidden className="w-2" />
+                )}
+                <span>{o.label}</span>
               </li>
             );
           })}

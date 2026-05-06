@@ -1,19 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Icon } from "@/components/icons/Icon";
 import { collectionsApi, ApiError } from "@/lib/api-client";
 import type { CategoryId, EntryCollection } from "@/lib/types";
 
 /**
- * Chip row of user-defined collections inside a system category.
- * Top-level UI for the "коллекции внутри YouTube" feature — clicking
- * a chip filters the list to entries assigned to that collection.
+ * Two-level chip row for user-defined collections inside a system
+ * category.  Top row = collections with parent_id = null.  When one
+ * of them is active, a second row appears below with that parent's
+ * sub-collections + "+ Новая подкатегория".  Schema supports deeper
+ * nesting via parent_id self-reference but the UI caps at two levels
+ * for now to keep navigation tidy.
  *
- * Selection model:
- *   selected = null    → "Все записи" (show everything)
- *   selected = "none"  → "Без коллекции" (collection_id IS NULL)
- *   selected = uuid    → entries.collection_id = uuid
+ * Selection:
+ *   selected = null          → "Все записи" (no filter)
+ *   selected = uuid (parent) → entries with collection_id in
+ *                              {parent.id, ...descendants}
+ *   selected = uuid (child)  → entries with collection_id = child.id
+ *
+ * The descendant-inclusive filter for parents is computed in
+ * CategoryView via the `collections` map onCollectionsChange exports.
  */
 export function CollectionsTabs({
   categoryId,
@@ -27,20 +34,13 @@ export function CollectionsTabs({
   onCollectionsChange?: (collections: EntryCollection[]) => void;
 }) {
   const [collections, setCollections] = useState<EntryCollection[] | null>(null);
-  const [creating, setCreating] = useState(false);
+  // creating === null  → no inline input
+  // creating === { parentId }  → input visible at that level
+  const [creating, setCreating] = useState<null | { parentId: string | null }>(null);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
-
-  // Auto-dismiss errors after 4 s — they're transient feedback, not
-  // persistent state (e.g. "уже есть" right after creation should
-  // not still be on screen ten minutes later).
-  useEffect(() => {
-    if (!error) return;
-    const t = setTimeout(() => setError(null), 4000);
-    return () => clearTimeout(t);
-  }, [error]);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,23 +61,70 @@ export function CollectionsTabs({
     return () => { cancelled = true; };
   }, [categoryId, onCollectionsChange]);
 
+  // Auto-dismiss errors after 4 s.
+  useEffect(() => {
+    if (!error) return;
+    const t = setTimeout(() => setError(null), 4000);
+    return () => clearTimeout(t);
+  }, [error]);
+
   const broadcast = (next: EntryCollection[]) => {
     setCollections(next);
     onCollectionsChange?.(next);
   };
 
+  // Collection trees: top-level + lookup of children-by-parent.
+  const { topLevel, byParent, byId } = useMemo(() => {
+    const top: EntryCollection[] = [];
+    const map = new Map<string, EntryCollection[]>();
+    const idLookup = new Map<string, EntryCollection>();
+    for (const c of collections ?? []) {
+      idLookup.set(c.id, c);
+      if (c.parentId) {
+        const arr = map.get(c.parentId) ?? [];
+        arr.push(c);
+        map.set(c.parentId, arr);
+      } else {
+        top.push(c);
+      }
+    }
+    // Stable sort by position then name within each level.
+    const sorter = (a: EntryCollection, b: EntryCollection) =>
+      a.position - b.position || a.name.localeCompare(b.name);
+    top.sort(sorter);
+    for (const arr of map.values()) arr.sort(sorter);
+    return { topLevel: top, byParent: map, byId: idLookup };
+  }, [collections]);
+
+  // Walk parents up to the root so we can highlight the active top-
+  // level chip even when a deep sub is selected.
+  const activeRootId = useMemo(() => {
+    if (!selected) return null;
+    let cur = byId.get(selected);
+    while (cur?.parentId) cur = byId.get(cur.parentId);
+    return cur?.id ?? null;
+  }, [selected, byId]);
+
+  const subRow = activeRootId ? byParent.get(activeRootId) ?? [] : [];
+  const showSubRow = activeRootId && (subRow.length > 0 || creating?.parentId === activeRootId);
+
   const handleCreate = async () => {
+    if (!creating) return;
     const name = draft.trim();
     if (!name) {
-      setCreating(false);
+      setCreating(null);
       return;
     }
     setError(null);
     try {
-      const created = await collectionsApi.create({ categoryId, name });
+      const created = await collectionsApi.create({
+        categoryId,
+        name,
+        parentId: creating.parentId,
+      });
       broadcast([...(collections ?? []), created]);
       setDraft("");
-      setCreating(false);
+      setCreating(null);
       onSelect(created.id);
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : (e as Error).message;
@@ -102,23 +149,32 @@ export function CollectionsTabs({
   };
 
   const handleDelete = async (c: EntryCollection) => {
-    if (!confirm(`Удалить коллекцию «${c.name}»?\nЗаписи останутся, но потеряют привязку.`)) return;
+    const childCount = byParent.get(c.id)?.length ?? 0;
+    const tail = childCount > 0
+      ? `\nВнутри ${childCount} подкатегорий — они тоже удалятся.`
+      : "\nЗаписи останутся, но потеряют привязку.";
+    if (!confirm(`Удалить «${c.name}»?${tail}`)) return;
     setError(null);
     try {
       await collectionsApi.delete(c.id);
-      broadcast((collections ?? []).filter((x) => x.id !== c.id));
-      if (selected === c.id) onSelect(null);
+      // FK on entry_collections.parent_id is ON DELETE CASCADE, so
+      // children are gone too — refetch to stay consistent.
+      const r = await collectionsApi.list(categoryId);
+      broadcast(r.items);
+      // Clear selection if it pointed inside the deleted subtree.
+      if (selected === c.id || (selected && !r.items.some((x) => x.id === selected))) {
+        onSelect(null);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "delete failed");
     }
   };
 
-  if (collections === null) {
-    return null; // First load — keep CategoryView header stable.
-  }
+  if (collections === null) return null;
 
   return (
     <div className="max-w-[1480px] mx-auto px-10 mb-6">
+      {/* Top-level row */}
       <div className="flex flex-wrap gap-2 items-center">
         <button
           type="button"
@@ -129,86 +185,84 @@ export function CollectionsTabs({
           Все записи
         </button>
 
-        {collections.map((c) => {
-          const active = selected === c.id;
-          if (renamingId === c.id) {
-            return (
-              <span key={c.id} className="inline-flex items-center gap-1">
-                <input
-                  autoFocus
-                  className="font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full bg-emerald-deep border border-gold/40 text-ivory min-w-[120px] focus:outline-none focus:border-gold"
-                  value={renameDraft}
-                  onChange={(e) => setRenameDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void handleRename(c.id);
-                    else if (e.key === "Escape") setRenamingId(null);
-                  }}
-                />
-                <button type="button" onClick={() => void handleRename(c.id)} className="item-actions-btn" title="Сохранить">
-                  <Icon name="check" size={12} />
-                </button>
-              </span>
-            );
-          }
-          return (
-            <span key={c.id} className="inline-flex items-stretch group/chip">
-              <button
-                type="button"
-                onClick={() => onSelect(c.id)}
-                onDoubleClick={() => { setRenamingId(c.id); setRenameDraft(c.name); }}
-                className={chipClass(active) + " group-hover/chip:rounded-r-none"}
-                title={`Коллекция «${c.name}» (двойной клик чтобы переименовать)`}
-              >
-                {c.name}
-              </button>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); void handleDelete(c); }}
-                className={
-                  "hidden group-hover/chip:flex items-center px-2 rounded-r-full border border-l-0 transition " +
-                  (active
-                    ? "bg-gold text-emerald-deep border-gold hover:bg-red-400 hover:border-red-400"
-                    : "border-white/15 text-ivory-mute hover:text-red-400 hover:border-red-400/40")
-                }
-                title={`Удалить коллекцию «${c.name}»`}
-              >
-                <Icon name="x" size={11} />
-              </button>
-            </span>
-          );
-        })}
+        {topLevel.map((c) =>
+          renderChip(c, {
+            isActive: c.id === activeRootId,
+            isSelected: c.id === selected,
+            isRenaming: renamingId === c.id,
+            renameDraft,
+            setRenameDraft,
+            onRename: () => void handleRename(c.id),
+            startRename: () => { setRenamingId(c.id); setRenameDraft(c.name); },
+            cancelRename: () => setRenamingId(null),
+            onSelect: () => onSelect(c.id),
+            onDelete: () => void handleDelete(c),
+          }),
+        )}
 
-        {creating ? (
-          <span className="inline-flex items-center gap-1">
-            <input
-              autoFocus
-              placeholder="Название коллекции"
-              className="font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full bg-emerald-deep border border-gold/40 text-ivory min-w-[160px] focus:outline-none focus:border-gold"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void handleCreate();
-                else if (e.key === "Escape") { setCreating(false); setDraft(""); }
-              }}
-            />
-            <button type="button" onClick={() => void handleCreate()} className="item-actions-btn" title="Создать">
-              <Icon name="check" size={12} />
-            </button>
-            <button type="button" onClick={() => { setCreating(false); setDraft(""); }} className="item-actions-btn" title="Отмена">
-              <Icon name="x" size={12} />
-            </button>
-          </span>
+        {creating?.parentId === null ? (
+          <InlineCreate
+            placeholder="Название коллекции"
+            draft={draft}
+            setDraft={setDraft}
+            onCommit={() => void handleCreate()}
+            onCancel={() => { setCreating(null); setDraft(""); }}
+          />
         ) : (
           <button
             type="button"
-            onClick={() => setCreating(true)}
+            onClick={() => { setCreating({ parentId: null }); setDraft(""); }}
             className="font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full border border-emerald-300/30 text-emerald-200 hover:border-emerald-300 hover:bg-emerald-300/[0.06] transition flex items-center gap-1.5"
-            title="Создать новую коллекцию"
+            title="Создать новую коллекцию верхнего уровня"
           >
             <Icon name="add" size={11} /> Новая коллекция
           </button>
         )}
       </div>
+
+      {/* Sub-row — only when a top-level chip is active and either
+          has children or the user is mid-creation under it. */}
+      {showSubRow && (
+        <div className="mt-2.5 pl-4 border-l-2 border-gold/20 flex flex-wrap gap-2 items-center">
+          <span className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute pr-1">
+            подкатегории →
+          </span>
+          {subRow.map((c) =>
+            renderChip(c, {
+              isActive: c.id === selected,
+              isSelected: c.id === selected,
+              isRenaming: renamingId === c.id,
+              renameDraft,
+              setRenameDraft,
+              onRename: () => void handleRename(c.id),
+              startRename: () => { setRenamingId(c.id); setRenameDraft(c.name); },
+              cancelRename: () => setRenamingId(null),
+              onSelect: () => onSelect(c.id),
+              onDelete: () => void handleDelete(c),
+            }),
+          )}
+
+          {creating?.parentId === activeRootId ? (
+            <InlineCreate
+              placeholder="Название подкатегории"
+              draft={draft}
+              setDraft={setDraft}
+              onCommit={() => void handleCreate()}
+              onCancel={() => { setCreating(null); setDraft(""); }}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => { setCreating({ parentId: activeRootId }); setDraft(""); }}
+              className="font-mono text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-full border border-emerald-300/25 text-emerald-200/80 hover:border-emerald-300 hover:bg-emerald-300/[0.06] transition flex items-center gap-1.5"
+              title="Создать новую подкатегорию внутри текущей"
+            >
+              <Icon name="add" size={10} /> Новая подкатегория
+            </button>
+          )}
+        </div>
+      )}
+
       {error && (
         <div className="mt-2 font-mono text-[10px] text-red-400 flex items-center gap-1.5">
           <Icon name="x" size={11} /> {error}
@@ -218,11 +272,112 @@ export function CollectionsTabs({
   );
 }
 
-function chipClass(active: boolean): string {
+/* -------------------- helpers -------------------- */
+
+interface ChipState {
+  isActive: boolean;
+  isSelected: boolean;
+  isRenaming: boolean;
+  renameDraft: string;
+  setRenameDraft: (v: string) => void;
+  onRename: () => void;
+  startRename: () => void;
+  cancelRename: () => void;
+  onSelect: () => void;
+  onDelete: () => void;
+}
+
+function renderChip(c: EntryCollection, s: ChipState) {
+  if (s.isRenaming) {
+    return (
+      <span key={c.id} className="inline-flex items-center gap-1">
+        <input
+          autoFocus
+          className="font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full bg-emerald-deep border border-gold/40 text-ivory min-w-[120px] focus:outline-none focus:border-gold"
+          value={s.renameDraft}
+          onChange={(e) => s.setRenameDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") s.onRename();
+            else if (e.key === "Escape") s.cancelRename();
+          }}
+        />
+        <button type="button" onClick={s.onRename} className="item-actions-btn" title="Сохранить">
+          <Icon name="check" size={12} />
+        </button>
+      </span>
+    );
+  }
   return (
-    "font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full transition " +
-    (active
-      ? "bg-gold text-emerald-deep"
-      : "border border-white/15 text-ivory-mute hover:text-gold hover:border-gold/40")
+    <span key={c.id} className="inline-flex items-stretch group/chip">
+      <button
+        type="button"
+        onClick={s.onSelect}
+        onDoubleClick={s.startRename}
+        className={chipClass(s.isSelected, s.isActive) + " group-hover/chip:rounded-r-none"}
+        title={`«${c.name}» — двойной клик чтобы переименовать`}
+      >
+        {c.name}
+      </button>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); s.onDelete(); }}
+        className={
+          "hidden group-hover/chip:flex items-center px-2 rounded-r-full border border-l-0 transition " +
+          (s.isSelected
+            ? "bg-gold text-emerald-deep border-gold hover:bg-red-400 hover:border-red-400"
+            : "border-white/15 text-ivory-mute hover:text-red-400 hover:border-red-400/40")
+        }
+        title={`Удалить «${c.name}»`}
+      >
+        <Icon name="x" size={11} />
+      </button>
+    </span>
   );
+}
+
+function InlineCreate({
+  placeholder, draft, setDraft, onCommit, onCancel,
+}: {
+  placeholder: string;
+  draft: string;
+  setDraft: (v: string) => void;
+  onCommit: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <input
+        autoFocus
+        placeholder={placeholder}
+        className="font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full bg-emerald-deep border border-gold/40 text-ivory min-w-[160px] focus:outline-none focus:border-gold"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") onCommit();
+          else if (e.key === "Escape") onCancel();
+        }}
+      />
+      <button type="button" onClick={onCommit} className="item-actions-btn" title="Создать">
+        <Icon name="check" size={12} />
+      </button>
+      <button type="button" onClick={onCancel} className="item-actions-btn" title="Отмена">
+        <Icon name="x" size={12} />
+      </button>
+    </span>
+  );
+}
+
+/**
+ * Selected = the chip that currently filters the list (gold fill).
+ * Active   = a parent chip whose subtree is currently being viewed,
+ *            even if the actual selection is a child (gold border).
+ */
+function chipClass(selected: boolean, active = false): string {
+  if (selected) {
+    return "font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full bg-gold text-emerald-deep transition";
+  }
+  if (active) {
+    return "font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full border border-gold/60 text-gold hover:bg-gold/[0.06] transition";
+  }
+  return "font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full border border-white/15 text-ivory-mute hover:text-gold hover:border-gold/40 transition";
 }

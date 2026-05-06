@@ -50,6 +50,33 @@ export function CategoryView({ category, initialItems }: Props) {
   // every category but the UI is gated to keep the chip row tidy.
   const showCollections = isVideo;
 
+  // Build a "selected + descendants" id-set so picking a parent chip
+  // also surfaces entries assigned to its sub-collections.  Cheap —
+  // collections list is small per category.
+  const selectedScope = useMemo(() => {
+    if (!selectedCollection || selectedCollection === "none") return null;
+    const childrenByParent = new Map<string, string[]>();
+    for (const c of collections) {
+      if (c.parentId) {
+        const arr = childrenByParent.get(c.parentId) ?? [];
+        arr.push(c.id);
+        childrenByParent.set(c.parentId, arr);
+      }
+    }
+    const out = new Set<string>([selectedCollection]);
+    const stack = [selectedCollection];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      for (const child of childrenByParent.get(cur) ?? []) {
+        if (!out.has(child)) {
+          out.add(child);
+          stack.push(child);
+        }
+      }
+    }
+    return out;
+  }, [selectedCollection, collections]);
+
   // Apply the collections filter before pinned/others split so all
   // downstream code (cards, keyboard nav, bulk ops) sees a consistent
   // already-filtered list.
@@ -57,7 +84,7 @@ export function CategoryView({ category, initialItems }: Props) {
     ? items
     : selectedCollection === "none"
     ? items.filter((it) => !it.collectionId)
-    : items.filter((it) => it.collectionId === selectedCollection);
+    : items.filter((it) => it.collectionId && selectedScope?.has(it.collectionId));
 
   const pinned = filtered.filter((it) => it.pinned);
   const others = filtered.filter((it) => !it.pinned);
