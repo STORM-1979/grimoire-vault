@@ -4,7 +4,15 @@ import { getEntry, updateEntry } from "@/lib/data/entries";
 import { summarize } from "@/lib/summarize";
 import { fetchYouTubeTranscript } from "@/lib/youtube-transcript-server";
 import { translateArrayToRussian, looksRussian } from "@/lib/translate";
+import { polishWithLLM } from "@/lib/llm-polish";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/ratelimit";
+
+// Pollinations' free `openai-fast` model takes 30–55 s for a typical
+// transcript.  Vercel's default 10 s function timeout would kill it
+// long before the LLM responds, so we lift the cap to 60 s — the
+// hobby-tier maximum.  If the LLM doesn't respond in time we fall
+// through to extractive output and the request still succeeds.
+export const maxDuration = 60;
 
 /**
  * POST /api/entries/[id]/summarize
@@ -54,20 +62,30 @@ export const POST = withErrorHandler(async (_req: Request, ctx: RouteContext) =>
   if (!entry) throw new HttpError("Not found", 404);
   if (entry.userId !== user.id) throw new HttpError("Forbidden", 403);
 
-  // Cached?  Return immediately — but if the cached theses are still
-  // in a non-Russian language (older entries summarised before the
-  // translation step landed), translate them on this access and
-  // re-save so subsequent visits skip the round-trip.
-  const cached = (entry.metadata?.summary as unknown);
-  if (Array.isArray(cached) && cached.length > 0 && cached.every((x) => typeof x === "string")) {
+  // Cached?  Return immediately — but only if the cached version was
+  // produced by the LLM polish path.  Older entries cached before the
+  // LLM step landed (or where the LLM timed out) carry an extractive
+  // summary; on next access we force a re-polish so the user sees the
+  // upgraded output.  metadata.summarySource records which path won.
+  const cached = entry.metadata?.summary as unknown;
+  const cachedSource = entry.metadata?.summarySource as unknown;
+  if (
+    Array.isArray(cached)
+    && cached.length > 0
+    && cached.every((x) => typeof x === "string")
+    && cachedSource === "llm"
+  ) {
     const cachedStrs = cached as string[];
     if (looksRussian(cachedStrs[0])) {
-      return NextResponse.json({ summary: cachedStrs, cached: true });
+      return NextResponse.json({ summary: cachedStrs, cached: true, source: "llm" });
     }
+    // Polished but somehow non-Russian → translate and persist.
     const translatedCached = await translateArrayToRussian(cachedStrs);
     const nextMetaCached = { ...(entry.metadata ?? {}), summary: translatedCached };
     await updateEntry(id, { metadata: nextMetaCached });
-    return NextResponse.json({ summary: translatedCached, cached: true, translated: true });
+    return NextResponse.json({
+      summary: translatedCached, cached: true, translated: true, source: "llm",
+    });
   }
 
   if (!entry.url) throw new HttpError("Entry has no URL to summarize", 400);
@@ -87,32 +105,54 @@ export const POST = withErrorHandler(async (_req: Request, ctx: RouteContext) =>
     throw new HttpError("Не удалось выделить тезисы из транскрипта", 422);
   }
 
-  // If the transcript was in any non-Russian language (English, German,
-  // etc.), translate the theses into Russian before saving.  We check
-  // the first thesis as a representative sample — extractive
-  // summarisation always picks sentences in the original language, so
-  // they're either all Russian or all foreign.  Translation falls
-  // through gracefully: any line that fails translation keeps its
-  // original text rather than disappearing.
-  let finalTheses = rawTheses;
+  // Try LLM polish first — Pollinations' free `openai-fast` model
+  // produces a real abstractive summary in proper Russian (5 polished
+  // bullet sentences) instead of the spoken-fragment chunks the
+  // extractive pass picks from auto-generated captions.  Up to ~50 s
+  // wait; on timeout / failure we fall back to extractive.
+  const polished = await polishWithLLM(transcript.text);
+  let source: "llm" | "extractive" = "extractive";
+  let finalTheses: string[];
   let translated = false;
-  if (!looksRussian(rawTheses[0])) {
-    finalTheses = await translateArrayToRussian(rawTheses);
-    translated = true;
+
+  if (polished && polished.length >= 3) {
+    finalTheses = polished.slice(0, 5);
+    source = "llm";
+    // Pollinations should already produce Russian when prompted in
+    // Russian.  Belt-and-braces translate if it slipped (rare).
+    if (!looksRussian(finalTheses[0])) {
+      finalTheses = await translateArrayToRussian(finalTheses);
+      translated = true;
+    }
+  } else {
+    // Extractive fallback — picks raw sentences from the transcript,
+    // translates if not Russian.
+    finalTheses = rawTheses;
+    if (!looksRussian(rawTheses[0])) {
+      finalTheses = await translateArrayToRussian(rawTheses);
+      translated = true;
+    }
   }
 
   console.log(JSON.stringify({
     msg: "summarize.result",
     videoId: vid,
     theses: finalTheses.length,
+    source,
     translated,
     transcriptLen: transcript.text.length,
   }));
 
   // Persist into entry.metadata so the next request returns instantly.
   // Spread to keep any existing keys (model, source, etc.) intact.
-  const nextMeta = { ...(entry.metadata ?? {}), summary: finalTheses };
+  // summarySource lets the cached path tell extractive vs LLM apart
+  // and re-polish the former on next access.
+  const nextMeta = {
+    ...(entry.metadata ?? {}),
+    summary: finalTheses,
+    summarySource: source,
+  };
   await updateEntry(id, { metadata: nextMeta });
 
-  return NextResponse.json({ summary: finalTheses, cached: false, translated });
+  return NextResponse.json({ summary: finalTheses, cached: false, translated, source });
 });

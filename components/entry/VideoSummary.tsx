@@ -61,7 +61,7 @@ export function VideoSummary({
       </div>
       {loading && (
         <div className="font-mono text-[11px] text-ivory-mute italic">
-          Готовлю тезисы по транскрипту…
+          Готовлю выжимку — это занимает до минуты при первом открытии…
         </div>
       )}
       {error && !loading && (
