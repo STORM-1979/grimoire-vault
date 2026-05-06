@@ -3,6 +3,7 @@ import { requireUser, withErrorHandler, HttpError } from "@/lib/api-helpers";
 import { getEntry, updateEntry } from "@/lib/data/entries";
 import { summarize } from "@/lib/summarize";
 import { fetchYouTubeTranscript } from "@/lib/youtube-transcript-server";
+import { translateArrayToRussian, looksRussian } from "@/lib/translate";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/ratelimit";
 
 /**
@@ -53,10 +54,20 @@ export const POST = withErrorHandler(async (_req: Request, ctx: RouteContext) =>
   if (!entry) throw new HttpError("Not found", 404);
   if (entry.userId !== user.id) throw new HttpError("Forbidden", 403);
 
-  // Cached?  Return immediately.
+  // Cached?  Return immediately — but if the cached theses are still
+  // in a non-Russian language (older entries summarised before the
+  // translation step landed), translate them on this access and
+  // re-save so subsequent visits skip the round-trip.
   const cached = (entry.metadata?.summary as unknown);
   if (Array.isArray(cached) && cached.length > 0 && cached.every((x) => typeof x === "string")) {
-    return NextResponse.json({ summary: cached as string[], cached: true });
+    const cachedStrs = cached as string[];
+    if (looksRussian(cachedStrs[0])) {
+      return NextResponse.json({ summary: cachedStrs, cached: true });
+    }
+    const translatedCached = await translateArrayToRussian(cachedStrs);
+    const nextMetaCached = { ...(entry.metadata ?? {}), summary: translatedCached };
+    await updateEntry(id, { metadata: nextMetaCached });
+    return NextResponse.json({ summary: translatedCached, cached: true, translated: true });
   }
 
   if (!entry.url) throw new HttpError("Entry has no URL to summarize", 400);
@@ -71,15 +82,37 @@ export const POST = withErrorHandler(async (_req: Request, ctx: RouteContext) =>
     );
   }
 
-  const theses = summarize(transcript.text, 5);
-  if (theses.length === 0) {
+  const rawTheses = summarize(transcript.text, 5);
+  if (rawTheses.length === 0) {
     throw new HttpError("Не удалось выделить тезисы из транскрипта", 422);
   }
 
+  // If the transcript was in any non-Russian language (English, German,
+  // etc.), translate the theses into Russian before saving.  We check
+  // the first thesis as a representative sample — extractive
+  // summarisation always picks sentences in the original language, so
+  // they're either all Russian or all foreign.  Translation falls
+  // through gracefully: any line that fails translation keeps its
+  // original text rather than disappearing.
+  let finalTheses = rawTheses;
+  let translated = false;
+  if (!looksRussian(rawTheses[0])) {
+    finalTheses = await translateArrayToRussian(rawTheses);
+    translated = true;
+  }
+
+  console.log(JSON.stringify({
+    msg: "summarize.result",
+    videoId: vid,
+    theses: finalTheses.length,
+    translated,
+    transcriptLen: transcript.text.length,
+  }));
+
   // Persist into entry.metadata so the next request returns instantly.
   // Spread to keep any existing keys (model, source, etc.) intact.
-  const nextMeta = { ...(entry.metadata ?? {}), summary: theses };
+  const nextMeta = { ...(entry.metadata ?? {}), summary: finalTheses };
   await updateEntry(id, { metadata: nextMeta });
 
-  return NextResponse.json({ summary: theses, cached: false });
+  return NextResponse.json({ summary: finalTheses, cached: false, translated });
 });
