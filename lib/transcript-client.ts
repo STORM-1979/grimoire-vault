@@ -53,7 +53,11 @@ export function youtubeVideoId(url: string): string | null {
   return null;
 }
 
-export async function fetchTranscriptFromBrowser(videoId: string): Promise<string | null> {
+export type TranscriptFetchResult =
+  | { ok: true; text: string }
+  | { ok: false; reason: string };
+
+export async function fetchTranscriptFromBrowser(videoId: string): Promise<TranscriptFetchResult> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), KOME_TIMEOUT_MS);
   try {
@@ -63,9 +67,19 @@ export async function fetchTranscriptFromBrowser(videoId: string): Promise<strin
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ video_id: videoId, format: true }),
     });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { transcript?: string };
-    if (typeof data.transcript !== "string" || data.transcript.length < 50) return null;
+    if (!res.ok) {
+      console.warn("[transcript-client] kome.ai HTTP", res.status);
+      return { ok: false, reason: `kome.ai HTTP ${res.status}` };
+    }
+    const data = (await res.json().catch(() => ({}))) as { transcript?: string };
+    if (typeof data.transcript !== "string") {
+      console.warn("[transcript-client] kome.ai no transcript field");
+      return { ok: false, reason: "kome.ai вернул пустой ответ" };
+    }
+    if (data.transcript.length < 50) {
+      console.warn("[transcript-client] kome.ai short transcript:", data.transcript.length);
+      return { ok: false, reason: `kome.ai вернул ${data.transcript.length} символов (мало)` };
+    }
     const cleaned = data.transcript
       .replace(/&amp;#39;/g, "'")
       .replace(/&amp;quot;/g, '"')
@@ -74,10 +88,17 @@ export async function fetchTranscriptFromBrowser(videoId: string): Promise<strin
       .replace(/&quot;/g, '"')
       .replace(/\s+/g, " ")
       .trim();
-    if (looksLikeTranscriptError(cleaned)) return null;
-    return cleaned;
-  } catch {
-    return null;
+    if (looksLikeTranscriptError(cleaned)) {
+      console.warn("[transcript-client] kome.ai returned apology stub:", cleaned.slice(0, 100));
+      return { ok: false, reason: "kome.ai вернул заглушку «нет субтитров»" };
+    }
+    console.info("[transcript-client] kome.ai ok", cleaned.length, "chars");
+    return { ok: true, text: cleaned };
+  } catch (e) {
+    const msg = (e as Error)?.message ?? "unknown";
+    console.warn("[transcript-client] kome.ai fetch threw:", msg);
+    // Common error shapes: "Failed to fetch" (CORS / network), "aborted" (timeout)
+    return { ok: false, reason: `kome.ai: ${msg}` };
   } finally {
     clearTimeout(timer);
   }

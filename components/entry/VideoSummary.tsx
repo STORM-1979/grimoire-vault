@@ -59,13 +59,48 @@ export function VideoSummary({
       const id = youtubeVideoId(videoUrl);
       if (!id) return;
 
-      // Stage 1: pull transcript in the user's browser.
+      // Stage 1a: try browser kome.ai (residential IP, fastest).
       setStage("transcript");
-      const transcript = await fetchTranscriptFromBrowser(id);
+      const browserResult = await fetchTranscriptFromBrowser(id);
       if (cancelled) return;
+
+      let transcript: string | null = null;
+      let failReason = "";
+      if (browserResult.ok) {
+        transcript = browserResult.text;
+      } else {
+        failReason = browserResult.reason;
+        // Stage 1b: fall back to server-side multi-path chain
+        // (server kome.ai retry → innertube → mobile → invidious).
+        // The server returns extractive theses directly so we'll
+        // adopt those if it succeeds.
+        try {
+          const res = await fetch(`/api/entries/${entryId}/summarize`, { method: "POST" });
+          if (cancelled) return;
+          if (res.ok) {
+            const data = await res.json() as { summary?: string[]; source?: string };
+            if (data.summary?.length) {
+              setTheses(data.summary);
+              setSource(data.source ?? "extractive");
+              // Run polish in browser if server gave us something —
+              // server might've succeeded via innertube/mobile/invidious,
+              // and we don't have the raw transcript locally to polish
+              // ourselves, so this round skips the polish step.
+              setStage("done");
+              return;
+            }
+          } else {
+            const body = await res.json().catch(() => ({}));
+            failReason = `${failReason} · сервер: ${body?.error ?? `HTTP ${res.status}`}`;
+          }
+        } catch (e) {
+          failReason = `${failReason} · сервер: ${(e as Error).message}`;
+        }
+      }
+
       if (!transcript) {
         setStage("fail");
-        setErrorMsg("Транскрипт недоступен (у видео нет субтитров либо kome.ai сейчас не отвечает)");
+        setErrorMsg(`Транскрипт недоступен (${failReason || "нет субтитров"})`);
         return;
       }
 
