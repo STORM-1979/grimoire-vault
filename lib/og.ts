@@ -53,6 +53,7 @@ export interface ExtractedMeta {
     scrape?: { ok: boolean; status?: number };
     oembed?: "skipped" | "ok" | "fail";
     innertube?: "skipped" | "ok" | "fail";
+    mobile?: "skipped" | "ok" | "fail";
     consentWall?: boolean;
   };
 }
@@ -283,6 +284,75 @@ function truncateDescription(raw: string): string {
   return out;
 }
 
+/**
+ * Mobile YouTube watch page scrape — last-resort fallback for videos
+ * where innertube returns null (Vercel IPs occasionally hit rate limits
+ * on the WEB-client API key).  m.youtube.com serves the actual watch
+ * page when given a CONSENT cookie, including `<meta itemprop="duration"
+ * content="PT3M34S">` and the og:* tags.  We pluck duration from there
+ * directly — the same path the desktop scrape was supposed to use, but
+ * mobile is friendlier to non-cookied UAs and reliably gives us the
+ * tag.  Description falls back via og:description; full description
+ * via shortDescription in ytInitialPlayerResponse if it's near the top.
+ */
+async function fetchYouTubeMobileScrape(videoId: string): Promise<{
+  duration?: string; description?: string; title?: string; image?: string;
+} | null> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 5000);
+  try {
+    const res = await fetch(
+      `https://m.youtube.com/watch?v=${videoId}&hl=en&gl=US&persist_hl=1`,
+      {
+        signal: ctrl.signal,
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Linux; Android 14; SM-S921B) " +
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+          Cookie: "CONSENT=YES+1; SOCS=CAI",
+        },
+      },
+    );
+    if (!res.ok) return null;
+    const html = (await res.text()).slice(0, 1024 * 1024);
+
+    const ogDur = pickMeta(html, "duration") ?? pickMeta(html, "og:duration");
+    let duration = ogDur ? isoDurationToHuman(ogDur) : undefined;
+    if (!duration) {
+      // ytInitialPlayerResponse JSON usually carries lengthSeconds too.
+      const lenMatch = html.match(/"lengthSeconds"\s*:\s*"(\d+)"/);
+      if (lenMatch) duration = secondsToHuman(Number(lenMatch[1]));
+    }
+
+    const title = pickMeta(html, "og:title");
+    const image = pickMeta(html, "og:image") ?? `https://i.ytimg.com/vi_webp/${videoId}/maxresdefault.webp`;
+
+    // Full description: shortDescription is JSON-string-escaped inside
+    // ytInitialPlayerResponse.  If we can't find it, fall back to the
+    // truncated og:description in the head.
+    let description: string | undefined;
+    const descMatch = html.match(/"shortDescription":"((?:[^"\\]|\\.){2,5000})"/);
+    if (descMatch) {
+      try { description = JSON.parse('"' + descMatch[1] + '"') as string; }
+      catch { /* malformed, leave undefined */ }
+    }
+    if (!description) description = pickMeta(html, "og:description");
+
+    return {
+      duration,
+      description: description ? truncateDescription(description) : undefined,
+      title,
+      image,
+    };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Detect well-known video URLs so the caller can route to the right category. */
 function detectVideoId(u: URL): string | undefined {
   const h = u.hostname.replace(/^www\./, "");
@@ -318,6 +388,7 @@ export async function extractMetadata(input: string): Promise<ExtractedMeta> {
     scrape: { ok: false },
     oembed: "skipped",
     innertube: "skipped",
+    mobile: "skipped",
     consentWall: false,
   };
   try {
@@ -330,6 +401,11 @@ export async function extractMetadata(input: string): Promise<ExtractedMeta> {
         // available at the same path (e.g. some media sites).
         Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
         "Accept-Language": "ru,en;q=0.9",
+        // Pre-acknowledge YouTube's EU cookie consent prompt so the
+        // actual watch page loads (with itemprop=duration intact)
+        // instead of the redirect-to-consent stub.  Harmless for any
+        // non-YouTube target.
+        Cookie: "CONSENT=YES+1; SOCS=CAI",
       },
     });
     diag.scrape = { ok: res.ok, status: res.status };
@@ -500,6 +576,24 @@ export async function extractMetadata(input: string): Promise<ExtractedMeta> {
       // text which we already trimmed to ~500 chars in the fetcher.
       if (!finalDescription?.trim() && it.description) {
         finalDescription = it.description;
+      }
+    }
+  }
+
+  // Last-resort: if the watch-page scrape lacked a duration AND
+  // innertube didn't deliver one, try the mobile YouTube page.  Plain
+  // HTML scrape against m.youtube.com with a CONSENT cookie usually
+  // gives us lengthSeconds and shortDescription via ytInitialPlayerResponse,
+  // even when the WEB innertube key is rate-limited from this IP.
+  if (videoId && !duration) {
+    const mob = await fetchYouTubeMobileScrape(videoId);
+    diag.mobile = mob ? "ok" : "fail";
+    if (mob) {
+      duration ??= mob.duration;
+      finalTitle ??= mob.title;
+      finalImage ??= mob.image;
+      if (!finalDescription?.trim() && mob.description) {
+        finalDescription = mob.description;
       }
     }
   }

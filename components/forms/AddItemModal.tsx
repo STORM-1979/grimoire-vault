@@ -56,7 +56,10 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
   const [duplicate, setDuplicate] = useState<DuplicateInfo | null>(null);
   // og: extraction state — purely advisory UX feedback while the user
   // pastes a link.  The actual fetch happens via /api/extract.
+  // Mirrored on a ref so requestClose can poll the live value (state
+  // is captured in closures and never updates inside an async loop).
   const [extracting, setExtracting] = useState(false);
+  const extractingRef = useRef(false);
   // For video category: until the URL is pasted (or the user clicks
   // "fill manually"), the form shows just one URL input.  Other fields
   // appear after extraction succeeds OR the user opts out of auto-fill.
@@ -109,6 +112,7 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
     extractTimer.current = setTimeout(async () => {
       lastExtractedUrl.current = url;
       setExtracting(true);
+      extractingRef.current = true;
       setExtractError(null);
       try {
         const meta = await extractApi.fromUrl(url);
@@ -151,6 +155,7 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
         }
       } finally {
         setExtracting(false);
+        extractingRef.current = false;
       }
     }, 600);
     return () => {
@@ -243,6 +248,20 @@ export function AddItemModal({ categoryId, onClose, onSubmit }: Props) {
    */
   const requestClose = async () => {
     if (submitting) return;
+    // If the autofill extraction is mid-flight, wait it out before
+    // deciding whether there's anything to save.  Without this guard,
+    // a Cancel/Esc one second after pasting a YouTube URL would race
+    // the /api/extract response and persist an entry without duration
+    // / description even though they were a moment away from filling.
+    // Cap the wait at 8s so a stalled network never freezes the close.
+    // Polled via the ref because state values are captured in this
+    // closure and never update inside an async loop.
+    if (extractingRef.current) {
+      const startedAt = Date.now();
+      while (extractingRef.current && Date.now() - startedAt < 8000) {
+        await new Promise((r) => setTimeout(r, 100));
+      }
+    }
     const pendingUrl = form.url.trim();
     const pendingTitle = form.title.trim();
     const hasPending =
