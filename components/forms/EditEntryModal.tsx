@@ -23,6 +23,7 @@ export function EditEntryModal({ entry, onClose, onSubmit, collections }: Props)
   const cat = getCategory(entry.categoryId);
   const isVideo = isVideoCategory(entry.categoryId);
   const isMedia = isMediaCategory(entry.categoryId);
+  const isDesign = entry.categoryId === "designs";
   const isWeb = entry.categoryId === "web";
   const isDoc = entry.categoryId === "documents";
   const isLocal = entry.categoryId === "local";
@@ -88,7 +89,7 @@ export function EditEntryModal({ entry, onClose, onSubmit, collections }: Props)
         const n = form.count ? parseInt(form.count, 10) : null;
         patch.fileCount = isNaN(n as number) ? null : n;
       }
-      if (isWeb || isDoc || isLocal) patch.url = form.url.trim() || null;
+      if (isWeb || isDoc || isLocal || isDesign) patch.url = form.url.trim() || null;
       if (isDoc || isLocal) patch.sizeLabel = form.size.trim() || null;
       if (isPrompt) {
         patch.metadata = { ...entry.metadata, model: form.model.trim() || undefined };
@@ -145,7 +146,19 @@ export function EditEntryModal({ entry, onClose, onSubmit, collections }: Props)
             </>
           )}
 
-          {isMedia && (
+          {isDesign && (
+            <Field label="Ссылка на сайт / страницу">
+              <input
+                type="url"
+                className="field-input"
+                value={form.url}
+                onChange={set("url")}
+                placeholder="https://… (Behance / Dribbble / студийный сайт)"
+              />
+            </Field>
+          )}
+
+          {isMedia && !isDesign && (
             <>
               <FileUpload kind="covers" accept="image/*" maxBytes={10 * 1024 * 1024}
                 value={form.cover} onChange={(url) => setForm((f) => ({ ...f, cover: url }))}

@@ -50,6 +50,12 @@ export function AddItemModal({
   const isLocal = categoryId === "local";
   const isPrompt = categoryId === "prompts";
   const isImage = categoryId === "images";
+  // Designs is conceptually a media category (uses MediaCard for
+  // cover rendering) but the user adds entries by pasting a URL —
+  // a Behance / Dribbble / studio site / article — and the cover
+  // comes from og:image automatically.  No upload, no manual image
+  // URL field.
+  const isDesign = categoryId === "designs";
   // Text-first categories — no built-in URL or file extractor of their
   // own, but we still expose an optional "Источник (URL)" input at the
   // top.  Pasting any link runs the same /api/extract pipeline used by
@@ -127,7 +133,7 @@ export function AddItemModal({
     // URL changed — clear the "this URL already failed to save" marker
     // so close-with-pending can try again on the new value.
     if (failedUrl.current && failedUrl.current !== url) failedUrl.current = null;
-    if (!(isWeb || isVideo || isText) || url.length < 8) return;
+    if (!(isWeb || isVideo || isText || isDesign) || url.length < 8) return;
     let parsed: URL | null = null;
     try { parsed = new URL(url); } catch { return; }
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return;
@@ -201,7 +207,7 @@ export function AddItemModal({
     return () => {
       if (extractTimer.current) clearTimeout(extractTimer.current);
     };
-  }, [form.url, isWeb, isVideo, isText]);
+  }, [form.url, isWeb, isVideo, isText, isDesign]);
 
   /**
    * Build the CreateEntryInput payload from the current form state and
@@ -437,7 +443,7 @@ export function AddItemModal({
             <>
               <Field label="Название" required>
                 <input
-                  autoFocus={!isVideo && !isText}
+                  autoFocus={!isVideo && !isText && !isDesign}
                   type="text"
                   className="field-input"
                   value={form.title}
@@ -479,7 +485,31 @@ export function AddItemModal({
             </>
           )}
 
-          {isMedia && (
+          {/* Designs: URL-only flow.  No upload; cover comes from
+              og:image of the pasted page (Behance / Dribbble /
+              studio site / article).  Title + description fill
+              from og: meta via the extraction effect above. */}
+          {isDesign && (
+            <Field
+              label="Ссылка на сайт / страницу"
+              hint={
+                extracting
+                  ? "Подтягиваю название и превью со страницы…"
+                  : "Вставь ссылку — название и обложка подставятся автоматически"
+              }
+            >
+              <input
+                autoFocus
+                type="url"
+                className="field-input"
+                value={form.url}
+                onChange={set("url")}
+                placeholder="https://… (Behance / Dribbble / студийный сайт)"
+              />
+            </Field>
+          )}
+
+          {isMedia && !isDesign && (
             <>
               <FileUpload
                 kind="covers"
@@ -490,7 +520,7 @@ export function AddItemModal({
                 onMeta={(meta) => {
                   // Cover-image filename → entry title — same logic as
                   // the document/local upload, just for media categories
-                  // (designs / images / portfolio). Empty-only fill.
+                  // (images / portfolio). Empty-only fill.
                   setForm((f) => ({
                     ...f,
                     title: f.title.trim() ? f.title : (meta.suggestedTitle ?? ""),
