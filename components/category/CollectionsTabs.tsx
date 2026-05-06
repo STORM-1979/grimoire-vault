@@ -33,6 +33,15 @@ export function CollectionsTabs({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
 
+  // Auto-dismiss errors after 4 s — they're transient feedback, not
+  // persistent state (e.g. "уже есть" right after creation should
+  // not still be on screen ten minutes later).
+  useEffect(() => {
+    if (!error) return;
+    const t = setTimeout(() => setError(null), 4000);
+    return () => clearTimeout(t);
+  }, [error]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
