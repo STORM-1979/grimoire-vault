@@ -23,12 +23,31 @@
  * The tracker just saves us from re-applying gigabytes of identical
  * SQL on every fork bootstrap.
  */
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const MIGRATIONS_DIR = join(__dirname, "..", "supabase", "migrations");
+const ENV_FILE = join(__dirname, "..", ".env.migrate");
+
+// Optional dotfile loader.  Lets us keep the PAT in .env.migrate (gitignored)
+// rather than passing it on the command line every time.  Only loads keys
+// that aren't already set in the process env, so command-line / CI vars
+// always win.
+function loadEnvFile(path) {
+  if (!existsSync(path)) return;
+  for (const line of readFileSync(path, "utf-8").split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq < 0) continue;
+    const k = trimmed.slice(0, eq).trim();
+    const v = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, "");
+    if (!process.env[k]) process.env[k] = v;
+  }
+}
+loadEnvFile(ENV_FILE);
 
 const PROJECT_REF = process.env.SUPABASE_PROJECT_REF;
 const TOKEN = process.env.SUPABASE_ACCESS_TOKEN;
@@ -36,7 +55,10 @@ const PLAN_ONLY = process.argv.includes("--plan");
 const RESET_LOG = process.argv.includes("--reset-log");
 
 if (!PROJECT_REF || !TOKEN) {
-  console.error("Set SUPABASE_PROJECT_REF and SUPABASE_ACCESS_TOKEN env vars.");
+  console.error(
+    "Set SUPABASE_PROJECT_REF and SUPABASE_ACCESS_TOKEN env vars,\n" +
+    "or store them in .env.migrate (gitignored).",
+  );
   process.exit(2);
 }
 
