@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Icon } from "@/components/icons/Icon";
 import { humanFileSize, uploadToR2, type UploadKind, type UploadProgress } from "@/lib/upload";
+import { compressImageIfNeeded } from "@/lib/image-compress";
 
 /**
  * Metadata about the picked file.  Surfaced BEFORE the upload starts so
@@ -43,10 +44,30 @@ export function FileUpload({
   const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [compressing, setCompressing] = useState(false);
 
-  const handleFile = async (file: File | null) => {
-    if (!file) return;
+  const handleFile = async (rawFile: File | null) => {
+    if (!rawFile) return;
     setError(null);
+
+    // Step 1: client-side image compression.  Only kicks in for
+    // re-encodable raster MIMEs (JPEG/PNG/WebP/AVIF/BMP/TIFF) and
+    // only if the file is over the cap — small images pass through
+    // untouched.  GIFs / SVGs / non-images bypass entirely so we
+    // don't strip animation / rasterise vectors.
+    let file = rawFile;
+    if (maxBytes && rawFile.size > maxBytes && rawFile.type.startsWith("image/")) {
+      setCompressing(true);
+      try {
+        file = await compressImageIfNeeded(rawFile, { targetBytes: maxBytes });
+      } catch {
+        // Fall through to the size-check below so the user sees the
+        // real error rather than a silent abort.
+      } finally {
+        setCompressing(false);
+      }
+    }
+
     if (maxBytes && file.size > maxBytes) {
       setError(`Файл больше ${humanFileSize(maxBytes)}`);
       return;
@@ -143,9 +164,13 @@ export function FileUpload({
         >
           <Icon name="add" size={22} className="mx-auto text-gold mb-2" />
           <div className="font-mono text-[11px] uppercase tracking-widest text-gold">
-            {busy ? "Загружаю…" : `Перетащи ${fileLabel} или кликни`}
+            {compressing
+              ? "Сжимаю…"
+              : busy
+              ? "Загружаю…"
+              : `Перетащи ${fileLabel} или кликни`}
           </div>
-          {hint && !busy && (
+          {hint && !busy && !compressing && (
             <div className="font-mono text-[10px] text-ivory-mute/70 mt-2">{hint}</div>
           )}
         </div>
