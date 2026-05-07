@@ -5,6 +5,7 @@ import { Footer } from "@/components/layout/Footer";
 import { IdlePreload } from "@/components/layout/IdlePreload";
 import { CommandPalette } from "@/components/layout/CommandPalette";
 import { KeyboardHelp } from "@/components/layout/KeyboardHelp";
+import { QuickCapture } from "@/components/layout/QuickCapture";
 
 export default async function AppLayout({
   children,
@@ -25,6 +26,7 @@ export default async function AppLayout({
       <IdlePreload />
       <CommandPalette />
       <KeyboardHelp />
+      <QuickCapture />
     </>
   );
 }

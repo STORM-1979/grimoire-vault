@@ -18,6 +18,7 @@ export function Header({ user }: HeaderProps) {
 
         <nav className="flex items-center gap-9">
           <NavLink href="/" exact>Главная</NavLink>
+          <NavLink href="/today">Сегодня</NavLink>
           <NavLink href="/categories">Категории</NavLink>
           <span className="inline-flex items-center">
             <NavLink href="/inbox">Inbox</NavLink>

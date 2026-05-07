@@ -14,6 +14,7 @@ import { humanSize } from "@/lib/utils";
 import { resolveYouTubeDuration, youtubeVideoId } from "@/lib/youtube-client";
 import { siteScreenshot } from "@/lib/screenshot";
 import { translateToRussianBrowser } from "@/lib/translate-client";
+import { useEntryTemplates, type EntryTemplate } from "@/lib/hooks/useEntryTemplates";
 import type { CategoryId, EntryCollection } from "@/lib/types";
 import type { CreateEntryInput } from "@/lib/schemas/entries";
 
@@ -98,6 +99,19 @@ export function AddItemModal({
     || categoryId === "misc";
 
   const [form, setForm] = useState({ ...EMPTY_FORM });
+  // Per-category presets (Skills / Prompts / Ideas / Active Projects
+  // ship seeded defaults; everything else starts empty).  Picking a
+  // template patches title / desc / tags only — fields the user
+  // explicitly typed are never overwritten.
+  const { templates } = useEntryTemplates(categoryId);
+  const applyTemplate = (tpl: EntryTemplate) => {
+    setForm((f) => ({
+      ...f,
+      title: f.title.trim() ? f.title : (tpl.title ?? f.title),
+      desc: f.desc.trim() ? f.desc : (tpl.desc ?? f.desc),
+      tags: f.tags.trim() ? f.tags : (tpl.tags ?? []).join(", "),
+    }));
+  };
   // Collection picker state — separate from `form` because it's only
   // present for categories that have collections, and we don't want
   // to widen EMPTY_FORM with a field most categories never use.
@@ -549,6 +563,31 @@ export function AddItemModal({
 
           {(!isVideo || videoExpanded) && (
             <>
+              {/* Template picker — only when this category has any
+                  presets and the user hasn't started typing yet.
+                  Disappears once a title or description is in place
+                  so it doesn't clutter the form mid-edit. */}
+              {templates.length > 0 && !form.title.trim() && !form.desc.trim() && (
+                <div className="mb-4">
+                  <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute mb-2">
+                    Шаблон →
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {templates.map((tpl) => (
+                      <button
+                        key={tpl.id}
+                        type="button"
+                        onClick={() => applyTemplate(tpl)}
+                        className="font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full border border-emerald-300/30 text-emerald-200 hover:border-emerald-300 hover:bg-emerald-300/[0.06] transition flex items-center gap-1.5"
+                        title="Подставить шаблон в форму"
+                      >
+                        <Icon name="add" size={11} /> {tpl.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <Field label="Название" required>
                 <input
                   autoFocus={!isVideo && !isText && !isDesign}
