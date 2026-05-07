@@ -138,7 +138,9 @@ export function EditEntryModal({ entry, onClose, onSubmit, collections }: Props)
                 value={form.thumb} onChange={(url) => setForm((f) => ({ ...f, thumb: url }))}
                 label="Превью видео" hint="WebP / JPEG / PNG · до 5 MB" />
               <Field label="…или URL превью">
-                <input type="url" className="field-input" value={form.thumb} onChange={set("thumb")} />
+                {/* type="text" — accepts our internal /api/r2/* paths
+                    (HTML5 url validation rejects relative URLs). */}
+                <input type="text" className="field-input" value={form.thumb} onChange={set("thumb")} />
               </Field>
               <Field label="Длительность">
                 <input type="text" className="field-input" value={form.duration} onChange={set("duration")} placeholder="12:34" />
@@ -164,7 +166,8 @@ export function EditEntryModal({ entry, onClose, onSubmit, collections }: Props)
                 value={form.cover} onChange={(url) => setForm((f) => ({ ...f, cover: url }))}
                 label="Обложка" hint="WebP / JPEG / PNG · до 10 MB" />
               <Field label="…или URL обложки">
-                <input type="url" className="field-input" value={form.cover} onChange={set("cover")} />
+                {/* See note on the thumb field — same reason. */}
+                <input type="text" className="field-input" value={form.cover} onChange={set("cover")} />
               </Field>
             </>
           )}

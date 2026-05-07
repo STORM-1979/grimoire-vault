@@ -486,7 +486,11 @@ export function AddItemModal({
                 hint="WebP / JPEG / PNG · до 5 MB. Или вставь URL ниже."
               />
               <Field label="…или URL превью">
-                <input type="url" className="field-input" value={form.thumb} onChange={set("thumb")}
+                {/* type="text" instead of "url": HTML5 url validation
+                    rejects our internal "/api/r2/object/..." paths
+                    because they're not absolute schemes. Zod still
+                    enforces the right format on the server. */}
+                <input type="text" className="field-input" value={form.thumb} onChange={set("thumb")}
                   placeholder="https://images.unsplash.com/photo-... или /api/r2/object/..." />
               </Field>
               <Field label="Длительность">
@@ -541,8 +545,9 @@ export function AddItemModal({
                 hint="WebP / JPEG / PNG · до 10 MB. Или вставь URL ниже."
               />
               <Field label="…или URL обложки">
-                <input type="url" className="field-input" value={form.cover} onChange={set("cover")}
-                  placeholder="https://images.unsplash.com/photo-..." />
+                {/* See note on the thumb field — same reason. */}
+                <input type="text" className="field-input" value={form.cover} onChange={set("cover")}
+                  placeholder="https://images.unsplash.com/photo-... или /api/r2/object/..." />
               </Field>
             </>
           )}
