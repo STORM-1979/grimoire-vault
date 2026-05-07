@@ -76,8 +76,18 @@ export function MediaCard({ item, big, selected, bulkSelected, onBulkToggle, onT
           </div>
         )}
         {cover && (
-          <div className="absolute bottom-3 left-3 font-mono text-[9px] uppercase tracking-widest text-ivory-mute/90">
-            {designFallback && !item.coverUrl ? "screenshot" : "webp"}
+          <div className="absolute bottom-3 left-3 font-mono text-[9px] uppercase tracking-widest text-ivory-mute/90 flex items-center gap-1.5">
+            <span>{designFallback && !item.coverUrl ? "screenshot" : "webp"}</span>
+            {/* Weight chip — set by AddItemModal / EditEntryModal on
+                fresh uploads (post-compression bytes).  Older entries
+                without sizeLabel just hide the chip; designs use
+                og:image / screenshots, so they never carry a weight. */}
+            {item.sizeLabel && (
+              <>
+                <span aria-hidden className="text-ivory-mute/40">·</span>
+                <span>{item.sizeLabel}</span>
+              </>
+            )}
           </div>
         )}
       </div>

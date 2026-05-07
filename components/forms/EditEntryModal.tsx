@@ -6,6 +6,7 @@ import { Field } from "./Field";
 import { FileUpload } from "./FileUpload";
 import { CollectionSelect } from "./CollectionSelect";
 import { getCategory, isMediaCategory, isVideoCategory } from "@/lib/categories";
+import { humanSize } from "@/lib/utils";
 import type { Entry, EntryCollection } from "@/lib/types";
 import type { UpdateEntryInput } from "@/lib/schemas/entries";
 
@@ -43,6 +44,10 @@ export function EditEntryModal({ entry, onClose, onSubmit, collections }: Props)
     count: entry.fileCount?.toString() ?? "",
     model: (entry.metadata?.model as string) ?? "",
   });
+  // Bytes of a freshly re-uploaded cover (post-compression).  Only
+  // set when the user replaces the existing image — null means "no
+  // change, keep whatever the entry already has".
+  const [coverBytes, setCoverBytes] = useState<number | null>(null);
   // Collection assignment lives outside `form` because it's only
   // present for video entries with collections loaded.
   const [collectionId, setCollectionId] = useState<string | null>(entry.collectionId ?? null);
@@ -85,6 +90,12 @@ export function EditEntryModal({ entry, onClose, onSubmit, collections }: Props)
         patch.collectionId = collectionId;
       }
       if (isMedia) patch.coverUrl = form.cover.trim() || null;
+      // Update the cached weight only on a fresh upload — same
+      // skip-for-designs reason as in AddItemModal.
+      if (isMedia && !isDesign && coverBytes !== null) {
+        patch.sizeBytes = coverBytes;
+        patch.sizeLabel = humanSize(coverBytes);
+      }
       if (isImage) {
         const n = form.count ? parseInt(form.count, 10) : null;
         patch.fileCount = isNaN(n as number) ? null : n;
@@ -164,6 +175,7 @@ export function EditEntryModal({ entry, onClose, onSubmit, collections }: Props)
             <>
               <FileUpload kind="covers" accept="image/*" maxBytes={10 * 1024 * 1024}
                 value={form.cover} onChange={(url) => setForm((f) => ({ ...f, cover: url }))}
+                onMeta={(meta) => setCoverBytes(meta.size)}
                 label="Обложка" hint="WebP / JPEG / PNG · до 10 MB" />
               <Field label="…или URL обложки">
                 {/* See note on the thumb field — same reason. */}

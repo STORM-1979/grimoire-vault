@@ -37,6 +37,11 @@ interface Props {
 const EMPTY_FORM = {
   title: "", desc: "", tags: "", pinned: false,
   url: "", thumb: "", cover: "", duration: "", size: "", count: "", model: "",
+  // Bytes of the most recently uploaded cover (post-compression) — set
+  // by FileUpload's onMeta callback for media categories so we can
+  // persist sizeBytes / sizeLabel on submit and render the weight on
+  // the card.  Stays 0 if the user pasted a URL instead of uploading.
+  coverBytes: 0,
 };
 
 export function AddItemModal({
@@ -254,6 +259,13 @@ export function AddItemModal({
       if (form.duration.trim()) input.duration = form.duration.trim();
     }
     if (isMedia && form.cover.trim()) input.coverUrl = form.cover.trim();
+    // Persist the cover-image weight so the card can render it.
+    // Skipped for designs (cover comes from og:image / screenshot,
+    // not a real upload — bytes would be misleading).
+    if (isMedia && !isDesign && form.coverBytes > 0) {
+      input.sizeBytes = form.coverBytes;
+      input.sizeLabel = humanSize(form.coverBytes);
+    }
     if (isImage && form.count) {
       const n = parseInt(form.count, 10);
       if (!isNaN(n)) input.fileCount = n;
@@ -535,10 +547,13 @@ export function AddItemModal({
                 onMeta={(meta) => {
                   // Cover-image filename → entry title — same logic as
                   // the document/local upload, just for media categories
-                  // (images / portfolio). Empty-only fill.
+                  // (images / portfolio). Empty-only fill. Also capture
+                  // the post-compression bytes so the card can show
+                  // the file weight.
                   setForm((f) => ({
                     ...f,
                     title: f.title.trim() ? f.title : (meta.suggestedTitle ?? ""),
+                    coverBytes: meta.size,
                   }));
                 }}
                 label="Обложка — загрузить"
