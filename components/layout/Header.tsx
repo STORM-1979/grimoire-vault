@@ -26,6 +26,8 @@ export function Header({ user }: HeaderProps) {
           </span>
           <NavLink href="/search">Поиск</NavLink>
           <NavLink href="/kanban">Канбан</NavLink>
+          <NavLink href="/review">Review</NavLink>
+          <NavLink href="/graph">Граф</NavLink>
           <NavLink href="/settings">Настройки</NavLink>
         </nav>
 

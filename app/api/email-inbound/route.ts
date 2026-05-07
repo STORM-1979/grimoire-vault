@@ -1,0 +1,90 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { createServiceClient } from "@/lib/supabase/server";
+import { withErrorHandler, HttpError } from "@/lib/api-helpers";
+import { createEntry } from "@/lib/data/entries";
+
+/**
+ * POST /api/email-inbound — webhook for inbound email forwarding.
+ *
+ * Stub-friendly: any provider that POSTs an `{ to, subject, text,
+ * from }` payload (Postmark, SendGrid Inbound Parse, Mailgun Routes,
+ * SES + SNS, etc.) hits this endpoint and the user's vault gets a
+ * new entry.  The `to` address is matched against the
+ * `email_aliases` table (alias → user_id mapping); the body's URL
+ * (if any) goes through the existing extract pipeline.
+ *
+ * Setup checklist (deferred — needs DNS + provider account):
+ *   1. Provision a domain (e.g. `gv-mail.your-domain.com`) with MX
+ *      records pointing at Postmark / SendGrid.
+ *   2. Configure the provider to POST inbound to
+ *      https://grimoire-vault.vercel.app/api/email-inbound.
+ *   3. Add a webhook secret as `EMAIL_WEBHOOK_SECRET` env var,
+ *      verify it in the handler below.
+ *   4. Create the `email_aliases` table (see deferred migration in
+ *      docs/UPGRADING.md "Email-to-vault" section).
+ *   5. Add a Settings UI for users to provision their alias.
+ *
+ * For now this endpoint accepts the payload, validates schema,
+ * saves to misc category for the configured owner — enough to test
+ * end-to-end once the DNS / webhook half is in place.
+ */
+
+const inboundSchema = z.object({
+  to: z.string().email().optional(),
+  from: z.string().email().optional(),
+  subject: z.string().max(500).optional(),
+  text: z.string().max(20000).optional(),
+  html: z.string().max(50000).optional(),
+});
+
+export const POST = withErrorHandler(async (req: Request) => {
+  // Verify webhook secret to prevent random POSTs from creating
+  // entries.  Provider sends it as a query param or header — pick
+  // whichever matches your config.
+  const secret = process.env.EMAIL_WEBHOOK_SECRET;
+  if (secret) {
+    const url = new URL(req.url);
+    const provided = url.searchParams.get("secret") ?? req.headers.get("x-webhook-secret");
+    if (provided !== secret) throw new HttpError("Unauthorized", 401);
+  }
+
+  let body: unknown;
+  try { body = await req.json(); }
+  catch { throw new HttpError("Body must be valid JSON", 400); }
+  const parsed = inboundSchema.safeParse(body);
+  if (!parsed.success) throw new HttpError("Invalid payload", 400);
+  const { to, from, subject, text, html } = parsed.data;
+
+  // TODO(email-aliases): replace this with a real lookup against
+  // public.email_aliases keyed by `to`.  For now we route everything
+  // to the configured owner.
+  const ownerEmail = process.env.OWNER_EMAIL;
+  if (!ownerEmail) {
+    throw new HttpError("Server not configured for email inbound", 503);
+  }
+  const svc = createServiceClient();
+  const { data: { users } } = await svc.auth.admin.listUsers();
+  const owner = users.find((u) => u.email === ownerEmail);
+  if (!owner) throw new HttpError("Owner not found", 503);
+
+  // Detect URL in the body — falls back to subject as title if none.
+  const combined = (text ?? "") + " " + (html ?? "");
+  const urlMatch = combined.match(/https?:\/\/[^\s)>"'`]+/);
+  const url = urlMatch?.[0] ?? null;
+
+  await createEntry(owner.id, {
+    categoryId: url ? "web" : "misc",
+    title: subject?.trim() || "(email)",
+    description: text?.trim().slice(0, 2000) || null,
+    url: url ?? undefined,
+    tags: ["email", from?.split("@")[1] ?? "inbox"].filter(Boolean) as string[],
+    pinned: false,
+    metadata: { capturedVia: "email", from },
+    importedVia: "web",
+  });
+
+  return NextResponse.json({ ok: true });
+});
+
+void z;

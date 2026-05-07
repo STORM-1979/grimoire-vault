@@ -12,6 +12,7 @@ import { VideoSummary } from "@/components/entry/VideoSummary";
 import { ProjectPanel } from "@/components/entry/ProjectPanel";
 import { BacklinksPanel } from "@/components/entry/BacklinksPanel";
 import { ShareButton } from "@/components/entry/ShareButton";
+import { AddToReviewButton } from "@/components/entry/AddToReviewButton";
 
 /**
  * /entry/[id] — full-detail view of one entry, with the interactive
@@ -91,6 +92,7 @@ export default async function EntryPage({
                 </a>
               )}
               <ShareButton entryId={entry.id} />
+              <AddToReviewButton entryId={entry.id} />
             </div>
           </div>
         </div>
