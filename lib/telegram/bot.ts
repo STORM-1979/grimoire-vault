@@ -179,9 +179,16 @@ function dupOrSavedReply(
 async function fetchYouTubeMeta(videoId: string): Promise<{
   title: string; author: string; thumb: string;
 } | null> {
+  // 5-second AbortController guard.  YouTube's oEmbed endpoint
+  // occasionally stalls from Vercel egress IPs, and without a
+  // timeout the entire bot handler would freeze waiting for it
+  // (the user sees no reply until Vercel kills the function).
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 5_000);
   try {
     const res = await fetch(
-      `https://www.youtube.com/oembed?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3D${videoId}&format=json`
+      `https://www.youtube.com/oembed?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3D${videoId}&format=json`,
+      { signal: ctrl.signal },
     );
     if (!res.ok) return null;
     const data = await res.json();
@@ -192,6 +199,8 @@ async function fetchYouTubeMeta(videoId: string): Promise<{
     };
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -253,12 +262,20 @@ export function getBot(): Bot {
       await safeReply(ctx, "Минимум 2 символа.\nПример: `/search next.js`", { parse_mode: "Markdown" });
       return;
     }
+    // PostgREST's `.or()` filter takes a comma-separated string of
+    // "column.operator.value" triples. User input is interpolated
+    // directly into the value, so a `q` containing `,` or `.` or
+    // `()` would parse as additional filter clauses. RLS already
+    // scopes to the caller's user_id, so the worst-case is a
+    // misshapen query against the user's own rows — but escaping
+    // is still cheap insurance.
+    const safeQ = q.replace(/[,.()*\\]/g, " ").replace(/\s+/g, " ").trim();
     const svc = createServiceClient();
     const { data } = await svc
       .from("entries")
       .select("category_id, title, description, created_at")
       .eq("user_id", user.userId)
-      .or(`title.ilike.%${q}%,description.ilike.%${q}%`)
+      .or(`title.ilike.%${safeQ}%,description.ilike.%${safeQ}%`)
       .order("pinned", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(5);
