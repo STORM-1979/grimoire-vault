@@ -55,14 +55,16 @@ export async function compressImageIfNeeded(
 
   // First pass: cap dimensions, encode at preferred quality.
   let blob = await encode(bitmap, w, h, quality);
-  // Step 1: lower quality.
-  while (blob.size > opts.targetBytes && quality > 0.5) {
-    quality = Math.max(0.5, quality - 0.1);
+  // Step 1: lower quality down to 0.4 — visually still acceptable for
+  // photos, and a 5–10× size reduction over 0.82 on detailed scenes.
+  while (blob.size > opts.targetBytes && quality > 0.4) {
+    quality = Math.max(0.4, quality - 0.1);
     blob = await encode(bitmap, w, h, quality);
   }
-  // Step 2: shrink dimensions ×0.75 per pass, floor at 600 px on the
-  // longer side so we don't ship a postage stamp.
-  while (blob.size > opts.targetBytes && Math.max(w, h) > 600) {
+  // Step 2: shrink dimensions ×0.75 per pass, floor at 480 px on the
+  // longer side so we don't ship a postage stamp.  Combined with the
+  // quality floor above this lets a 50 MB DSLR shot fit under 1 MB.
+  while (blob.size > opts.targetBytes && Math.max(w, h) > 480) {
     w = Math.round(w * 0.75);
     h = Math.round(h * 0.75);
     blob = await encode(bitmap, w, h, quality);

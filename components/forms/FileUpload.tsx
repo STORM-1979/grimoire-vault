@@ -50,26 +50,44 @@ export function FileUpload({
     if (!rawFile) return;
     setError(null);
 
-    // Step 1: client-side image compression.  Only kicks in for
-    // re-encodable raster MIMEs (JPEG/PNG/WebP/AVIF/BMP/TIFF) and
-    // only if the file is over the cap — small images pass through
-    // untouched.  GIFs / SVGs / non-images bypass entirely so we
-    // don't strip animation / rasterise vectors.
+    // Step 1: client-side image compression.  Triggers for
+    // re-encodable raster formats — detected via MIME first, then by
+    // file-extension fallback (some OSes hand us empty / generic
+    // `application/octet-stream` MIME, especially on drag-drop).
+    // GIFs / SVGs / non-image files bypass entirely so we don't
+    // strip animation or rasterise vectors.
     let file = rawFile;
-    if (maxBytes && rawFile.size > maxBytes && rawFile.type.startsWith("image/")) {
+    const looksLikeImage =
+      /^image\/(jpeg|png|webp|avif|bmp|tiff|heic|heif)$/i.test(rawFile.type) ||
+      /\.(jpe?g|png|webp|avif|bmp|tiff?|heic|heif)$/i.test(rawFile.name);
+    if (maxBytes && rawFile.size > maxBytes && looksLikeImage) {
       setCompressing(true);
       try {
         file = await compressImageIfNeeded(rawFile, { targetBytes: maxBytes });
-      } catch {
-        // Fall through to the size-check below so the user sees the
-        // real error rather than a silent abort.
+      } catch (e) {
+        // HEIC / corrupt / unsupported formats end up here. Tell the
+        // user explicitly instead of silently bouncing them off the
+        // generic size-cap message — they can convert and retry.
+        const reason = e instanceof Error ? e.message : "decode failed";
+        const isHeic = /heic|heif/i.test(rawFile.type) || /\.(heic|heif)$/i.test(rawFile.name);
+        setCompressing(false);
+        setError(
+          isHeic
+            ? "HEIC не поддерживается браузером — сохрани как JPEG или PNG."
+            : `Не удалось сжать изображение: ${reason}. Уменьши вручную и загрузи снова.`,
+        );
+        return;
       } finally {
         setCompressing(false);
       }
     }
 
     if (maxBytes && file.size > maxBytes) {
-      setError(`Файл больше ${humanFileSize(maxBytes)}`);
+      setError(
+        looksLikeImage
+          ? `Не удалось ужать ниже ${humanFileSize(maxBytes)} (получилось ${humanFileSize(file.size)}). Возьми меньшее изображение.`
+          : `Файл больше ${humanFileSize(maxBytes)}`,
+      );
       return;
     }
     // Surface metadata before the network call so the parent can
