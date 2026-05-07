@@ -10,6 +10,7 @@ const PUBLIC_PATHS = [
   "/auth/callback",
   "/api/telegram",          // bot webhook + cron — own auth via secret_token / cron header
   "/api/health",
+  "/share",                 // public read-only entry view via /share/<token>
 ];
 
 export async function updateSession(request: NextRequest) {

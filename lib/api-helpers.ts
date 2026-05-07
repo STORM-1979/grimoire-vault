@@ -17,6 +17,66 @@ export async function requireUser() {
   return user;
 }
 
+/**
+ * Resolve user from EITHER cookie session OR `Authorization: Bearer
+ * <pat>` header.  Used by the v1 REST API so iOS Shortcuts / Zapier
+ * / curl can call the same endpoints the browser uses.  The token is
+ * matched by SHA-256 against `personal_access_tokens.token_hash`.
+ *
+ * Falls back to cookie auth when the header is absent so a route
+ * mounted under v1 can still serve a logged-in browser.
+ */
+export async function requireUserFlexible() {
+  const supabase = await createClient();
+  const { data: { user: cookieUser } } = await supabase.auth.getUser();
+  if (cookieUser) return cookieUser;
+
+  // Cookie miss — try Bearer token.  Read the header from the
+  // request via the `headers()` helper imported lazily so this
+  // function stays callable from contexts where the header isn't
+  // available (e.g. server actions).
+  const { headers } = await import("next/headers");
+  const h = await headers();
+  const auth = h.get("authorization");
+  if (!auth?.startsWith("Bearer ")) throw new HttpError("Unauthorized", 401);
+  const token = auth.slice(7).trim();
+  if (!token) throw new HttpError("Unauthorized", 401);
+
+  // Hash with Web Crypto and look up.  We use the service-role
+  // client for this query so RLS doesn't block (no user session yet).
+  const { createServiceClient } = await import("@/lib/supabase/server");
+  const svc = createServiceClient();
+  const hash = await sha256Hex(token);
+  const { data: row, error } = await svc
+    .from("personal_access_tokens")
+    .select("user_id")
+    .eq("token_hash", hash)
+    .maybeSingle();
+  if (error || !row) throw new HttpError("Unauthorized", 401);
+
+  // Touch last_used_at fire-and-forget so the user can audit which
+  // tokens are alive.
+  void svc
+    .from("personal_access_tokens")
+    .update({ last_used_at: new Date().toISOString() })
+    .eq("token_hash", hash);
+
+  // Hydrate the auth.users row so callers get the same shape as
+  // requireUser().
+  const { data: { user } } = await svc.auth.admin.getUserById(row.user_id);
+  if (!user) throw new HttpError("Unauthorized", 401);
+  return user;
+}
+
+/** SHA-256 → hex via Web Crypto. */
+async function sha256Hex(input: string): Promise<string> {
+  const buf = new TextEncoder().encode(input);
+  const hash = await crypto.subtle.digest("SHA-256", buf);
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 /** Parse JSON body with Zod schema, throwing 400 on failure. */
 export async function parseBody<T>(request: Request, schema: ZodType<T>): Promise<T> {
   let raw: unknown;

@@ -7,6 +7,7 @@ import { ImportVault } from "@/components/settings/ImportVault";
 import { AdminStats } from "@/components/settings/AdminStats";
 import { PushNotifications } from "@/components/settings/PushNotifications";
 import { VaultsPanel } from "@/components/settings/VaultsPanel";
+import { TokensPanel } from "@/components/settings/TokensPanel";
 import { isOwnerEmail } from "@/lib/admin";
 
 export default async function SettingsPage() {
@@ -50,6 +51,8 @@ export default async function SettingsPage() {
         <TelegramSettings />
 
         <VaultsPanel ownerUserId={user?.id ?? ""} />
+
+        <TokensPanel />
 
         <PushNotifications />
 
