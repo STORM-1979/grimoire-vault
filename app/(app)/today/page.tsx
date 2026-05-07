@@ -27,33 +27,35 @@ export default async function TodayPage({
   const targetDate = d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : todayUtc();
   const supabase = await createClient();
 
-  // Fetch entries created on the target day.  The DB stores UTC; for
-  // a personal-vault audience this is good enough — most edits live
-  // in one TZ anyway.  If TZ mismatches become annoying we add a
-  // user_profiles.timezone column.
+  // Both queries share the same "this user's entries inside a date
+  // window" shape, so we run them in parallel and halve the page's
+  // server-side latency.  The DB stores UTC; for a personal-vault
+  // audience this is good enough — most edits live in one TZ anyway.
   const start = `${targetDate}T00:00:00.000Z`;
   const end = `${targetDate}T23:59:59.999Z`;
-  const { data: rows } = await supabase
-    .from("entries")
-    .select("*")
-    .gte("created_at", start)
-    .lte("created_at", end)
-    .order("created_at", { ascending: true });
-  const entries: Entry[] = (rows ?? []).map(rowToEntry);
-
-  // Fetch a 90-day window of counts for the heatmap. We pull only
-  // the `created_at` column (8 bytes per row over the wire) and
-  // group by date in JS — for typical personal vaults (10-200
-  // entries/day max) this beats a server-side GROUP BY round-trip.
-  // The new entries_user_created_idx covers the predicate path so
-  // the read is index-only.
   const heatmapStart = isoDateAddDays(targetDate, -89);
-  const { data: heatRows } = await supabase
-    .from("entries")
-    .select("created_at")
-    .gte("created_at", `${heatmapStart}T00:00:00.000Z`)
-    .lte("created_at", `${targetDate}T23:59:59.999Z`)
-    .limit(10000); // safety cap — heatmap doesn't need precision past this
+  const [dayResp, heatResp] = await Promise.all([
+    supabase
+      .from("entries")
+      .select("*")
+      .gte("created_at", start)
+      .lte("created_at", end)
+      .order("created_at", { ascending: true }),
+    // 90-day count: we pull only `created_at` (8 bytes / row) and
+    // group by date in JS.  The new entries_user_created_idx covers
+    // the predicate path so the read is index-only; for typical
+    // personal vaults (10–200 entries/day) this beats a server-side
+    // GROUP BY round-trip.  10K cap turns the failure mode from
+    // "slow page" into "slightly stale heatmap" if a user goes wild.
+    supabase
+      .from("entries")
+      .select("created_at")
+      .gte("created_at", `${heatmapStart}T00:00:00.000Z`)
+      .lte("created_at", `${targetDate}T23:59:59.999Z`)
+      .limit(10000),
+  ]);
+  const entries: Entry[] = (dayResp.data ?? []).map(rowToEntry);
+  const heatRows = heatResp.data;
   const heatCounts: Record<string, number> = {};
   for (const r of heatRows ?? []) {
     const day = (r.created_at as string).slice(0, 10);

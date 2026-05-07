@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Icon } from "@/components/icons/Icon";
 
 /**
  * ← Previous day / Today / Next day → shortcut row.  Server component

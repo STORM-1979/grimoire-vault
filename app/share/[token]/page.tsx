@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createServiceClient } from "@/lib/supabase/server";
 import { rowToEntry } from "@/lib/data/mappers";
@@ -53,12 +54,12 @@ export default async function SharedEntryPage({
           <div className="font-mono text-[10px] uppercase tracking-widest text-gold">
             Grimoire Vault · share-link
           </div>
-          <a
+          <Link
             href="/"
             className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute hover:text-gold transition"
           >
             Свой vault →
-          </a>
+          </Link>
         </div>
       </header>
 

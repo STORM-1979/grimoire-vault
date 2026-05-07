@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { Icon } from "@/components/icons/Icon";
 import { GraphView } from "@/components/graph/GraphView";
 
 /**
@@ -16,15 +15,21 @@ const GRAPH_NODE_CAP = 1500;
 
 export default async function GraphPage() {
   const supabase = await createClient();
-  const { data: entryRows } = await supabase
-    .from("entries")
-    .select("id, title, category_id, tags, created_at")
-    .order("created_at", { ascending: false })
-    .limit(GRAPH_NODE_CAP);
-  const { data: backlinkRows } = await supabase
-    .from("entry_backlinks")
-    .select("source_id, target_id")
-    .not("target_id", "is", null);
+  // Run both reads in parallel — entries and backlinks are
+  // independent.  Saves a round-trip on every /graph navigation.
+  const [entryResp, backlinkResp] = await Promise.all([
+    supabase
+      .from("entries")
+      .select("id, title, category_id, tags, created_at")
+      .order("created_at", { ascending: false })
+      .limit(GRAPH_NODE_CAP),
+    supabase
+      .from("entry_backlinks")
+      .select("source_id, target_id")
+      .not("target_id", "is", null),
+  ]);
+  const entryRows = entryResp.data;
+  const backlinkRows = backlinkResp.data;
 
   const nodes = (entryRows ?? []).map((r) => ({
     id: r.id as string,

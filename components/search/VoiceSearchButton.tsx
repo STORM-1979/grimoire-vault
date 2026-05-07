@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Icon } from "@/components/icons/Icon";
 
 /**
  * Microphone button that drives the search input via Web Speech API.

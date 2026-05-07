@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@/components/icons/Icon";
 
 interface ShareLink {
@@ -29,7 +29,7 @@ export function ShareButton({ entryId }: { entryId: string }) {
   const [justCreated, setJustCreated] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     try {
       const r = await fetch(`/api/share-links?entryId=${entryId}`, {
         credentials: "same-origin",
@@ -40,11 +40,11 @@ export function ShareButton({ entryId }: { entryId: string }) {
     } catch (e) {
       setError(e instanceof Error ? e.message : "load failed");
     }
-  };
+  }, [entryId]);
 
   useEffect(() => {
     if (open) void refresh();
-  }, [open, entryId]);
+  }, [open, refresh]);
 
   const expiresIso = (() => {
     if (expiry === "never") return null;

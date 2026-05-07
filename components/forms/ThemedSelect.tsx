@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 /**
  * Generic styled dropdown matching the rest of the form palette.
@@ -36,10 +36,13 @@ export function ThemedSelect<V extends string = string>({
 
   // The blank "no selection" sentinel lives at index 0 so the user
   // can clear the field via the same Enter / mousedown pipeline.
-  const opts: SelectOption<V | "">[] = [
-    { value: "", label: placeholder },
-    ...options,
-  ];
+  // Memoised so its identity is stable across renders; otherwise
+  // the two useEffect hooks below would re-arm on every keystroke
+  // and lint would (rightfully) complain.
+  const opts: SelectOption<V | "">[] = useMemo(
+    () => [{ value: "" as V | "", label: placeholder }, ...options],
+    [options, placeholder],
+  );
   const selected = opts.find((o) => o.value === value) ?? opts[0];
 
   useEffect(() => {

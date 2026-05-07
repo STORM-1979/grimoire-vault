@@ -40,21 +40,26 @@ const inboundSchema = z.object({
 
 export const POST = withErrorHandler(async (req: Request) => {
   // Verify webhook secret to prevent random POSTs from creating
-  // entries.  Provider sends it as a query param or header — pick
-  // whichever matches your config.
+  // entries.  Without EMAIL_WEBHOOK_SECRET configured we refuse all
+  // requests — opening this endpoint is opt-in via env var, not the
+  // default state.  Earlier draft skipped the check entirely when
+  // the env was unset, which let anyone with the URL DOS the owner.
   const secret = process.env.EMAIL_WEBHOOK_SECRET;
-  if (secret) {
-    const url = new URL(req.url);
-    const provided = url.searchParams.get("secret") ?? req.headers.get("x-webhook-secret");
-    if (provided !== secret) throw new HttpError("Unauthorized", 401);
+  if (!secret) {
+    throw new HttpError("Email inbound is not configured on this deployment", 503);
   }
+  const reqUrl = new URL(req.url);
+  const provided = reqUrl.searchParams.get("secret") ?? req.headers.get("x-webhook-secret");
+  if (provided !== secret) throw new HttpError("Unauthorized", 401);
 
   let body: unknown;
   try { body = await req.json(); }
   catch { throw new HttpError("Body must be valid JSON", 400); }
   const parsed = inboundSchema.safeParse(body);
   if (!parsed.success) throw new HttpError("Invalid payload", 400);
-  const { to, from, subject, text, html } = parsed.data;
+  const { from, subject, text, html } = parsed.data;
+  // `to` is read once email_aliases lands; for now everything routes
+  // to OWNER_EMAIL so we ignore the destination address.
 
   // TODO(email-aliases): replace this with a real lookup against
   // public.email_aliases keyed by `to`.  For now we route everything

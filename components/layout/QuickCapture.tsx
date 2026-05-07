@@ -30,10 +30,16 @@ export function QuickCapture() {
 
   // Global hotkey + Esc-to-close.  Keydown is captured at the
   // document level so it works no matter what's focused.
+  //
+  // Combo: Cmd/Ctrl+Shift+; (semicolon).  Earlier draft used
+  // Cmd+Shift+N but Chrome eats that at the OS level — it opens an
+  // Incognito window and our keydown listener never fires.
+  // Semicolon is free in every major browser; a bit awkward to
+  // type two-handed but it's reliable.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const isCapture =
-        (e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === "n" || e.key === "N");
+        (e.metaKey || e.ctrlKey) && e.shiftKey && e.key === ";";
       if (isCapture) {
         e.preventDefault();
         setOpen(true);
@@ -77,10 +83,21 @@ export function QuickCapture() {
     try {
       // For URL-bearing entries we save the URL, the app's existing
       // extraction will fill og:meta on next view.  For plain text
-      // we save the first line as the title.
+      // we use the first line as the title and put the rest in
+      // description so a multi-paragraph idea isn't truncated to 200
+      // chars on save.
       const url = extractUrl(value);
-      const title = url ?? value.split("\n")[0].slice(0, 200);
-      const description = url ? value.replace(url, "").trim() || null : null;
+      let title: string;
+      let description: string | null;
+      if (url) {
+        title = url;
+        description = value.replace(url, "").trim() || null;
+      } else {
+        const lines = value.split("\n");
+        title = lines[0].slice(0, 200);
+        const rest = lines.slice(1).join("\n").trim();
+        description = rest || (lines[0].length > 200 ? lines[0].slice(200, 4000) : null);
+      }
       await entriesApi.create({
         categoryId: effective,
         title,
@@ -140,7 +157,7 @@ export function QuickCapture() {
                   setCategoryOverride(cycleCategory(effective));
                 }
               }}
-              placeholder="Что записать? (Enter — сохранить, Shift+Enter — новая строка, Tab — сменить категорию)"
+              placeholder="Что записать? Enter — сохранить · Shift+Enter — новая строка · Tab — сменить категорию"
             />
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
@@ -176,7 +193,7 @@ export function QuickCapture() {
               </div>
             )}
             <div className="mt-3 font-mono text-[9px] text-ivory-mute/60">
-              ⌘⇧N / Ctrl+Shift+N открывает это окно откуда угодно
+              ⌘⇧; / Ctrl+Shift+; открывает это окно откуда угодно
             </div>
           </div>
         </div>
