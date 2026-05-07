@@ -18,7 +18,7 @@ export const CATEGORIES: Category[] = [
   { id: "prompts",     no: "08", en: "Prompts",       ru: "Промпты",           icon: "prompts",   ordering: 8  },
   { id: "kanban",      no: "09", en: "Kanban",        ru: "Канбан",            icon: "kanban",    ordering: 9  },
   { id: "ideas",       no: "10", en: "Ideas",         ru: "Идеи",              icon: "ideas",     ordering: 10 },
-  { id: "portfolio",   no: "11", en: "Portfolio",     ru: "Портфолио",         icon: "portfolio", ordering: 11 },
+  { id: "portfolio",   no: "11", en: "Active Projects", ru: "Активные проекты", icon: "portfolio", ordering: 11 },
   { id: "misc",        no: "12", en: "Misc",          ru: "Разное",            icon: "misc",      ordering: 12 },
   { id: "credentials", no: "13", en: "Credentials",   ru: "Пароли и аккаунты", icon: "lock",      ordering: 13, secured: true },
 ];

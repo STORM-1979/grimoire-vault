@@ -4,6 +4,7 @@ import { getCategory } from "@/lib/categories";
 import { listEntries } from "@/lib/data/entries";
 import { Icon } from "@/components/icons/Icon";
 import { CategoryView } from "@/components/category/CategoryView";
+import { PortfolioSiteLink } from "@/components/category/PortfolioSiteLink";
 import type { CategoryId } from "@/lib/types";
 
 interface PageProps {
@@ -40,6 +41,10 @@ export default async function CategoryPage({ params }: PageProps) {
             </div>
             <h1 className="font-display text-[88px] font-light leading-[0.92] tracking-tightest">{cat.en}</h1>
             <div className="font-mono text-[12px] uppercase tracking-widest text-ivory-mute mt-2">{cat.ru}</div>
+            {/* Portfolio gets an editable "site with works" link in
+                the header — empty until the user pastes it, lives in
+                localStorage for now. */}
+            {cat.id === "portfolio" && <PortfolioSiteLink />}
           </div>
         </div>
       </section>

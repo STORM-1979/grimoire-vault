@@ -31,6 +31,7 @@ export function EditEntryModal({ entry, onClose, onSubmit, collections }: Props)
   const isLocal = entry.categoryId === "local";
   const isPrompt = entry.categoryId === "prompts";
   const isImage = entry.categoryId === "images";
+  const isPortfolio = entry.categoryId === "portfolio";
 
   const [form, setForm] = useState({
     title: entry.title,
@@ -44,6 +45,11 @@ export function EditEntryModal({ entry, onClose, onSubmit, collections }: Props)
     size: entry.sizeLabel ?? "",
     count: entry.fileCount?.toString() ?? "",
     model: (entry.metadata?.model as string) ?? "",
+    // Portfolio project links — read from existing metadata so the
+    // form pre-populates with whatever was saved at create time.
+    vercelUrl: (entry.metadata?.vercelUrl as string) ?? "",
+    gitUrl: (entry.metadata?.gitUrl as string) ?? "",
+    dbUrl: (entry.metadata?.dbUrl as string) ?? "",
   });
   // Bytes of a freshly re-uploaded cover (post-compression).  Only
   // set when the user replaces the existing image — null means "no
@@ -105,6 +111,17 @@ export function EditEntryModal({ entry, onClose, onSubmit, collections }: Props)
       if (isDoc || isLocal) patch.sizeLabel = form.size.trim() || null;
       if (isPrompt) {
         patch.metadata = { ...entry.metadata, model: form.model.trim() || undefined };
+      }
+      // Portfolio project links — overwrite previous values on every
+      // save so cleared fields actually clear (undefined → key is
+      // dropped from the merged metadata object).
+      if (isPortfolio) {
+        patch.metadata = {
+          ...entry.metadata,
+          vercelUrl: form.vercelUrl.trim() || undefined,
+          gitUrl:    form.gitUrl.trim()    || undefined,
+          dbUrl:     form.dbUrl.trim()     || undefined,
+        };
       }
 
       await onSubmit(entry.id, patch);
@@ -189,6 +206,20 @@ export function EditEntryModal({ entry, onClose, onSubmit, collections }: Props)
             <Field label="Кол-во файлов">
               <input type="number" min="0" className="field-input" value={form.count} onChange={set("count")} />
             </Field>
+          )}
+
+          {isPortfolio && (
+            <>
+              <Field label="Vercel / прод-ссылка">
+                <input type="text" className="field-input" value={form.vercelUrl} onChange={set("vercelUrl")} placeholder="https://my-project.vercel.app" />
+              </Field>
+              <Field label="GitHub / репозиторий">
+                <input type="text" className="field-input" value={form.gitUrl} onChange={set("gitUrl")} placeholder="https://github.com/me/project" />
+              </Field>
+              <Field label="БД / админ-панель">
+                <input type="text" className="field-input" value={form.dbUrl} onChange={set("dbUrl")} placeholder="https://supabase.com/dashboard/project/…" />
+              </Field>
+            </>
           )}
 
           {isWeb && (

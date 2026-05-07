@@ -9,6 +9,7 @@ import { formatDateTime } from "@/lib/utils";
 import { EntryBoard } from "@/components/entry/EntryBoard";
 import { EntryPrimaryView } from "@/components/entry/EntryPrimaryView";
 import { VideoSummary } from "@/components/entry/VideoSummary";
+import { ProjectPanel } from "@/components/entry/ProjectPanel";
 
 /**
  * /entry/[id] — full-detail view of one entry, with the interactive
@@ -116,6 +117,12 @@ export default async function EntryPage({
             : undefined}
         />
       )}
+
+      {/* Portfolio entries get a dedicated workspace panel: ТЗ,
+          quick links, custom links, and credentials.  Renders above
+          the EntryBoard so the project's structured fields land
+          before the freeform attachment grid. */}
+      {entry.categoryId === "portfolio" && <ProjectPanel entry={entry} />}
 
       <EntryBoard entry={entry} initial={attachments} />
     </div>

@@ -54,6 +54,10 @@ const EMPTY_FORM = {
   // persist sizeBytes / sizeLabel on submit and render the weight on
   // the card.  Stays 0 if the user pasted a URL instead of uploading.
   coverBytes: 0,
+  // Portfolio project links — surfaced as dedicated inputs only when
+  // categoryId === "portfolio", persisted under entry.metadata so we
+  // don't churn the entries schema.
+  vercelUrl: "", gitUrl: "", dbUrl: "",
 };
 
 export function AddItemModal({
@@ -69,6 +73,7 @@ export function AddItemModal({
   const isPrompt = categoryId === "prompts";
   const isIdea = categoryId === "ideas";
   const isImage = categoryId === "images";
+  const isPortfolio = categoryId === "portfolio";
   // For these text-first categories the source link is supplementary
   // — the user types a title and the body text first, the link is
   // optional context.  Putting the URL field above name/description
@@ -322,6 +327,18 @@ export function AddItemModal({
     }
     if ((isDoc || isLocal) && form.size.trim()) input.sizeLabel = form.size.trim();
     if (isPrompt && form.model.trim()) input.metadata = { ...input.metadata, model: form.model.trim() };
+    // Portfolio project links — persist any non-empty value.  All
+    // three are optional; we strip empties so the metadata stays
+    // clean and the project-panel renderer doesn't show empty rows.
+    if (isPortfolio) {
+      const projectMeta: Record<string, string> = {};
+      if (form.vercelUrl.trim()) projectMeta.vercelUrl = form.vercelUrl.trim();
+      if (form.gitUrl.trim())    projectMeta.gitUrl    = form.gitUrl.trim();
+      if (form.dbUrl.trim())     projectMeta.dbUrl     = form.dbUrl.trim();
+      if (Object.keys(projectMeta).length) {
+        input.metadata = { ...input.metadata, ...projectMeta };
+      }
+    }
 
     try {
       await onSubmit(input);
@@ -667,6 +684,41 @@ export function AddItemModal({
             <Field label="Кол-во файлов в коллекции">
               <input type="number" min="1" className="field-input" value={form.count} onChange={set("count")} placeholder="12" />
             </Field>
+          )}
+
+          {/* Portfolio project links.  All three are optional and
+              persisted under entry.metadata — pure flat URL fields,
+              no schema migration needed. */}
+          {isPortfolio && (
+            <>
+              <Field label="Vercel / прод-ссылка">
+                <input
+                  type="text"
+                  className="field-input"
+                  value={form.vercelUrl}
+                  onChange={set("vercelUrl")}
+                  placeholder="https://my-project.vercel.app"
+                />
+              </Field>
+              <Field label="GitHub / репозиторий">
+                <input
+                  type="text"
+                  className="field-input"
+                  value={form.gitUrl}
+                  onChange={set("gitUrl")}
+                  placeholder="https://github.com/me/project"
+                />
+              </Field>
+              <Field label="БД / админ-панель">
+                <input
+                  type="text"
+                  className="field-input"
+                  value={form.dbUrl}
+                  onChange={set("dbUrl")}
+                  placeholder="https://supabase.com/dashboard/project/…"
+                />
+              </Field>
+            </>
           )}
 
           {isWeb && (
