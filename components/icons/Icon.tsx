@@ -40,6 +40,7 @@ const PATHS: Record<IconName, React.ReactNode> = {
   drag:      <g><circle cx="8" cy="6" r="1.4" fill="currentColor"/><circle cx="8" cy="12" r="1.4" fill="currentColor"/><circle cx="8" cy="18" r="1.4" fill="currentColor"/><circle cx="16" cy="6" r="1.4" fill="currentColor"/><circle cx="16" cy="12" r="1.4" fill="currentColor"/><circle cx="16" cy="18" r="1.4" fill="currentColor"/></g>,
   wifi:      <g><path d="M5 12.5a10 10 0 0 1 14 0M8 16a5 5 0 0 1 8 0" fill="none" strokeWidth="1.4"/><circle cx="12" cy="19" r="1.2" fill="currentColor"/></g>,
   wifiOff:   <g><path d="M3 3l18 18" strokeWidth="1.5"/><path d="M5 12.5a10 10 0 0 1 5-2.5M14 10c2 .3 3.7 1.2 5 2.5" fill="none" strokeWidth="1.4"/><circle cx="12" cy="19" r="1.2" fill="currentColor"/></g>,
+  sort:      <g><path d="M7 5v14M3 9l4-4 4 4M17 19V5M13 15l4 4 4-4" fill="none" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></g>,
 };
 
 interface IconProps extends Omit<SVGProps<SVGSVGElement>, "name"> {

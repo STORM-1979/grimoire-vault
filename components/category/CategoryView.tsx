@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useEntries } from "@/lib/hooks/useEntries";
 import { useEntryKeyboardNav } from "@/lib/hooks/useEntryKeyboardNav";
@@ -12,7 +12,11 @@ import { VideoCard } from "./VideoCard";
 import { MediaCard } from "./MediaCard";
 import { BulkActionsBar } from "./BulkActionsBar";
 import { CollectionsTabs } from "./CollectionsTabs";
+import { SortControl, type SortMode } from "./SortControl";
 import type { Category, CategoryId, Entry, EntryCollection } from "@/lib/types";
+
+const SORT_LS_PREFIX = "grimoire:sort:";
+const VALID_SORTS: SortMode[] = ["newest", "oldest", "title", "titleZ", "tags"];
 
 // Lazy-load modals: both pull in FileUpload + XHR helpers (~6 KB each).
 // They're rarely opened on a page visit, so we keep them out of the
@@ -43,6 +47,22 @@ export function CategoryView({ category, initialItems }: Props) {
   // Collections sub-filter — null = all, "none" = uncategorised, uuid = that collection.
   const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
   const [collections, setCollections] = useState<EntryCollection[]>([]);
+  // Sort preference — persisted per-category in localStorage so the
+  // user's choice survives reloads / category switches.
+  const [sortMode, setSortMode] = useState<SortMode>("newest");
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem(SORT_LS_PREFIX + category.id);
+    if (stored && (VALID_SORTS as string[]).includes(stored)) {
+      setSortMode(stored as SortMode);
+    }
+  }, [category.id]);
+  const updateSort = useCallback((next: SortMode) => {
+    setSortMode(next);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(SORT_LS_PREFIX + category.id, next);
+    }
+  }, [category.id]);
 
   const isVideo = isVideoCategory(category.id);
   const isMedia = isMediaCategory(category.id);
@@ -86,8 +106,40 @@ export function CategoryView({ category, initialItems }: Props) {
     ? items.filter((it) => !it.collectionId)
     : items.filter((it) => it.collectionId && selectedScope?.has(it.collectionId));
 
-  const pinned = filtered.filter((it) => it.pinned);
-  const others = filtered.filter((it) => !it.pinned);
+  // Apply sort. Default ("newest") is a no-op since the API already
+  // returns rows ordered by created_at DESC. Other modes copy the
+  // array first so we don't mutate the hook's state.
+  const sorted = useMemo(() => {
+    if (sortMode === "newest") return filtered;
+    const arr = [...filtered];
+    const ts = (it: Entry) => new Date(it.createdAt).getTime();
+    if (sortMode === "oldest") {
+      arr.sort((a, b) => ts(a) - ts(b));
+    } else if (sortMode === "title") {
+      arr.sort((a, b) => a.title.localeCompare(b.title, "ru", { sensitivity: "base" }));
+    } else if (sortMode === "titleZ") {
+      arr.sort((a, b) => b.title.localeCompare(a.title, "ru", { sensitivity: "base" }));
+    } else if (sortMode === "tags") {
+      // Sort by first tag (case-insensitive, RU-aware); untagged rows
+      // sink to the bottom; ties break on createdAt DESC for parity
+      // with the default ordering.
+      const firstTag = (it: Entry) =>
+        it.tags.length > 0 ? it.tags[0].toLowerCase() : "";
+      arr.sort((a, b) => {
+        const ta = firstTag(a);
+        const tb = firstTag(b);
+        if (!ta && !tb) return ts(b) - ts(a);
+        if (!ta) return 1;
+        if (!tb) return -1;
+        const cmp = ta.localeCompare(tb, "ru", { sensitivity: "base" });
+        return cmp !== 0 ? cmp : ts(b) - ts(a);
+      });
+    }
+    return arr;
+  }, [filtered, sortMode]);
+
+  const pinned = sorted.filter((it) => it.pinned);
+  const others = sorted.filter((it) => !it.pinned);
 
   // Keyboard nav operates on the visual order (pinned first, then others).
   const flat = useMemo(() => [...pinned, ...others], [pinned, others]);
@@ -260,7 +312,10 @@ export function CategoryView({ category, initialItems }: Props) {
 
       {/* Main list */}
       <section className="max-w-[1480px] mx-auto px-10 py-10">
-        <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-4">Все записи · {others.length}</div>
+        <div className="flex items-center justify-between mb-4 gap-4">
+          <div className="font-mono text-[10px] uppercase tracking-widest text-gold">Все записи · {others.length}</div>
+          <SortControl value={sortMode} onChange={updateSort} />
+        </div>
         {isVideo ? (
           <div className="grid grid-cols-3 gap-7">
             {others.map((it) => (
