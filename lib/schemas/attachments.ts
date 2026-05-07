@@ -8,8 +8,6 @@ import { z } from "zod";
  * below.
  */
 
-const attachmentKindSchema = z.enum(["image", "video", "link", "note", "file"]);
-
 /**
  * URL validator that accepts absolute http(s) URLs OR our internal
  * `/api/r2/object/...` paths.  R2 uploads return the latter (the
