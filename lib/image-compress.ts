@@ -7,22 +7,28 @@
  * unchanged because canvas re-encoding would either lose animation
  * (GIF) or rasterise vectors (SVG) — neither is a win.
  *
- * The strategy is adaptive: we first scale the longer side down to
- * `maxDim` (default 2400 px — enough for a 1.5x retina hero block),
- * encode at `quality` (default 0.82), and if the result is still over
- * `targetBytes` we keep stepping quality down to 0.5.  If even at 0.5
- * we're over, we shrink dimensions further (×0.75 each step) until
- * we fit or hit a 600-px floor.
+ * Strategy:
+ *   1. Always re-encode raster images to WebP — even tiny PNG
+ *      screenshots typically shrink 50–70 % at q ≈ 0.82, and JPEGs
+ *      get a free 15–25 % from the more efficient codec.  Already-
+ *      WebP / AVIF inputs are skipped (re-encoding can grow them).
+ *   2. If the WebP result ends up *bigger* than the source (rare —
+ *      lossless icons, very small files where headers dominate), we
+ *      keep the original bytes and only update the MIME for clarity.
+ *   3. If a hard `targetBytes` cap is set and the first pass is over,
+ *      step quality down to 0.4, then shrink dimensions ×0.75 per
+ *      pass with a 480-px floor.
  *
  * Output is always a `File` so the existing upload pipeline doesn't
  * notice anything changed beyond the bytes being smaller.
  */
 
-const COMPRESSIBLE = /^image\/(jpeg|png|webp|avif|bmp|tiff)$/i;
+const RECOMPRESSIBLE = /^image\/(jpeg|png|bmp|tiff)$/i;
+const SKIP = /^image\/(webp|avif|gif|svg\+xml)$/i;
 
 export interface CompressOptions {
-  /** Hard byte cap. Compression keeps stepping down until we fit. */
-  targetBytes: number;
+  /** Hard byte cap. If set, we keep stepping down until we fit. */
+  targetBytes?: number;
   /** Longer-side cap in px. Default 2400. */
   maxDim?: number;
   /** Initial WebP quality 0..1. Default 0.82. */
@@ -32,19 +38,25 @@ export interface CompressOptions {
 }
 
 /**
- * Compress `file` to fit under `targetBytes`. Returns the original
- * file unchanged if it's already small enough or not a re-encodable
- * raster format.
+ * Re-encode `file` to WebP.  Returns the original file unchanged if
+ * it's a format where re-encoding is a net loss (WebP/AVIF/GIF/SVG),
+ * or if the encoded result ended up larger than the source.
  */
-export async function compressImageIfNeeded(
+export async function compressImage(
   file: File,
-  opts: CompressOptions,
+  opts: CompressOptions = {},
 ): Promise<File> {
-  if (!COMPRESSIBLE.test(file.type)) return file;
-  if (file.size <= opts.targetBytes) return file;
+  if (SKIP.test(file.type)) return file;
+  // Detect by extension when MIME is missing/generic — drag-drop
+  // sometimes hands us application/octet-stream.
+  const looksRaster =
+    RECOMPRESSIBLE.test(file.type) ||
+    /\.(jpe?g|png|bmp|tiff?)$/i.test(file.name);
+  if (!looksRaster) return file;
 
   const maxDim = opts.maxDim ?? 2400;
   let quality = opts.quality ?? 0.82;
+  const target = opts.targetBytes ?? Infinity;
   opts.onStep?.("Сжимаю изображение…");
 
   const bitmap = await loadBitmap(file);
@@ -55,28 +67,42 @@ export async function compressImageIfNeeded(
 
   // First pass: cap dimensions, encode at preferred quality.
   let blob = await encode(bitmap, w, h, quality);
-  // Step 1: lower quality down to 0.4 — visually still acceptable for
-  // photos, and a 5–10× size reduction over 0.82 on detailed scenes.
-  while (blob.size > opts.targetBytes && quality > 0.4) {
+  // Step 1 (only when a target is set): lower quality down to 0.4 —
+  // visually still acceptable for photos, and a 5–10× size reduction
+  // over 0.82 on detailed scenes.
+  while (blob.size > target && quality > 0.4) {
     quality = Math.max(0.4, quality - 0.1);
     blob = await encode(bitmap, w, h, quality);
   }
-  // Step 2: shrink dimensions ×0.75 per pass, floor at 480 px on the
-  // longer side so we don't ship a postage stamp.  Combined with the
-  // quality floor above this lets a 50 MB DSLR shot fit under 1 MB.
-  while (blob.size > opts.targetBytes && Math.max(w, h) > 480) {
+  // Step 2 (only when a target is set): shrink dimensions ×0.75 per
+  // pass, floor at 480 px so we don't ship a postage stamp.
+  while (blob.size > target && Math.max(w, h) > 480) {
     w = Math.round(w * 0.75);
     h = Math.round(h * 0.75);
     blob = await encode(bitmap, w, h, quality);
   }
 
-  // Browsers without OffscreenCanvas / WebP support fall back inside
-  // `encode()`. If even after all passes we're still over, ship what
-  // we have — better than refusing the upload entirely; the size-cap
-  // banner will catch it upstream and the user can pick something
-  // smaller.
+  // If our WebP came out bigger than the source (very small images
+  // where the WebP container overhead dominates, lossless icons,
+  // etc.), keep the original — re-encoding would be a net loss.
+  if (blob.size >= file.size) {
+    return file;
+  }
+
   const renamed = renameToWebp(file.name);
   return new File([blob], renamed, { type: blob.type, lastModified: Date.now() });
+}
+
+/**
+ * @deprecated  Kept as a thin alias for callers that only want
+ * compression to kick in when the source is over the cap.  New
+ * call-sites should use `compressImage` directly.
+ */
+export async function compressImageIfNeeded(
+  file: File,
+  opts: CompressOptions & { targetBytes: number },
+): Promise<File> {
+  return compressImage(file, opts);
 }
 
 /* ----------------------------- internals --------------------------- */

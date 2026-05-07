@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { Icon } from "@/components/icons/Icon";
 import { humanFileSize, uploadToR2, type UploadKind, type UploadProgress } from "@/lib/upload";
-import { compressImageIfNeeded } from "@/lib/image-compress";
+import { compressImage } from "@/lib/image-compress";
 
 /**
  * Metadata about the picked file.  Surfaced BEFORE the upload starts so
@@ -50,33 +50,41 @@ export function FileUpload({
     if (!rawFile) return;
     setError(null);
 
-    // Step 1: client-side image compression.  Triggers for
-    // re-encodable raster formats — detected via MIME first, then by
-    // file-extension fallback (some OSes hand us empty / generic
-    // `application/octet-stream` MIME, especially on drag-drop).
-    // GIFs / SVGs / non-image files bypass entirely so we don't
-    // strip animation or rasterise vectors.
+    // Step 1: client-side image compression.  Always re-encode raster
+    // images (JPEG/PNG/BMP/TIFF) to WebP — even tiny screenshots
+    // typically shrink 50–70 %, and the compressor returns the
+    // original if its output ends up bigger.  Already-WebP/AVIF/GIF/
+    // SVG inputs are skipped inside `compressImage`.  Detection is
+    // MIME-first with extension fallback for empty / generic types.
     let file = rawFile;
     const looksLikeImage =
-      /^image\/(jpeg|png|webp|avif|bmp|tiff|heic|heif)$/i.test(rawFile.type) ||
-      /\.(jpe?g|png|webp|avif|bmp|tiff?|heic|heif)$/i.test(rawFile.name);
-    if (maxBytes && rawFile.size > maxBytes && looksLikeImage) {
+      /^image\/(jpeg|png|webp|avif|bmp|tiff|heic|heif|gif|svg)/i.test(rawFile.type) ||
+      /\.(jpe?g|png|webp|avif|bmp|tiff?|heic|heif|gif|svg)$/i.test(rawFile.name);
+    if (looksLikeImage) {
       setCompressing(true);
       try {
-        file = await compressImageIfNeeded(rawFile, { targetBytes: maxBytes });
+        file = await compressImage(rawFile, {
+          targetBytes: maxBytes ?? undefined,
+        });
       } catch (e) {
-        // HEIC / corrupt / unsupported formats end up here. Tell the
-        // user explicitly instead of silently bouncing them off the
-        // generic size-cap message — they can convert and retry.
-        const reason = e instanceof Error ? e.message : "decode failed";
-        const isHeic = /heic|heif/i.test(rawFile.type) || /\.(heic|heif)$/i.test(rawFile.name);
-        setCompressing(false);
-        setError(
-          isHeic
-            ? "HEIC не поддерживается браузером — сохрани как JPEG или PNG."
-            : `Не удалось сжать изображение: ${reason}. Уменьши вручную и загрузи снова.`,
-        );
-        return;
+        // HEIC / corrupt / unsupported formats end up here. If the
+        // file was within the cap to begin with, fall through and
+        // upload the original.  Otherwise tell the user explicitly
+        // so they can convert and retry instead of bouncing off the
+        // generic size-cap banner.
+        if (maxBytes && rawFile.size > maxBytes) {
+          const reason = e instanceof Error ? e.message : "decode failed";
+          const isHeic = /heic|heif/i.test(rawFile.type) || /\.(heic|heif)$/i.test(rawFile.name);
+          setCompressing(false);
+          setError(
+            isHeic
+              ? "HEIC не поддерживается браузером — сохрани как JPEG или PNG."
+              : `Не удалось сжать изображение: ${reason}. Уменьши вручную и загрузи снова.`,
+          );
+          return;
+        }
+        // Within-cap decode failure → ship the original bytes.
+        file = rawFile;
       } finally {
         setCompressing(false);
       }

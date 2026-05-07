@@ -77,7 +77,15 @@ export function MediaCard({ item, big, selected, bulkSelected, onBulkToggle, onT
         )}
         {cover && (
           <div className="absolute bottom-3 left-3 font-mono text-[9px] uppercase tracking-widest text-ivory-mute/90 flex items-center gap-1.5">
-            <span>{designFallback && !item.coverUrl ? "screenshot" : "webp"}</span>
+            <span>
+              {designFallback && !item.coverUrl
+                ? "screenshot"
+                /* Sniff format from the URL extension — most uploads
+                   are now WebP after compression, but legacy entries
+                   may still be PNG/JPEG/GIF and the chip should say
+                   so. Strips query strings before the lookup. */
+                : formatFromUrl(cover) ?? "image"}
+            </span>
             {/* Weight chip — set by AddItemModal / EditEntryModal on
                 fresh uploads (post-compression bytes).  Older entries
                 without sizeLabel just hide the chip; designs use
@@ -109,4 +117,17 @@ export function MediaCard({ item, big, selected, bulkSelected, onBulkToggle, onT
       </div>
     </div>
   );
+}
+
+/** Pluck a format tag (webp/png/jpeg/...) out of a cover URL.  Returns
+ *  null when the URL has no usable extension (e.g. external CDN URLs
+ *  with query params and no file suffix). */
+function formatFromUrl(url: string): string | null {
+  // Strip query / fragment first.
+  const clean = url.split(/[?#]/)[0];
+  const m = clean.match(/\.([a-z0-9]+)$/i);
+  if (!m) return null;
+  const ext = m[1].toLowerCase();
+  if (ext === "jpg") return "jpeg";
+  return ext;
 }
