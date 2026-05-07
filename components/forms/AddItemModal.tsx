@@ -7,6 +7,7 @@ import { Icon } from "@/components/icons/Icon";
 import { Field } from "./Field";
 import { FileUpload } from "./FileUpload";
 import { CollectionSelect } from "./CollectionSelect";
+import { ThemedSelect, type SelectOption } from "./ThemedSelect";
 import { getCategory, isMediaCategory, isVideoCategory } from "@/lib/categories";
 import { extractApi, ApiError } from "@/lib/api-client";
 import { humanSize } from "@/lib/utils";
@@ -34,6 +35,16 @@ interface Props {
    * currently active collection chip from the category page. */
   defaultCollectionId?: string | null;
 }
+
+// Prompt-model presets shown in the Модель selector.  Kept in one
+// place so AddItemModal and EditEntryModal stay in sync.
+const PROMPT_MODELS: SelectOption[] = [
+  { value: "Opus 4.7", label: "Claude Opus 4.7" },
+  { value: "Sonnet 4.6", label: "Claude Sonnet 4.6" },
+  { value: "Haiku 4.5", label: "Claude Haiku 4.5" },
+  { value: "GPT-5", label: "GPT-5" },
+  { value: "Gemini 2.5", label: "Gemini 2.5" },
+];
 
 const EMPTY_FORM = {
   title: "", desc: "", tags: "", pinned: false,
@@ -474,7 +485,11 @@ export function AddItemModal({
             </button>
           )}
 
-          {isText && (
+          {/* Source URL — shown above title for text-first categories
+              EXCEPT prompts.  Prompts put the link under the prompt
+              text itself (per-user request: name → text → link).
+              The same input renders inside the prompt block below. */}
+          {isText && !isPrompt && (
             <Field
               label="Ссылка (необязательно)"
               hint={
@@ -511,14 +526,45 @@ export function AddItemModal({
                 />
               </Field>
 
-              <Field label="Описание">
+              <Field
+                label={isPrompt ? "Текст промпта" : "Описание"}
+                hint={isPrompt ? "Сюда вставь сам промпт целиком — карточка скопирует это поле по клику." : undefined}
+              >
                 <textarea
-                  className="field-textarea"
+                  className={"field-textarea" + (isPrompt ? " min-h-[180px]" : "")}
                   value={form.desc}
                   onChange={set("desc")}
-                  placeholder={isVideo ? "Канал и заметки" : isText ? "Подтянется из URL — или впиши вручную" : "Что это, зачем сохранил, ключевая мысль…"}
+                  placeholder={
+                    isVideo
+                      ? "Канал и заметки"
+                      : isPrompt
+                      ? "Полный текст промпта…"
+                      : isText
+                      ? "Подтянется из URL — или впиши вручную"
+                      : "Что это, зачем сохранил, ключевая мысль…"
+                  }
                 />
               </Field>
+
+              {/* Prompts: source link goes BELOW the prompt text. */}
+              {isPrompt && (
+                <Field
+                  label="Ссылка (необязательно)"
+                  hint={
+                    extracting
+                      ? "Подтягиваю заголовок и описание со страницы…"
+                      : "Откуда взят промпт — статья, твит, репозиторий."
+                  }
+                >
+                  <input
+                    type="text"
+                    className="field-input"
+                    value={form.url}
+                    onChange={set("url")}
+                    placeholder="https://…"
+                  />
+                </Field>
+              )}
             </>
           )}
 
@@ -651,14 +697,11 @@ export function AddItemModal({
 
           {isPrompt && (
             <Field label="Модель">
-              <select className="field-select" value={form.model} onChange={set("model")}>
-                <option value="">— Не указано —</option>
-                <option value="Opus 4.7">Claude Opus 4.7</option>
-                <option value="Sonnet 4.6">Claude Sonnet 4.6</option>
-                <option value="Haiku 4.5">Claude Haiku 4.5</option>
-                <option value="GPT-5">GPT-5</option>
-                <option value="Gemini 2.5">Gemini 2.5</option>
-              </select>
+              <ThemedSelect
+                options={PROMPT_MODELS}
+                value={form.model}
+                onChange={(v) => setForm((f) => ({ ...f, model: v }))}
+              />
             </Field>
           )}
 

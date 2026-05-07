@@ -5,6 +5,7 @@ import { Icon } from "@/components/icons/Icon";
 import { Field } from "./Field";
 import { FileUpload } from "./FileUpload";
 import { CollectionSelect } from "./CollectionSelect";
+import { ThemedSelect } from "./ThemedSelect";
 import { getCategory, isMediaCategory, isVideoCategory } from "@/lib/categories";
 import { humanSize } from "@/lib/utils";
 import type { Entry, EntryCollection } from "@/lib/types";
@@ -209,14 +210,17 @@ export function EditEntryModal({ entry, onClose, onSubmit, collections }: Props)
 
           {isPrompt && (
             <Field label="Модель">
-              <select className="field-select" value={form.model} onChange={set("model")}>
-                <option value="">— Не указано —</option>
-                <option value="Opus 4.7">Claude Opus 4.7</option>
-                <option value="Sonnet 4.6">Claude Sonnet 4.6</option>
-                <option value="Haiku 4.5">Claude Haiku 4.5</option>
-                <option value="GPT-5">GPT-5</option>
-                <option value="Gemini 2.5">Gemini 2.5</option>
-              </select>
+              <ThemedSelect
+                options={[
+                  { value: "Opus 4.7", label: "Claude Opus 4.7" },
+                  { value: "Sonnet 4.6", label: "Claude Sonnet 4.6" },
+                  { value: "Haiku 4.5", label: "Claude Haiku 4.5" },
+                  { value: "GPT-5", label: "GPT-5" },
+                  { value: "Gemini 2.5", label: "Gemini 2.5" },
+                ]}
+                value={form.model}
+                onChange={(v) => setForm({ ...form, model: v })}
+              />
             </Field>
           )}
 

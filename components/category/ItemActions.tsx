@@ -12,13 +12,30 @@ interface Props {
   position?: "topRight";
 }
 
-// Categories where the `url` field stores free-form text (install
-// commands, snippets, prompt source, etc.) rather than a clean URL.
-// On these we want a "copy" affordance so the user gets the saved
-// command on the clipboard with one click.
+// Categories where the card grows a "copy" affordance on hover.
+// What gets copied differs by category — see copyTextFor below —
+// but the goal is the same: one-click access to whatever the user
+// actually wants on their clipboard for that record.
 const COPYABLE_CATEGORIES = new Set([
   "skills", "prompts", "ideas", "portfolio", "misc",
 ]);
+
+/**
+ * Pick the right field to copy for a given entry.
+ *   • prompts → the prompt text itself (description) takes priority
+ *     over the source link, because that's the artefact the user
+ *     wants to paste into Claude / ChatGPT / etc.  Falls back to
+ *     the URL when description is empty (rare).
+ *   • everything else → the url field, which on text-first
+ *     categories holds the install command / shell snippet / link.
+ */
+function copyTextFor(item: { categoryId: string; url?: string | null; description?: string | null }): string {
+  if (item.categoryId === "prompts") {
+    const desc = item.description?.trim();
+    if (desc) return desc;
+  }
+  return item.url ?? "";
+}
 
 export function ItemActions({ item, onTogglePin, onDelete, onEdit, position = "topRight" }: Props) {
   const [copied, setCopied] = useState(false);
@@ -38,19 +55,20 @@ export function ItemActions({ item, onTogglePin, onDelete, onEdit, position = "t
     e.preventDefault();
     if (onEdit) onEdit(item);
   };
+  const copyText = copyTextFor(item);
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    if (!item.url) return;
+    if (!copyText) return;
     try {
-      await navigator.clipboard.writeText(item.url);
+      await navigator.clipboard.writeText(copyText);
       setCopied(true);
       setTimeout(() => setCopied(false), 1400);
     } catch {
       // Older browsers / iframes without clipboard permissions —
       // fall back to a hidden textarea + execCommand("copy").
       const ta = document.createElement("textarea");
-      ta.value = item.url;
+      ta.value = copyText;
       ta.style.position = "fixed";
       ta.style.opacity = "0";
       document.body.appendChild(ta);
@@ -61,7 +79,10 @@ export function ItemActions({ item, onTogglePin, onDelete, onEdit, position = "t
   };
 
   const posClass = position === "topRight" ? "absolute top-3 right-3" : "absolute top-2 right-2";
-  const showCopy = !!item.url && COPYABLE_CATEGORIES.has(item.categoryId);
+  const showCopy = !!copyText && COPYABLE_CATEGORIES.has(item.categoryId);
+  const copyTitle = item.categoryId === "prompts"
+    ? (copied ? "Промпт скопирован" : "Скопировать промпт")
+    : (copied ? "Скопировано" : "Скопировать ссылку / команду");
 
   return (
     <div className={`${posClass} flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10`}>
@@ -69,7 +90,7 @@ export function ItemActions({ item, onTogglePin, onDelete, onEdit, position = "t
         <button
           onClick={handleCopy}
           className={`item-actions-btn ${copied ? "active" : ""}`}
-          title={copied ? "Скопировано" : "Скопировать ссылку / команду"}
+          title={copyTitle}
         >
           <Icon name={copied ? "check" : "copy"} size={13} />
         </button>
