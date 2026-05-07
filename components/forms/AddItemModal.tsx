@@ -67,7 +67,15 @@ export function AddItemModal({
   const isDoc = categoryId === "documents";
   const isLocal = categoryId === "local";
   const isPrompt = categoryId === "prompts";
+  const isIdea = categoryId === "ideas";
   const isImage = categoryId === "images";
+  // For these text-first categories the source link is supplementary
+  // — the user types a title and the body text first, the link is
+  // optional context.  Putting the URL field above name/description
+  // would push the primary inputs below the fold.  Skills keeps the
+  // URL on top because pasting the install command is the workflow
+  // trigger that drives og:meta extraction.
+  const urlBelowDescription = isPrompt || isIdea;
   // Designs is conceptually a media category (uses MediaCard for
   // cover rendering) but the user adds entries by pasting a URL —
   // a Behance / Dribbble / studio site / article — and the cover
@@ -486,10 +494,10 @@ export function AddItemModal({
           )}
 
           {/* Source URL — shown above title for text-first categories
-              EXCEPT prompts.  Prompts put the link under the prompt
-              text itself (per-user request: name → text → link).
-              The same input renders inside the prompt block below. */}
-          {isText && !isPrompt && (
+              EXCEPT those flagged via urlBelowDescription (prompts +
+              ideas).  Those put the link under the body text so name
+              and description sit at the top of the form. */}
+          {isText && !urlBelowDescription && (
             <Field
               label="Ссылка (необязательно)"
               hint={
@@ -546,14 +554,20 @@ export function AddItemModal({
                 />
               </Field>
 
-              {/* Prompts: source link goes BELOW the prompt text. */}
-              {isPrompt && (
+              {/* Body-first text categories (prompts, ideas) put the
+                  source link under the description so the eye lands
+                  on title → text first.  Hint text adapts per
+                  category — promptly says "where the prompt came
+                  from", ideas say "источник вдохновения". */}
+              {urlBelowDescription && (
                 <Field
                   label="Ссылка (необязательно)"
                   hint={
                     extracting
                       ? "Подтягиваю заголовок и описание со страницы…"
-                      : "Откуда взят промпт — статья, твит, репозиторий."
+                      : isPrompt
+                      ? "Откуда взят промпт — статья, твит, репозиторий."
+                      : "Источник идеи — статья, твит, любая ссылка."
                   }
                 >
                   <input
