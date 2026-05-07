@@ -10,6 +10,7 @@ import { Icon } from "@/components/icons/Icon";
 import { ItemCard } from "./ItemCard";
 import { VideoCard } from "./VideoCard";
 import { MediaCard } from "./MediaCard";
+import { IdeaCard } from "./IdeaCard";
 import { BulkActionsBar } from "./BulkActionsBar";
 import { CollectionsTabs } from "./CollectionsTabs";
 import { SortControl, type SortMode } from "./SortControl";
@@ -70,6 +71,11 @@ export function CategoryView({ category, initialItems }: Props) {
 
   const isVideo = isVideoCategory(category.id);
   const isMedia = isMediaCategory(category.id);
+  // Ideas render as a tiled grid of square cards instead of the
+  // dense list rows ItemCard uses — turns the page into a visual
+  // idea-board where titles + first lines of context can be scanned
+  // at a glance.
+  const isIdea = category.id === "ideas";
   // Every system category except Kanban (column-based) and
   // Credentials (record-typed) supports user-defined collections.
   const showCollections = categorySupportsCollections(category.id);
@@ -331,6 +337,16 @@ export function CategoryView({ category, initialItems }: Props) {
                   onTogglePin={togglePin} onDelete={remove} onEdit={setEditing} />
               ))}
             </div>
+          ) : isIdea ? (
+            <div className="grid grid-cols-3 gap-5">
+              {pinned.map((it) => (
+                <IdeaCard key={it.id} item={it} category={category} big
+                  selected={selectedId === it.id}
+                  bulkSelected={bulkIds.has(it.id)}
+                  onBulkToggle={toggleBulk}
+                  onTogglePin={togglePin} onDelete={remove} onEdit={setEditing} />
+              ))}
+            </div>
           ) : (
             <div className="grid grid-cols-2 gap-4">
               {pinned.map((it) => (
@@ -411,6 +427,16 @@ export function CategoryView({ category, initialItems }: Props) {
           <div className="grid grid-cols-4 gap-6">
             {others.map((it) => (
               <MediaCard key={it.id} item={it}
+                selected={selectedId === it.id}
+                bulkSelected={bulkIds.has(it.id)}
+                onBulkToggle={toggleBulk}
+                onTogglePin={togglePin} onDelete={remove} onEdit={setEditing} />
+            ))}
+          </div>
+        ) : isIdea ? (
+          <div className="grid grid-cols-4 gap-5">
+            {others.map((it) => (
+              <IdeaCard key={it.id} item={it} category={category}
                 selected={selectedId === it.id}
                 bulkSelected={bulkIds.has(it.id)}
                 onBulkToggle={toggleBulk}
