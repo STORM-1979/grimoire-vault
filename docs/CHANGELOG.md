@@ -8,6 +8,155 @@
 
 ---
 
+## Волна 26 · Power-features overhaul (2026-05-07)
+
+13 функций из списка «что добавить дальше» — реализованы все, что
+не требуют DNS / Whisper-ключа / Chrome Web Store ревью.
+
+### ⭐ Quick capture overlay
+Глобальный hotkey **⌘⇧N / Ctrl+Shift+N** открывает плавающее окошко
+поверх любой страницы.  Авто-детект категории по содержимому
+(URL → web/youtube/designs/skills, чистый текст → ideas), Tab
+циклит override, Enter сохраняет, Shift+Enter — новая строка.
+
+- `components/layout/QuickCapture.tsx` — портал в `<body>`,
+  глобальный keydown handler, AbortController для кейлогера.
+- Тост `✓ В <category>` после успешного сохранения, авто-dismiss 2 с.
+
+### ⭐ Daily journal (`/today`)
+Все записи за день одной лентой + 90-дневная heatmap активности
+(GitHub-стайл).  Стрелки Prev/Today/Next.  Пустые дни показывают
+«⌘⇧N — записать прямо сейчас».
+
+- `app/(app)/today/page.tsx` — server component, фетчит entries за
+  день и heatmap counts за 90 дней одним SELECT.
+- `TodayHeatmap` рендерит 12×12 cells с opacity по count/peak,
+  hover показывает «10 янв · 5 записей», клик — переход на /today?d=...
+- Pretty-имя «Сегодня / Вчера / 5 мая 2026» подбирается на сервере.
+
+### ⭐ Entry templates
+В Add-модалке теперь chip-row с пресетами для категорий, где это
+имеет смысл (Skills, Prompts, Ideas, Active Projects).  Клик —
+шаблон патчит title/desc/tags формы (поля, которые пользователь не
+трогал).  Шаблоны хранятся в localStorage, сидируются дефолтами при
+первом заходе.
+
+- `lib/hooks/useEntryTemplates.ts` — `add / remove / templates`,
+  seed-данные на 4 категории по 2 шаблона.
+- Появляются только пока title и description пустые — пропадают
+  как только начинаешь писать.
+
+### ⭐ [[Backlinks]]
+Wikilink-синтаксис `[[Title]]` в `description` или `body` парсится
+триггером на каждом INSERT/UPDATE entries.  Денормализованная
+таблица `entry_backlinks` хранит `source_id → target_id`.
+На странице записи внизу — секция «Упоминается в · N» со списком
+источников.
+
+- Migration `20260507000000_entry_backlinks.sql` — таблица + RLS +
+  trigger с `SECURITY DEFINER` для cross-row резолва title→id.
+- `GET /api/entries/[id]/backlinks` — endpoint.
+- `BacklinksPanel` — клиентский компонент, тих по дизайну: ничего
+  не рендерит при отсутствии входящих ссылок.
+
+### ⭐ Public sharing
+На каждой записи — кнопка «Поделиться» с popover-управлением
+share-link'ами.  Создание (без срока / 24h / 7d / 30d), копи в
+буфер, hit-count, отзыв.  Публичный route `/share/<token>` рендерит
+запись read-only без логина (через service-role + middleware
+PUBLIC_PATHS).
+
+- Migration `20260507010000_share_and_pat.sql` — `share_links` с
+  hashed token, hit_count, last_hit_at.
+- `/api/share-links` GET/POST + `/[id]` DELETE.
+- `app/share/[token]/page.tsx` — server component, не требует auth.
+
+### ⭐ Personal access tokens + v1 REST API
+Settings → API-токены: имя → Создать → раз в жизни видишь raw
+`gv_pat_…`, дальше только хеш в БД.  С токеном можно дёргать
+`/api/v1/entries` GET/POST — новая стабильная поверхность для
+iOS Shortcuts / Zapier / curl.
+
+- Migration `personal_access_tokens` — `(user_id, token_hash, name,
+  last_used_at)`.
+- `requireUserFlexible()` в `api-helpers` принимает либо cookie,
+  либо `Authorization: Bearer …`.
+- `TokensPanel` в Settings с встроенными примерами curl + iOS
+  Shortcuts в collapsible-блоке.
+
+### ⭐ Web Clipper extension
+Manifest V3 расширение в директории `clipper/`.  Кнопка в toolbar
+браузера → popup с auto-detected категорией, og:title/description
+вытягивается через `chrome.scripting`, POST на `/api/v1/entries`
+с PAT.  README описывает unpacked-установку и publishing checklist
+для Chrome Web Store.
+
+- `clipper/manifest.json` — host_permissions только на нашу прод-
+  ссылку (без `<all_urls>`).
+- `popup.html` — отдельный мини-CSS под тёмную палитру, без билда.
+- `popup.js` — get token from chrome.storage → fillFromActiveTab →
+  POST.
+
+### AI summarize для любых записей
+Раньше `/api/entries/[id]/summarize` падал с «Not a YouTube entry»
+если URL не видео.  Теперь сначала проверяет `entry.body`: если
+там ≥ 200 символов — extractive-сжатие через `summarize()` +
+перевод на русский, кэшируется в `metadata.summary`.  Видео идёт
+по старому пути.
+
+### Smart tag suggestions
+`/api/suggest-tags` дёргает Pollinations `openai-fast` с промптом
+«дано title+description + топ-50 тегов юзера, верни JSON
+{category, tags}».  `TagSuggestions` под полем тегов в Add-модалке
+дебоунсит 1.2 с, шлёт запрос, рендерит ghost-чипы.  Клик —
+тег мерджится в input, чип флипается на ✓.
+
+### Voice search
+`VoiceSearchButton` в шапке поиска — `window.SpeechRecognition`
+(`ru-RU`, single-shot).  На браузерах без поддержки рендерит
+ничего.  Микрофон золотится и пульсирует пока слушает; финальная
+расшифровка добавляется к запросу.
+
+### ⭐ Graph view (`/graph`)
+Force-directed визуализация всего vault'а.  Цвет узла = категория,
+толстые золотые рёбра = `[[backlinks]]`, тонкие серые = общие
+теги ≥ 2.  Drag перетаскивает узлы, hover показывает название,
+клик — открывает запись.
+
+- Чистый SVG + rAF-loop, без D3 / vis-network / cytoscape.
+- O(n²) repulsion + spring + soft gravity → центру.  Кончается
+  когда kinetic energy < 0.5.
+
+### ⭐ Spaced repetition (`/review`)
+SM-2 алгоритм поверх новой таблицы `review_schedule`.  Кнопка «В
+review» на каждой записи добавляет в очередь.  Страница `/review`
+показывает due-карточки: tap-to-reveal, три кнопки оценки
+(Не помню / Сомневаюсь / Знаю), интервал растёт по экспоненте
+ease_factor.
+
+- Migration `20260507020000_review_schedule.sql`.
+- `/api/review` GET/POST + `/api/review/grade`.
+- Streak-счётчик мотивирует не пропускать дни.
+
+### Email-to-vault (stub)
+`/api/email-inbound` принимает Postmark/SendGrid/Mailgun-style
+inbound JSON.  Stub-friendly: схема валидируется, URL извлекается,
+запись создаётся для OWNER_EMAIL.  DNS-половина (домен + MX-записи
++ webhook configuration) деферрена — вкладывается одной env-
+конфигурацией.
+
+### Deferred (требуют внешней инфры или ключа)
+
+- **OCR на скриншотах (#7)** — Tesseract.js работает в Web Worker,
+  но post-upload сервер-сайд процессинг требует или 250 KB WASM-
+  бандла на каждом запросе, или платного Cloud Vision API. Есть
+  смысл когда у пользователя > 50 скриншотных записей; не сейчас.
+- **Audio notes via Telegram (#8)** — handler шлёт voice-message
+  на Whisper API ($0.006/min).  Без OPENAI_API_KEY env'а не
+  собирается.  Готов как одно env'ное переменное добавление.
+
+---
+
 ## Волна 25 · Active Projects + per-category UX (2026-05-07)
 
 Большой сессионный апдейт: пять категорий получили специализированный
@@ -568,7 +717,7 @@ Email magic-link + password.  Middleware (`middleware.ts`)
 
 ---
 
-## Самые полезные фичи для ежедневного использования (топ-15)
+## Самые полезные фичи для ежедневного использования (топ-25)
 
 1. ⭐ **Telegram bot capture** — переслал ссылку → она в правильной категории через 2 секунды
 2. ⭐ **Inbox triage** — daily ритуал «к нулю» через one-click confirm/move/delete
@@ -585,6 +734,16 @@ Email magic-link + password.  Middleware (`middleware.ts`)
 13. ⭐ **Hover-copy для промптов** — клик по карточке кладёт текст промпта в буфер
 14. ⭐ **Active Projects panel** — ТЗ + ссылки + креды на странице каждого проекта
 15. ⭐ **Custom Kanban columns** — добавляй колонки помимо Backlog/Doing/Done
+16. ⭐ **⌘⇧N quick capture** — флоат-окошко записи откуда угодно
+17. ⭐ **/today daily journal** — лента записей за день + 90-дневная heatmap
+18. ⭐ **Entry templates** — пресеты для Skills / Prompts / Ideas / Active Projects
+19. ⭐ **[[Backlinks]]** — wikilink-связи между записями с панелью «упоминается в»
+20. ⭐ **Public sharing** — read-only ссылка на запись без логина
+21. ⭐ **API tokens + v1 REST** — curl / iOS Shortcuts / Zapier интеграции
+22. ⭐ **Web Clipper extension** — кнопка в браузере «Сохранить в vault»
+23. ⭐ **Smart tag suggestions** — AI предлагает теги по title+desc
+24. ⭐ **Graph view** — visual network твоих записей
+25. ⭐ **Spaced repetition** — SM-2 review для Skills и любых заметок
 
 ## Productivity-features для power-users (топ-10)
 
