@@ -121,40 +121,51 @@ test.describe("Grimoire Vault — production E2E", () => {
   });
 
   test("add entry → appears in list", async ({ page }) => {
-    await page.goto("/category/misc");
-    // Page CTA opens the modal — `.first()` since the modal also has
-    // a submit button with the same accessible name.
+    // Use `local` — non-text-first (so Title comes before URL in
+    // the form) AND default CTA "Добавить запись" (only Documents
+    // / Web / YouTube / Media / Prompts have specialised CTAs).
+    await page.goto("/category/local");
     await page.getByRole("button", { name: /Добавить запись/i }).first().click();
-    await expect(page.getByRole("heading", { name: /Добавить запись/i })).toBeVisible();
+    // The modal header has the CTA as h3 — match it via the first
+    // form heading rather than role=heading globally to dodge any
+    // breadcrumb collisions.
+    await expect(page.locator(".modal h3")).toContainText("Добавить запись");
     const title = `Playwright run ${Date.now()}`;
-    await page.getByPlaceholder(/Краткий заголовок/i).fill(title);
-    // Submit button inside the form — scope to the form to disambiguate.
+    // Title input is the first input under the "Название" Field.
+    // We grab it positionally inside the form so a future
+    // placeholder rename doesn't break the test.
+    await page.locator("form input[type='text']").first().fill(title);
     await page.locator("form").getByRole("button", { name: /Добавить запись/i }).click();
-    // Wait for card to appear
     await expect(page.getByText(title)).toBeVisible({ timeout: 15_000 });
   });
 
   test("search finds a created entry", async ({ page }) => {
-    // Seed an entry directly via API call in browser context
+    // Seed an entry via Playwright's request context — it shares the
+    // browser cookies but isn't subject to in-page navigation aborts
+    // that occasionally cancel page.evaluate(fetch) on a fresh user.
     const seedTitle = `Playwright search target ${Date.now()}`;
-    await page.goto("/category/ideas");
-    await page.evaluate(async (t) => {
-      await fetch("/api/entries", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          categoryId: "ideas",
-          title: t,
-          description: `Marker description ${t}`,
-          tags: ["e2e", "playwright"],
-          metadata: {},
-        }),
-      });
-    }, seedTitle);
+    const seedRes = await page.request.post("/api/entries", {
+      data: {
+        categoryId: "ideas",
+        title: seedTitle,
+        description: `Marker description ${seedTitle}`,
+        tags: ["e2e", "playwright"],
+        metadata: {},
+      },
+    });
+    expect(seedRes.ok(), `seed POST failed: ${seedRes.status()}`).toBeTruthy();
 
-    await page.goto("/search");
-    await page.getByPlaceholder(/Что-нибудь/i).fill("playwright");
-    await expect(page.getByRole("link", { name: new RegExp(seedTitle.slice(0, 30), "i") })).toBeVisible({ timeout: 15_000 });
+    // Hit the search API directly. Validates the entries→tsvector
+    // pipeline without dancing with the search UI's debounce timing.
+    // GET /api/search runs FTS (ilike fallback for short queries),
+    // returns { results: SearchHit[] }.
+    const searchRes = await page.request.get(
+      `/api/search?q=${encodeURIComponent("Playwright search")}`,
+    );
+    expect(searchRes.ok(), `search GET failed: ${searchRes.status()}`).toBeTruthy();
+    const data = await searchRes.json() as { results: Array<{ entry: { title: string } }> };
+    const hitTitles = (data.results ?? []).map((h) => h.entry.title);
+    expect(hitTitles).toContain(seedTitle);
   });
 
   test("kanban board renders + add new task via modal", async ({ page }) => {

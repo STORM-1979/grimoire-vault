@@ -1,26 +1,47 @@
 /**
  * Server-side data access for entries.
  * RLS enforces user isolation — we just call Supabase as the signed-in user.
+ *
+ * For routes authenticated via Bearer PAT (no cookie session), pass
+ * `{ asService: true }` to use the service-role client instead.
+ * The user_id parameter is still mandatory and scopes the row;
+ * service-role only sidesteps RLS, it doesn't change which user the
+ * row belongs to.
  */
 import "server-only";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import type { Entry, CategoryId } from "@/lib/types";
 import type { CreateEntryInput, UpdateEntryInput, ListEntriesQuery } from "@/lib/schemas/entries";
 import { rowToEntry, entryToRow } from "./mappers";
 import { DataError } from "@/lib/errors";
 import { computeContentHash } from "@/lib/dedup";
 
+interface DataOpts {
+  /** Use the service-role client to bypass RLS — required for Bearer-
+   *  PAT-authenticated routes where there is no cookie session. */
+  asService?: boolean;
+}
+
+async function clientFor(opts?: DataOpts) {
+  if (opts?.asService) return createServiceClient();
+  return createClient();
+}
+
 // Re-export so existing call sites (`import { DataError } from "@/lib/data/entries"`) keep working.
 export { DataError };
 
-export async function listEntries(query: ListEntriesQuery): Promise<{ items: Entry[]; total: number }> {
-  const supabase = await createClient();
+export async function listEntries(query: ListEntriesQuery, opts?: DataOpts & { userId?: string }): Promise<{ items: Entry[]; total: number }> {
+  const supabase = await clientFor(opts);
   let q = supabase
     .from("entries")
     .select("*", { count: "exact" })
     .order("pinned", { ascending: false })
     .order("created_at", { ascending: false });
 
+  // Service-role client bypasses RLS, so we have to scope by user_id
+  // explicitly when callers came in via Bearer PAT.  Cookie callers
+  // get the same row set via RLS automatically.
+  if (opts?.asService && opts.userId) q = q.eq("user_id", opts.userId);
   if (query.categoryId) q = q.eq("category_id", query.categoryId);
   if (query.pinned === "true") q = q.eq("pinned", true);
   if (query.pinned === "false") q = q.eq("pinned", false);
@@ -53,8 +74,8 @@ export async function getEntry(id: string): Promise<Entry | null> {
   return data ? rowToEntry(data) : null;
 }
 
-export async function createEntry(userId: string, input: CreateEntryInput): Promise<Entry> {
-  const supabase = await createClient();
+export async function createEntry(userId: string, input: CreateEntryInput, opts?: DataOpts): Promise<Entry> {
+  const supabase = await clientFor(opts);
   const row: Record<string, unknown> = { ...entryToRow(input), user_id: userId };
   // Auto-fill content_hash if the caller didn't supply one — gives us
   // duplicate detection for "paste the same URL twice" without forcing

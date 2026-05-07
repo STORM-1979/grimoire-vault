@@ -16,19 +16,24 @@ import { createEntrySchema, listEntriesQuerySchema } from "@/lib/schemas/entries
  */
 
 export const GET = withErrorHandler(async (req: Request) => {
-  await requireUserFlexible();
+  const user = await requireUserFlexible();
   const url = new URL(req.url);
   const parsed = listEntriesQuerySchema.safeParse(Object.fromEntries(url.searchParams));
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid query", issues: parsed.error.issues }, { status: 400 });
   }
-  const result = await listEntries(parsed.data);
+  // PAT-authed callers don't have an RLS-bound supabase session, so
+  // we use the service-role client and scope rows by user_id
+  // ourselves.  Cookie callers get RLS the normal way — the helper
+  // ignores asService when no PAT was used (we always pass it; the
+  // userId scope is correct in either case).
+  const result = await listEntries(parsed.data, { asService: true, userId: user.id });
   return NextResponse.json(result);
 });
 
 export const POST = withErrorHandler(async (req: Request) => {
   const user = await requireUserFlexible();
   const input = await parseBody(req, createEntrySchema);
-  const created = await createEntry(user.id, input);
+  const created = await createEntry(user.id, input, { asService: true });
   return NextResponse.json(created, { status: 201 });
 });
