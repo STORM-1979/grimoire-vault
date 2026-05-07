@@ -215,11 +215,14 @@ test.describe("BACKLOG — browser checks", () => {
   });
 
   test("Hotkeys suppressed inside an input field", async ({ page }) => {
-    await page.goto("/category/ideas");
-    // Open the AddItemModal where the title input lives.  `.first()` —
-    // the modal's submit button shares the same accessible name.
+    // Use `local` — non-text-first → CTA "Добавить запись" + the
+    // stable "Краткий заголовок" placeholder. Wave-26 made
+    // `ideas`/`misc`/`prompts`/`skills` text-first and reordered
+    // their forms (URL field above the title), which broke the
+    // earlier placeholder-based selector here.
+    await page.goto("/category/local");
     await page.getByRole("button", { name: /Добавить запись/ }).first().click();
-    const titleInput = page.getByPlaceholder(/Краткий заголовок|Theo - обзор/);
+    const titleInput = page.getByPlaceholder(/Краткий заголовок/);
     await titleInput.fill("");
     await titleInput.focus();
     // Type a literal "j" — should land in the input, not trigger nav.

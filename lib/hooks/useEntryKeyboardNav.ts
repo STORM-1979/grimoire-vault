@@ -15,7 +15,10 @@ interface KeyboardNavCallbacks {
   onSelectAll?: () => void;
 }
 
-const HOTKEYS = ["j", "k", "ArrowDown", "ArrowUp", "g", "G", "e", "p", "x", "Delete", "Backspace", "Enter", " ", "Escape", "?", "a"];
+// "?" lives in KeyboardHelp's global handler — listing it here too
+// caused the nav handler to swallow the event when itemsRef.current
+// happened to be non-empty, hiding the help overlay on busy pages.
+const HOTKEYS = ["j", "k", "ArrowDown", "ArrowUp", "g", "G", "e", "p", "x", "Delete", "Backspace", "Enter", " ", "Escape", "a"];
 
 /**
  * Vim-style keyboard navigation for an entry list.
