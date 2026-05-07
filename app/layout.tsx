@@ -3,11 +3,16 @@ import { Fraunces, Manrope, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ServiceWorkerRegister } from "@/components/layout/ServiceWorkerRegister";
 
+// Font weights are trimmed to what the codebase actually uses:
+// `font-light` (300), default (400), `font-medium` (500). `font-bold`
+// appears in 2 spots — both inside category badges that look fine
+// at 500. Earlier draft loaded 5–6 weights per family which added
+// ~250 KB to the initial network bundle for glyphs we never paint.
 const fraunces = Fraunces({
   variable: "--font-fraunces",
-  subsets: ["latin"], // Fraunces lacks cyrillic glyphs — DM Sans handles RU body text
+  subsets: ["latin"], // Fraunces lacks cyrillic glyphs — Manrope handles RU body text
   display: "swap",
-  weight: ["300", "400", "500", "600", "700"],
+  weight: ["300", "400", "500"],
   style: ["normal", "italic"],
 });
 
@@ -15,14 +20,14 @@ const manrope = Manrope({
   variable: "--font-sans-display",
   subsets: ["latin", "cyrillic"],
   display: "swap",
-  weight: ["200", "300", "400", "500", "600", "700"],
+  weight: ["300", "400", "500"],
 });
 
 const jetbrains = JetBrains_Mono({
   variable: "--font-mono-display",
   subsets: ["latin", "cyrillic"],
   display: "swap",
-  weight: ["300", "400", "500"],
+  weight: ["400", "500"],
 });
 
 export const metadata: Metadata = {

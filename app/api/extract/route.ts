@@ -27,10 +27,18 @@ export const POST = withErrorHandler(async (request: Request) => {
   const limited = await checkRateLimit(user.id, "og-extract", RATE_LIMITS.ogExtract);
   if (limited) return limited;
   const { url } = await parseBody(request, extractSchema);
+  // In-process cache: og:meta of a given URL is stable enough that
+  // re-fetching on every keystroke (e.g. user's debounce → server-
+  // side scrape, then user adjusts trailing slash and we go again)
+  // wastes upstream bandwidth.  15-minute TTL, capped at 200
+  // entries.  Cleared automatically by the lambda recycling on
+  // Vercel.
+  const cached = extractCache.get(url);
+  if (cached && cached.expiresAt > Date.now()) {
+    return NextResponse.json(cached.meta);
+  }
+
   const meta = await extractMetadata(url);
-  // Surface the diagnostic breadcrumbs in Vercel logs so we can see
-  // which fallback path filled (or didn't fill) duration without
-  // having to look at the user's DevTools.  Cheap one-line summary.
   console.log(JSON.stringify({
     msg: "extract.result",
     url,
@@ -40,5 +48,19 @@ export const POST = withErrorHandler(async (request: Request) => {
     hasDescription: Boolean(meta.description),
     diag: meta._diag,
   }));
+
+  if (meta.hasContent) {
+    if (extractCache.size >= EXTRACT_CACHE_MAX) {
+      // FIFO eviction — JS Map preserves insertion order.
+      const oldest = extractCache.keys().next().value;
+      if (oldest) extractCache.delete(oldest);
+    }
+    extractCache.set(url, { meta, expiresAt: Date.now() + EXTRACT_CACHE_TTL_MS });
+  }
+
   return NextResponse.json(meta);
 });
+
+const EXTRACT_CACHE_TTL_MS = 15 * 60 * 1000;
+const EXTRACT_CACHE_MAX = 200;
+const extractCache = new Map<string, { meta: Awaited<ReturnType<typeof extractMetadata>>; expiresAt: number }>();

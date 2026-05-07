@@ -29,14 +29,19 @@ export default async function EntryPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
-  const { data: row, error } = await supabase
-    .from("entries").select("*").eq("id", id).maybeSingle();
-  if (error || !row) notFound();
+  // Entry + attachments are independent reads — fire them in
+  // parallel and halve server-side latency.  RLS scopes both to
+  // the calling user, so listAttachments(id) for someone else's
+  // entry returns [] before we even check the entry row exists.
+  const [entryResp, attachments] = await Promise.all([
+    supabase.from("entries").select("*").eq("id", id).maybeSingle(),
+    listAttachments(id),
+  ]);
+  if (entryResp.error || !entryResp.data) notFound();
 
-  const entry = rowToEntry(row);
+  const entry = rowToEntry(entryResp.data);
   const cat = getCategory(entry.categoryId);
   if (!cat) notFound();
-  const attachments = await listAttachments(entry.id);
 
   return (
     <div className="fade-in">
