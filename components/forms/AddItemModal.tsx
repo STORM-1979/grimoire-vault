@@ -160,11 +160,15 @@ export function AddItemModal({
   // For video entries we also pull duration + tags + channel author
   // (server-side oEmbed fallback covers UA-blocked YouTube pages).
   useEffect(() => {
-    const url = form.url.trim();
+    // For portfolio entries the extraction trigger is the Vercel /
+    // prod URL field, not the generic url input — that one isn't
+    // even shown for portfolio.  Other categories keep using form.url.
+    const sourceUrl = isPortfolio ? form.vercelUrl.trim() : form.url.trim();
+    const url = sourceUrl;
     // URL changed — clear the "this URL already failed to save" marker
     // so close-with-pending can try again on the new value.
     if (failedUrl.current && failedUrl.current !== url) failedUrl.current = null;
-    if (!(isWeb || isVideo || isText || isDesign) || url.length < 8) return;
+    if (!(isWeb || isVideo || isText || isDesign || isPortfolio) || url.length < 8) return;
 
     // Try the input as-is first.  If that fails, scan for the first
     // embedded http(s) URL — handy when the user pastes a shell
@@ -230,11 +234,16 @@ export function AddItemModal({
           // телефон с камерой") for almost every video.  User decides
           // what's worth tagging.
           // Designs: when the page has no og:image, fall back to a
-          // free hero-block screenshot via WordPress mShots so the
-          // card never lands with an empty cover rectangle.
+          // free hero-block screenshot via Microlink so the card
+          // never lands with an empty cover rectangle.
           // Description for designs is intentionally NOT autofilled
           // (user request — they want title + cover, nothing else).
-          const designFallback = isDesign && !meta.image ? siteScreenshot(metaUrl) : null;
+          // Portfolio gets the same hero-block fallback because most
+          // Vercel deployments don't ship custom og:image tags.
+          const wantsScreenshotFallback = isDesign || isPortfolio;
+          const screenshotFallback = wantsScreenshotFallback && !meta.image
+            ? siteScreenshot(metaUrl)
+            : null;
           return {
             ...f,
             title: f.title.trim() ? f.title : (meta.title ?? f.title),
@@ -244,7 +253,7 @@ export function AddItemModal({
             thumb: f.thumb.trim() ? f.thumb : (meta.image ?? f.thumb),
             cover: f.cover.trim()
               ? f.cover
-              : (meta.image ?? designFallback ?? f.cover),
+              : (meta.image ?? screenshotFallback ?? f.cover),
             duration: f.duration.trim() ? f.duration : (meta.duration ?? f.duration),
           };
         });
@@ -278,7 +287,7 @@ export function AddItemModal({
     return () => {
       if (extractTimer.current) clearTimeout(extractTimer.current);
     };
-  }, [form.url, isWeb, isVideo, isText, isDesign]);
+  }, [form.url, form.vercelUrl, isWeb, isVideo, isText, isDesign, isPortfolio]);
 
   /**
    * Build the CreateEntryInput payload from the current form state and
@@ -688,10 +697,20 @@ export function AddItemModal({
 
           {/* Portfolio project links.  All three are optional and
               persisted under entry.metadata — pure flat URL fields,
-              no schema migration needed. */}
+              no schema migration needed.  The Vercel field doubles
+              as the og:meta source: pasting it pre-fills название,
+              описание, обложку (hero-block screenshot fallback when
+              the deployment ships no og:image, like designs do). */}
           {isPortfolio && (
             <>
-              <Field label="Vercel / прод-ссылка">
+              <Field
+                label="Vercel / прод-ссылка"
+                hint={
+                  extracting
+                    ? "Подтягиваю название, описание и превью со страницы…"
+                    : "Вставь ссылку — название, описание и обложка подтянутся автоматически."
+                }
+              >
                 <input
                   type="text"
                   className="field-input"
