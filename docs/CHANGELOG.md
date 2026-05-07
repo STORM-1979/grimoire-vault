@@ -8,6 +8,58 @@
 
 ---
 
+## Волна 27 · Performance pass (2026-05-07)
+
+После того как волна 26 расширила surface area, прошёлся по
+горячим точкам и убрал четыре отдельные пессимизации.
+
+### ⭐ Database indexes
+- `entries(user_id, created_at desc)` — покрывает `/today`
+  per-day выборку и 90-дневный heatmap.  До индекса — full scan +
+  RLS-фильтр, ~10× медленнее на vault'е в 1000 записей.
+- `entry_backlinks(target_id, created_at desc) where target_id is
+  not null` — partial index под «упоминается в» панель.
+
+### Today heatmap
+Добавил safety-cap 10K строк на 90-дневный fetch.  Даже при
+экстремальных днях capture (300 записей / день) этого с запасом
+для groupby; failure mode превращается из «медленная страница» в
+«слегка устаревший heatmap».
+
+### Graph view
+- Hard cap 1500 свежих узлов (было unbounded).  Будущий 10K-vault
+  не уронит страницу.
+- ⭐ Tag co-occurrence переписан с O(n²) pair-iteration на
+  bucket-by-tag (`O(t · k²)` где t — уникальные теги, k — средний
+  размер ведра).  ~100× быстрее на обычном vault'е.
+
+### Suggest-tags cache
+5-минутный in-process кэш топ-тегов на user_id.  Раньше fetch топ-
+50 тегов из 500 строк entries бил по БД на каждый debounced
+keystroke.  Теперь — один round-trip за окно.  Сменил выборку с
+«все 500» на «последние 200», так что подсказки следуют твоему
+текущему стилю.
+
+### Card memoisation
+`React.memo` на MediaCard / IdeaCard / VideoCard / ItemCard.
+Списки рендерят 50–200 карточек; без memo переключение sort-mode
+перерисовывало все.  Default shallow comparison работает потому
+что callback-prop'ы стабильны (useCallback / hook-returned).
+
+### Service worker v3
+Selective cache вместо full passthrough:
+- `/_next/static/*` → cache-first (content-hashed, immutable)
+- `/icons/*`, `/favicon` → cache-first
+- `/api/*` → never cache
+- остальное → network-first с 1.5 с timeout, fallback на кэш для
+  offline-continuity
+
+Repeat-page-loads теперь мгновенные — статика берётся из
+service-worker cache, html идёт через network-first с offline-
+fallback.
+
+---
+
 ## Волна 26 · Power-features overhaul (2026-05-07)
 
 13 функций из списка «что добавить дальше» — реализованы все, что
