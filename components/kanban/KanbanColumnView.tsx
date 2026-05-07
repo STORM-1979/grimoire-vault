@@ -12,9 +12,10 @@ interface Props {
   cards: KanbanCard[];
   onAdd: () => void;
   onDelete: (cardId: string) => void;
+  onEdit?: (card: KanbanCard) => void;
 }
 
-export function KanbanColumnView({ id, title, subtitle, cards, onAdd, onDelete }: Props) {
+export function KanbanColumnView({ id, title, subtitle, cards, onAdd, onDelete, onEdit }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id });
   const accent = id === "doing" ? "text-gold" : id === "done" ? "text-ivory-mute" : "text-ivory";
   const muted = id === "done";
@@ -46,7 +47,7 @@ export function KanbanColumnView({ id, title, subtitle, cards, onAdd, onDelete }
 
       <div className="space-y-3">
         {cards.map((card) => (
-          <KanbanCardView key={card.id} card={card} muted={muted} onDelete={onDelete} />
+          <KanbanCardView key={card.id} card={card} muted={muted} onDelete={onDelete} onEdit={onEdit} />
         ))}
         {cards.length === 0 && (
           <button

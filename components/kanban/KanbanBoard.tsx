@@ -20,6 +20,10 @@ const AddKanbanModal = dynamic(
   () => import("@/components/forms/AddKanbanModal").then((m) => m.AddKanbanModal),
   { ssr: false },
 );
+const EditKanbanModal = dynamic(
+  () => import("@/components/forms/EditKanbanModal").then((m) => m.EditKanbanModal),
+  { ssr: false },
+);
 
 const COLUMNS: { id: KanbanColumn; title: string; subtitle: string }[] = [
   { id: "backlog", title: "Backlog", subtitle: "В очереди" },
@@ -28,10 +32,11 @@ const COLUMNS: { id: KanbanColumn; title: string; subtitle: string }[] = [
 ];
 
 export function KanbanBoard() {
-  const { board, loading, error, create, remove, moveCard } = useKanban();
+  const { board, loading, error, create, update, remove, moveCard } = useKanban();
   const [activeCard, setActiveCard] = useState<KanbanCard | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [addCol, setAddCol] = useState<KanbanColumn>("backlog");
+  const [editing, setEditing] = useState<KanbanCard | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -129,6 +134,7 @@ export function KanbanBoard() {
                 cards={board[id]}
                 onAdd={() => openAdd(id)}
                 onDelete={(cardId) => remove(cardId, id)}
+                onEdit={(c) => setEditing(c)}
               />
             </SortableContext>
           ))}
@@ -148,6 +154,18 @@ export function KanbanBoard() {
           defaultCol={addCol}
           onClose={() => setShowAdd(false)}
           onSubmit={async (input) => { await create(input); }}
+        />
+      )}
+
+      {editing && (
+        <EditKanbanModal
+          card={editing}
+          onClose={() => setEditing(null)}
+          onSubmit={async (id, patch) => {
+            // Realtime + the update() optimistic path keep the board
+            // consistent — no need to refetch here.
+            await update(id, patch);
+          }}
         />
       )}
     </div>

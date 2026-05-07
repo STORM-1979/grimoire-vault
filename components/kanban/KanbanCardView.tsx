@@ -10,9 +10,10 @@ interface Props {
   muted?: boolean;
   dragging?: boolean;
   onDelete: (id: string) => void;
+  onEdit?: (card: KanbanCard) => void;
 }
 
-export function KanbanCardView({ card, muted, dragging: forceDragging, onDelete }: Props) {
+export function KanbanCardView({ card, muted, dragging: forceDragging, onDelete, onEdit }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
   });
@@ -32,6 +33,19 @@ export function KanbanCardView({ card, muted, dragging: forceDragging, onDelete 
     e.preventDefault();
     if (confirm(`Удалить задачу «${card.title}»?`)) onDelete(card.id);
   };
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (onEdit) onEdit(card);
+  };
+  // Double-click anywhere on the card opens the edit modal.  The
+  // pointer-down listener stops dnd-kit from treating the second
+  // click as the start of a drag.
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (onEdit) onEdit(card);
+  };
 
   return (
     <div
@@ -39,19 +53,35 @@ export function KanbanCardView({ card, muted, dragging: forceDragging, onDelete 
       style={style}
       {...attributes}
       {...listeners}
+      onDoubleClick={onEdit ? handleDoubleClick : undefined}
       className={`relative group rounded-lg border p-3.5 cursor-grab active:cursor-grabbing select-none transition
         ${dragging ? "opacity-30" : "opacity-100"}
         ${muted ? "border-white/8 bg-white/[0.02]" : "border-white/10 bg-white/[0.04]"}
         hover:border-gold/30 hover:bg-white/[0.07]`}
     >
-      <button
-        onClick={handleDelete}
-        onPointerDown={(e) => e.stopPropagation()}
-        className="item-actions-btn danger absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition"
-        title="Удалить"
-      >
-        <Icon name="x" size={11} />
-      </button>
+      {/* Hover toolbar — edit + delete.  pointerDown stop-propagation
+          on each button keeps dnd-kit from treating the click as the
+          start of a drag, so the buttons stay clickable. */}
+      <div className="absolute top-2 right-2 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition z-10">
+        {onEdit && (
+          <button
+            onClick={handleEdit}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="item-actions-btn"
+            title="Редактировать (двойной клик по карточке)"
+          >
+            <Icon name="edit" size={11} />
+          </button>
+        )}
+        <button
+          onClick={handleDelete}
+          onPointerDown={(e) => e.stopPropagation()}
+          className="item-actions-btn danger"
+          title="Удалить"
+        >
+          <Icon name="x" size={11} />
+        </button>
+      </div>
 
       <div className="flex items-start justify-between gap-3 mb-2 pr-7">
         <h4 className={`font-medium text-[14px] leading-snug ${muted ? "line-through text-ivory-mute" : "text-ivory"}`}>
