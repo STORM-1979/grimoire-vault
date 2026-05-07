@@ -143,36 +143,31 @@ export function AddItemModal({
 
     // Try the input as-is first.  If that fails, scan for the first
     // embedded http(s) URL — handy when the user pastes a shell
-    // command like `npx skills add https://github.com/foo/bar` and
-    // expects metadata extraction to "just work".  We auto-clean the
-    // field to the bare URL so the extracted entry actually points
-    // somewhere usable; the user's intent was the link, not the
-    // command around it.
+    // command like `npx skills add https://github.com/foo/bar`.  We
+    // keep the original text in the field (the surrounding command
+    // is the actionable artefact the user wants to remember), and
+    // only use the embedded URL for the metadata fetch.
     let parsed: URL | null = null;
+    let metaUrl = url;
     try { parsed = new URL(url); } catch { /* embedded-URL fallback below */ }
     if (!parsed) {
       const m = url.match(/https?:\/\/[^\s)>"'`]+/);
       if (!m) return;
       try { parsed = new URL(m[0]); } catch { return; }
-      // Auto-clean the field — but only once per paste, so the user
-      // can still edit it afterwards without us fighting them.
-      if (lastExtractedUrl.current !== m[0]) {
-        setForm((f) => ({ ...f, url: m[0] }));
-        // The setForm call retriggers this effect with the cleaned
-        // URL; we'll do the actual extraction on that pass.
-        return;
-      }
+      metaUrl = m[0];
     }
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return;
-    if (lastExtractedUrl.current === url) return;
+    // Dedupe on the EMBEDDED url — same shell command + same link =
+    // no need to re-fetch og:meta.
+    if (lastExtractedUrl.current === metaUrl) return;
     if (extractTimer.current) clearTimeout(extractTimer.current);
     extractTimer.current = setTimeout(async () => {
-      lastExtractedUrl.current = url;
+      lastExtractedUrl.current = metaUrl;
       setExtracting(true);
       extractingRef.current = true;
       setExtractError(null);
       try {
-        const meta = await extractApi.fromUrl(url);
+        const meta = await extractApi.fromUrl(metaUrl);
         if (!meta.hasContent) {
           if (isVideo) {
             setExtractError("Не удалось подтянуть данные. Заполни поля вручную.");
@@ -200,7 +195,7 @@ export function AddItemModal({
           // card never lands with an empty cover rectangle.
           // Description for designs is intentionally NOT autofilled
           // (user request — they want title + cover, nothing else).
-          const designFallback = isDesign && !meta.image ? siteScreenshot(url) : null;
+          const designFallback = isDesign && !meta.image ? siteScreenshot(metaUrl) : null;
           return {
             ...f,
             title: f.title.trim() ? f.title : (meta.title ?? f.title),
@@ -221,8 +216,8 @@ export function AddItemModal({
         // for us — residential IPs aren't blocked.  Two paths inside
         // resolveYouTubeDuration: CORS-friendly Invidious first, then
         // an off-screen YT IFrame Player API call.
-        if (isVideo && !meta.duration && youtubeVideoId(url)) {
-          const dur = await resolveYouTubeDuration(url);
+        if (isVideo && !meta.duration && youtubeVideoId(metaUrl)) {
+          const dur = await resolveYouTubeDuration(metaUrl);
           if (dur) {
             setForm((f) => ({
               ...f,
@@ -466,19 +461,24 @@ export function AddItemModal({
 
           {isText && (
             <Field
-              label="Источник (необязательно)"
+              label="Ссылка (необязательно)"
               hint={
                 extracting
                   ? "Подтягиваю заголовок и описание со страницы…"
-                  : "Вставь ссылку — заголовок и описание заполнятся сами. Теги добавь руками."
+                  : "Можно вставить целиком команду или ссылку — заголовок и описание подтянутся по URL внутри."
               }
             >
+              {/* type="text", not "url": the field accepts the full
+                  user input (e.g. "npx skills add https://github…
+                  --skill find-skills") and we extract just the URL
+                  for og:meta lookup. HTML5 url validation would
+                  reject anything that doesn't START with a scheme. */}
               <input
-                type="url"
+                type="text"
                 className="field-input"
                 value={form.url}
                 onChange={set("url")}
-                placeholder="https://… (статья, туториал, репозиторий)"
+                placeholder="https://… или команда установки со ссылкой внутри"
               />
             </Field>
           )}

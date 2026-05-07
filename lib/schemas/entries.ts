@@ -12,16 +12,21 @@ export const categoryIdSchema = z.enum([
 ]);
 
 /**
- * URL or empty.  Accepts either:
+ * URL or empty.  Accepts:
  *   • absolute http(s) URLs (Unsplash, og:image extractions, etc.)
  *   • our internal `/api/r2/object/...` paths from FileUpload — these
  *     are server-rendered and stay relative because the browser hits
  *     the same origin.  Plain `z.string().url()` rejects them because
  *     there's no scheme.
+ *   • free-form text that *contains* an http(s) URL anywhere — used
+ *     by Skills / Prompts / etc. where the user might paste an
+ *     install command like `npx skills add https://… --flag`.  We
+ *     keep the surrounding command intact in storage; UI components
+ *     extract the URL portion when they need a clickable href.
  */
 const looseUrl = z.string().refine(
-  (s) => /^(https?:\/\/|\/api\/r2\/)/.test(s),
-  { message: "Must be an absolute URL or /api/r2/* path" },
+  (s) => /^(https?:\/\/|\/api\/r2\/)/.test(s) || /https?:\/\//.test(s),
+  { message: "Must be a URL, /api/r2/* path, or text containing an http(s) URL" },
 );
 const urlOrEmpty = looseUrl.or(z.literal("")).optional().nullable();
 
