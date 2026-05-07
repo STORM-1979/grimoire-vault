@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/icons/Icon";
 import { Field } from "./Field";
+import { ThemedSelect } from "./ThemedSelect";
+import { CATEGORY_OPTS, COLUMN_OPTS, PRIORITY_OPTS } from "./kanban-options";
 import type { CreateKanbanInput } from "@/lib/schemas/kanban";
 import type { CategoryId, KanbanColumn, Priority } from "@/lib/types";
 
@@ -78,18 +80,20 @@ export function AddKanbanModal({ defaultCol = "backlog", onClose, onSubmit }: Pr
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Колонка">
-              <select className="field-select" value={form.columnName} onChange={set("columnName")}>
-                <option value="backlog">Backlog · в очереди</option>
-                <option value="doing">Doing · в работе</option>
-                <option value="done">Done · сделано</option>
-              </select>
+              <ThemedSelect
+                options={COLUMN_OPTS}
+                value={form.columnName}
+                onChange={(v) => setForm({ ...form, columnName: (v || "backlog") as KanbanColumn })}
+                placeholder="Backlog"
+              />
             </Field>
             <Field label="Приоритет">
-              <select className="field-select" value={form.priority} onChange={set("priority")}>
-                <option value="low">low</option>
-                <option value="medium">medium</option>
-                <option value="high">high</option>
-              </select>
+              <ThemedSelect
+                options={PRIORITY_OPTS}
+                value={form.priority}
+                onChange={(v) => setForm({ ...form, priority: (v || "medium") as Priority })}
+                placeholder="medium"
+              />
             </Field>
           </div>
 
@@ -98,8 +102,12 @@ export function AddKanbanModal({ defaultCol = "backlog", onClose, onSubmit }: Pr
               <input type="date" className="field-input" value={form.dueDate} onChange={set("dueDate")} />
             </Field>
             <Field label="Связь с категорией">
-              <input type="text" className="field-input" value={form.relatedCategory} onChange={set("relatedCategory")}
-                placeholder="designs / kanban / ideas …" />
+              <ThemedSelect
+                options={CATEGORY_OPTS}
+                value={form.relatedCategory}
+                onChange={(v) => setForm({ ...form, relatedCategory: (v as CategoryId | "") })}
+                placeholder="— Без привязки —"
+              />
             </Field>
           </div>
 

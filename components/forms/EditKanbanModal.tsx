@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Icon } from "@/components/icons/Icon";
 import { Field } from "./Field";
 import { ThemedSelect } from "./ThemedSelect";
+import { CATEGORY_OPTS, COLUMN_OPTS, PRIORITY_OPTS } from "./kanban-options";
 import type { UpdateKanbanInput } from "@/lib/schemas/kanban";
 import type { CategoryId, KanbanCard, KanbanColumn, Priority } from "@/lib/types";
 
@@ -12,18 +13,6 @@ interface Props {
   onClose: () => void;
   onSubmit: (id: string, patch: UpdateKanbanInput) => Promise<void>;
 }
-
-const COLUMN_OPTS = [
-  { value: "backlog", label: "Backlog · в очереди" },
-  { value: "doing", label: "Doing · в работе" },
-  { value: "done", label: "Done · сделано" },
-];
-
-const PRIORITY_OPTS = [
-  { value: "low", label: "low" },
-  { value: "medium", label: "medium" },
-  { value: "high", label: "high" },
-];
 
 export function EditKanbanModal({ card, onClose, onSubmit }: Props) {
   const [form, setForm] = useState({
@@ -141,12 +130,11 @@ export function EditKanbanModal({ card, onClose, onSubmit }: Props) {
               />
             </Field>
             <Field label="Связь с категорией">
-              <input
-                type="text"
-                className="field-input"
+              <ThemedSelect
+                options={CATEGORY_OPTS}
                 value={form.relatedCategory}
-                onChange={(e) => setForm({ ...form, relatedCategory: e.target.value as CategoryId | "" })}
-                placeholder="designs / kanban / ideas …"
+                onChange={(v) => setForm({ ...form, relatedCategory: (v as CategoryId | "") })}
+                placeholder="— Без привязки —"
               />
             </Field>
           </div>
