@@ -50,6 +50,9 @@ export function CategoryView({ category, initialItems }: Props) {
   // Sort preference — persisted per-category in localStorage so the
   // user's choice survives reloads / category switches.
   const [sortMode, setSortMode] = useState<SortMode>("newest");
+  // When sortMode === "tags", optionally narrow to a single tag.
+  // Cleared automatically when the sort mode changes away from "tags".
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
   useEffect(() => {
     if (typeof window === "undefined") return;
     const stored = window.localStorage.getItem(SORT_LS_PREFIX + category.id);
@@ -59,6 +62,7 @@ export function CategoryView({ category, initialItems }: Props) {
   }, [category.id]);
   const updateSort = useCallback((next: SortMode) => {
     setSortMode(next);
+    if (next !== "tags") setSelectedTag(null);
     if (typeof window !== "undefined") {
       window.localStorage.setItem(SORT_LS_PREFIX + category.id, next);
     }
@@ -100,11 +104,42 @@ export function CategoryView({ category, initialItems }: Props) {
   // Apply the collections filter before pinned/others split so all
   // downstream code (cards, keyboard nav, bulk ops) sees a consistent
   // already-filtered list.
-  const filtered = !showCollections || selectedCollection === null
+  const collectionFiltered = !showCollections || selectedCollection === null
     ? items
     : selectedCollection === "none"
     ? items.filter((it) => !it.collectionId)
     : items.filter((it) => it.collectionId && selectedScope?.has(it.collectionId));
+
+  // Distinct tag list (with counts) for the tag-picker row.  Computed
+  // off the collection-filtered list so the tag chips reflect what's
+  // actually visible in the current scope, sorted alphabetically.
+  // Only used when sortMode === "tags".
+  const tagFacets = useMemo(() => {
+    if (sortMode !== "tags") return [];
+    const counts = new Map<string, number>();
+    for (const it of collectionFiltered) {
+      for (const t of it.tags) {
+        counts.set(t, (counts.get(t) ?? 0) + 1);
+      }
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => a[0].localeCompare(b[0], "ru", { sensitivity: "base" }))
+      .map(([tag, count]) => ({ tag, count }));
+  }, [collectionFiltered, sortMode]);
+
+  // If the picked tag disappears from the current scope (entry edited
+  // / removed / collection switch), drop it so we don't show an empty
+  // list with a phantom filter active.
+  useEffect(() => {
+    if (selectedTag && !tagFacets.some((f) => f.tag === selectedTag)) {
+      setSelectedTag(null);
+    }
+  }, [tagFacets, selectedTag]);
+
+  // Apply tag filter on top of the collection filter.
+  const filtered = selectedTag
+    ? collectionFiltered.filter((it) => it.tags.includes(selectedTag))
+    : collectionFiltered;
 
   // Apply sort. Default ("newest") is a no-op since the API already
   // returns rows ordered by created_at DESC. Other modes copy the
@@ -316,6 +351,52 @@ export function CategoryView({ category, initialItems }: Props) {
           <div className="font-mono text-[10px] uppercase tracking-widest text-gold">Все записи · {others.length}</div>
           <SortControl value={sortMode} onChange={updateSort} />
         </div>
+
+        {/* Tag picker — only when sorting by tags.  Click a tag to
+            narrow the list to entries that carry it; click "Все" or
+            the same tag again to clear.  Counts come from the
+            collection-filtered scope so they always sum to whatever
+            "Все" shows. */}
+        {sortMode === "tags" && tagFacets.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-6 items-center">
+            <span className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute pr-1">
+              тег →
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedTag(null)}
+              className={
+                "font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full transition " +
+                (selectedTag === null
+                  ? "bg-gold text-emerald-deep"
+                  : "border border-white/15 text-ivory-mute hover:text-gold hover:border-gold/40")
+              }
+            >
+              Все · {collectionFiltered.length}
+            </button>
+            {tagFacets.map(({ tag, count }) => {
+              const active = selectedTag === tag;
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => setSelectedTag(active ? null : tag)}
+                  className={
+                    "font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full transition flex items-center gap-1.5 " +
+                    (active
+                      ? "bg-gold text-emerald-deep"
+                      : "border border-white/15 text-ivory-mute hover:text-gold hover:border-gold/40")
+                  }
+                >
+                  <span>{tag}</span>
+                  <span className={active ? "text-emerald-deep/60" : "text-ivory-mute/60"}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
         {isVideo ? (
           <div className="grid grid-cols-3 gap-7">
             {others.map((it) => (
