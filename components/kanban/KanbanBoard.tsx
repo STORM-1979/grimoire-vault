@@ -122,8 +122,10 @@ export function KanbanBoard() {
     removeColumn(col.slug);
   };
 
+  // Both default and custom columns can be renamed.  Default slugs
+  // stay fixed (other components style on them), only the display
+  // label changes.  Hook handles the persistence split internally.
   const handleColumnRename = (col: KanbanColumnDef) => {
-    if (!col.custom) return;
     const next = prompt("Новое название колонки", col.name);
     if (next === null) return;
     if (!next.trim()) return;
@@ -173,7 +175,7 @@ export function KanbanBoard() {
                 onAdd={() => openAdd(col.slug)}
                 onDelete={(cardId) => remove(cardId, col.slug)}
                 onEdit={(c) => setEditing(c)}
-                onRenameColumn={col.custom ? () => handleColumnRename(col) : undefined}
+                onRenameColumn={() => handleColumnRename(col)}
                 onDeleteColumn={col.custom ? () => handleColumnDelete(col) : undefined}
               />
             </SortableContext>

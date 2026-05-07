@@ -22,6 +22,11 @@ const DEFAULT_COLUMNS: KanbanColumnDef[] = [
 ];
 
 const CUSTOM_COLS_LS_KEY = "grimoire:kanban:custom-cols";
+// Display-name overrides for the three default columns.  Slugs stay
+// fixed (other components style on them, e.g. gold accent for
+// "doing") so the user can only retitle, not re-slug.  Stored as
+// `{ backlog?: string; doing?: string; done?: string }`.
+const DEFAULT_NAMES_LS_KEY = "grimoire:kanban:default-names";
 
 // Realtime refetch coalescing window. The server-side reorder issues
 // up to N sequential UPDATEs (one per shifted neighbour + the moved
@@ -71,6 +76,27 @@ function writeCustomCols(cols: KanbanColumnDef[]) {
   window.localStorage.setItem(CUSTOM_COLS_LS_KEY, JSON.stringify(payload));
 }
 
+function readDefaultNames(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(DEFAULT_NAMES_LS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(parsed ?? {})) {
+      if (typeof v === "string" && v.trim()) out[k] = v;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function writeDefaultNames(map: Record<string, string>) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(DEFAULT_NAMES_LS_KEY, JSON.stringify(map));
+}
+
 export function useKanban(initial: Board = empty) {
   const [board, setBoard] = useState<Board>(initial);
   const [loading, setLoading] = useState(false);
@@ -78,12 +104,17 @@ export function useKanban(initial: Board = empty) {
   // Custom columns only — defaults are merged in below.  Hydrated
   // from localStorage on mount so the picks survive reloads.
   const [customColumns, setCustomColumns] = useState<KanbanColumnDef[]>([]);
+  // User-supplied display names for the three defaults.  Slug → name.
+  const [defaultNames, setDefaultNames] = useState<Record<string, string>>({});
   // Suppress realtime echoes of our own writes until this timestamp.
   const localWriteUntil = useRef(0);
   const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Hydrate custom columns once on mount.
-  useEffect(() => { setCustomColumns(readCustomCols()); }, []);
+  // Hydrate persisted column metadata once on mount.
+  useEffect(() => {
+    setCustomColumns(readCustomCols());
+    setDefaultNames(readDefaultNames());
+  }, []);
 
   const refetch = useCallback(async () => {
     setLoading(true);
@@ -146,7 +177,13 @@ export function useKanban(initial: Board = empty) {
   const columns: KanbanColumnDef[] = useMemo(() => {
     const seen = new Set<string>();
     const out: KanbanColumnDef[] = [];
-    for (const c of [...DEFAULT_COLUMNS, ...customColumns]) {
+    // Defaults adopt their user-supplied name when set; otherwise
+    // fall back to the canonical Backlog / Doing / Done labels.
+    for (const c of DEFAULT_COLUMNS) {
+      seen.add(c.slug);
+      out.push({ ...c, name: defaultNames[c.slug] ?? c.name });
+    }
+    for (const c of customColumns) {
       if (seen.has(c.slug)) continue;
       seen.add(c.slug);
       out.push(c);
@@ -157,7 +194,7 @@ export function useKanban(initial: Board = empty) {
       out.push({ slug, name: slug, custom: true });
     }
     return out;
-  }, [customColumns, board]);
+  }, [customColumns, defaultNames, board]);
 
   // Stamp the quiet window before each local mutation so the
   // realtime channel ignores its own echo. The window is short and
@@ -290,13 +327,28 @@ export function useKanban(initial: Board = empty) {
     return slug;
   }, [customColumns]);
 
-  /** Rename a custom column.  Default columns are immutable. */
+  /** Rename any column — custom slugs go to the custom-cols list,
+   *  default slugs land in the display-name override map.  Slugs
+   *  themselves never change so the rest of the app keeps working. */
   const renameColumn = useCallback((slug: string, name: string) => {
     const trimmed = name.trim();
     if (!trimmed) return;
+    const isDefault = DEFAULT_COLUMNS.some((c) => c.slug === slug);
+    if (isDefault) {
+      const next = { ...defaultNames, [slug]: trimmed };
+      // If the new name happens to equal the canonical default,
+      // drop the override entirely so the form stays clean.
+      const canonical = DEFAULT_COLUMNS.find((c) => c.slug === slug)?.name;
+      if (canonical && trimmed === canonical) {
+        delete next[slug];
+      }
+      setDefaultNames(next);
+      writeDefaultNames(next);
+      return;
+    }
     const next = customColumns.map((c) => (c.slug === slug ? { ...c, name: trimmed } : c));
     persistCustom(next);
-  }, [customColumns]);
+  }, [customColumns, defaultNames]);
 
   /** Delete a custom column.  Refuses if the column still holds
    *  cards — the caller should move / delete cards first. */
