@@ -123,10 +123,21 @@ export function CollectionsTabs({
   // a child existed, but there was no way to create one.
   const showSubRow = !!activeRootId;
 
+  // Re-pull the canonical list from the server.  Used after every
+  // mutation so the UI reflects DB truth even if our local state was
+  // stale (another tab, a reload race, a 409 on a row that already
+  // existed but wasn't in our cached list).
+  const refetch = async (): Promise<EntryCollection[]> => {
+    const r = await collectionsApi.list(categoryId);
+    broadcast(r.items);
+    return r.items;
+  };
+
   // Quick-create from the curated suggestion list.  Adds the named
   // collection at top level (parent_id null), broadcasts the new
   // list, and selects it so the user can immediately drop entries
   // into it.  No-op if a collection with that name already exists.
+  // 409 self-heals: refetch and adopt the existing row.
   const quickCreate = async (name: string) => {
     setError(null);
     if ((collections ?? []).some((c) => c.name.toLowerCase() === name.toLowerCase())) {
@@ -137,30 +148,47 @@ export function CollectionsTabs({
       broadcast([...(collections ?? []), created]);
       onSelect(created.id);
     } catch (e) {
+      // 409 means the row exists server-side already — pull the truth
+      // and adopt it silently instead of yelling at the user.
+      if (e instanceof ApiError && e.status === 409) {
+        try {
+          const fresh = await refetch();
+          const match = fresh.find((c) => c.name.toLowerCase() === name.toLowerCase());
+          if (match) onSelect(match.id);
+          return;
+        } catch { /* fall through to the original error */ }
+      }
       const msg = e instanceof ApiError ? e.message : (e as Error).message;
       setError(msg);
     }
   };
 
   // Bulk-create the entire suggestion list — sequential to avoid
-  // hammering the rate limiter and to surface any 409s clearly.
+  // hammering the rate limiter.  After the run we always refetch so
+  // any 409s (rows already existed) self-heal: the suggestion row
+  // disappears because the local list now matches the server.
   const quickCreateAll = async () => {
     setError(null);
     const existingNames = new Set((collections ?? []).map((c) => c.name.toLowerCase()));
-    const next = [...(collections ?? [])];
+    let lastNonConflictError: string | null = null;
     for (const name of suggestions) {
       if (existingNames.has(name.toLowerCase())) continue;
       try {
-        const created = await collectionsApi.create({ categoryId, name });
-        next.push(created);
+        await collectionsApi.create({ categoryId, name });
         existingNames.add(name.toLowerCase());
       } catch (e) {
-        // Keep going on per-item failures — the user gets at least
-        // the partial list.  Last error wins in the banner.
-        setError(e instanceof Error ? e.message : "create failed");
+        // 409s are silent — the row was already there, refetch will
+        // pick it up.  Other errors surface in the banner.
+        if (e instanceof ApiError && e.status === 409) continue;
+        lastNonConflictError = e instanceof Error ? e.message : "create failed";
       }
     }
-    broadcast(next);
+    try {
+      await refetch();
+    } catch (e) {
+      lastNonConflictError = lastNonConflictError ?? (e instanceof Error ? e.message : "refresh failed");
+    }
+    if (lastNonConflictError) setError(lastNonConflictError);
   };
 
   const handleCreate = async () => {
@@ -182,6 +210,23 @@ export function CollectionsTabs({
       setCreating(null);
       onSelect(created.id);
     } catch (e) {
+      // Mirror the quickCreate self-heal: a 409 means the name exists
+      // in the DB but our local list was stale — refetch and adopt.
+      if (e instanceof ApiError && e.status === 409) {
+        try {
+          const fresh = await refetch();
+          const match = fresh.find(
+            (c) => c.name.toLowerCase() === name.toLowerCase()
+              && (c.parentId ?? null) === (creating?.parentId ?? null),
+          );
+          if (match) {
+            setDraft("");
+            setCreating(null);
+            onSelect(match.id);
+            return;
+          }
+        } catch { /* fall through */ }
+      }
       const msg = e instanceof ApiError ? e.message : (e as Error).message;
       setError(msg);
     }
