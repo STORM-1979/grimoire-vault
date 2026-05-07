@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons/Icon";
 import { ItemActions } from "./ItemActions";
@@ -17,7 +18,7 @@ interface VideoCardProps {
   onEdit?: (item: import("@/lib/types").Entry) => void;
 }
 
-export function VideoCard({ item, big, selected, bulkSelected, onBulkToggle, onTogglePin, onDelete, onEdit }: VideoCardProps) {
+function VideoCardImpl({ item, big, selected, bulkSelected, onBulkToggle, onTogglePin, onDelete, onEdit }: VideoCardProps) {
   const router = useRouter();
   // Bulk-select takes priority on shift-click; otherwise the row falls
   // through to its inner click handlers (thumbnail vs. title).
@@ -109,3 +110,6 @@ export function VideoCard({ item, big, selected, bulkSelected, onBulkToggle, onT
     </div>
   );
 }
+
+/** Memoised — YouTube grids render 30-60 of these per page. */
+export const VideoCard = memo(VideoCardImpl);

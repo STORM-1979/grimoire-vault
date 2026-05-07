@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons/Icon";
 import { ItemActions } from "./ItemActions";
@@ -21,7 +22,7 @@ interface ItemCardProps {
   onEdit?: (item: Entry) => void;
 }
 
-export function ItemCard({
+function ItemCardImpl({
   item, category, large, selected, bulkSelected, onBulkToggle,
   onTogglePin, onDelete, onEdit,
 }: ItemCardProps) {
@@ -157,3 +158,6 @@ export function ItemCard({
     </div>
   );
 }
+
+/** Memoised — list views show dozens of these per category page. */
+export const ItemCard = memo(ItemCardImpl);

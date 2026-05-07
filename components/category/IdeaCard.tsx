@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons/Icon";
 import { ItemActions } from "./ItemActions";
@@ -26,7 +27,7 @@ interface IdeaCardProps {
  * Aspect-square at default size; the `big` variant (used for pinned
  * entries) is taller to match other cards' pinned hero treatment.
  */
-export function IdeaCard({
+function IdeaCardImpl({
   item, category, big, selected, bulkSelected, onBulkToggle,
   onTogglePin, onDelete, onEdit,
 }: IdeaCardProps) {
@@ -99,3 +100,6 @@ export function IdeaCard({
     </div>
   );
 }
+
+/** Memoised — list views render dozens of these. */
+export const IdeaCard = memo(IdeaCardImpl);

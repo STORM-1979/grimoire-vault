@@ -41,14 +41,19 @@ export default async function TodayPage({
     .order("created_at", { ascending: true });
   const entries: Entry[] = (rows ?? []).map(rowToEntry);
 
-  // Fetch a 90-day window of counts for the heatmap.  Cheap because
-  // we group by date in JS — every entry row is a few bytes.
+  // Fetch a 90-day window of counts for the heatmap. We pull only
+  // the `created_at` column (8 bytes per row over the wire) and
+  // group by date in JS — for typical personal vaults (10-200
+  // entries/day max) this beats a server-side GROUP BY round-trip.
+  // The new entries_user_created_idx covers the predicate path so
+  // the read is index-only.
   const heatmapStart = isoDateAddDays(targetDate, -89);
   const { data: heatRows } = await supabase
     .from("entries")
     .select("created_at")
     .gte("created_at", `${heatmapStart}T00:00:00.000Z`)
-    .lte("created_at", `${targetDate}T23:59:59.999Z`);
+    .lte("created_at", `${targetDate}T23:59:59.999Z`)
+    .limit(10000); // safety cap — heatmap doesn't need precision past this
   const heatCounts: Record<string, number> = {};
   for (const r of heatRows ?? []) {
     const day = (r.created_at as string).slice(0, 10);

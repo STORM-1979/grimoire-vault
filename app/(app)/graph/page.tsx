@@ -9,12 +9,18 @@ import { GraphView } from "@/components/graph/GraphView";
  * edges.  Server-side fetch is intentionally compact: just the
  * fields the layout needs.
  */
+// Hard cap so a future 10K-entry vault doesn't choke the page.
+// Sorted by created_at desc so the most recent entries always make
+// the cut.
+const GRAPH_NODE_CAP = 1500;
+
 export default async function GraphPage() {
   const supabase = await createClient();
   const { data: entryRows } = await supabase
     .from("entries")
-    .select("id, title, category_id, tags")
-    .limit(2000);
+    .select("id, title, category_id, tags, created_at")
+    .order("created_at", { ascending: false })
+    .limit(GRAPH_NODE_CAP);
   const { data: backlinkRows } = await supabase
     .from("entry_backlinks")
     .select("source_id, target_id")
@@ -27,9 +33,6 @@ export default async function GraphPage() {
     tags: (r.tags as string[]) ?? [],
   }));
 
-  // Build edges: explicit backlinks + tag co-occurrence.  Tag edges
-  // are kept light — only emitted when two entries share ≥ 2 tags
-  // so the graph isn't a hairball.
   const edges = new Set<string>();
   const edgeList: { source: string; target: string; kind: "backlink" | "tag" }[] = [];
   for (const b of backlinkRows ?? []) {
@@ -43,18 +46,40 @@ export default async function GraphPage() {
       });
     }
   }
-  // Tag co-occurrence — O(n²) but n ≤ 2000 in practice and we only
-  // run it on the server during page build.  Fine.
+
+  // Tag co-occurrence — naive pair-iteration was O(n²).  Bucketing
+  // entries by tag first turns it into O(t · k²) where t is unique
+  // tag count and k is the avg number of entries per tag.  For
+  // 1500 entries × 5-10 tags / entry × maybe 50-200 unique tags,
+  // the bucketed pass is ~100× faster.
+  const byTag = new Map<string, number[]>();
   for (let i = 0; i < nodes.length; i++) {
-    for (let j = i + 1; j < nodes.length; j++) {
-      const shared = nodes[i].tags.filter((t) => nodes[j].tags.includes(t));
-      if (shared.length >= 2) {
-        const key = [nodes[i].id, nodes[j].id].sort().join("|") + "|tag";
-        if (!edges.has(key)) {
-          edges.add(key);
-          edgeList.push({ source: nodes[i].id, target: nodes[j].id, kind: "tag" });
-        }
+    for (const t of nodes[i].tags) {
+      const arr = byTag.get(t) ?? [];
+      arr.push(i);
+      byTag.set(t, arr);
+    }
+  }
+  // Count shared-tag occurrences per (i, j) pair via the bucket.
+  const pairCounts = new Map<string, number>();
+  for (const indices of byTag.values()) {
+    if (indices.length < 2) continue;
+    for (let a = 0; a < indices.length; a++) {
+      for (let b = a + 1; b < indices.length; b++) {
+        const i = indices[a];
+        const j = indices[b];
+        const key = i < j ? `${i}|${j}` : `${j}|${i}`;
+        pairCounts.set(key, (pairCounts.get(key) ?? 0) + 1);
       }
+    }
+  }
+  for (const [key, count] of pairCounts.entries()) {
+    if (count < 2) continue;
+    const [i, j] = key.split("|").map(Number);
+    const edgeKey = [nodes[i].id, nodes[j].id].sort().join("|") + "|tag";
+    if (!edges.has(edgeKey)) {
+      edges.add(edgeKey);
+      edgeList.push({ source: nodes[i].id, target: nodes[j].id, kind: "tag" });
     }
   }
 

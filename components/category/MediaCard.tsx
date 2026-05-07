@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons/Icon";
 import { ItemActions } from "./ItemActions";
@@ -18,7 +19,7 @@ interface MediaCardProps {
   onEdit?: (item: import("@/lib/types").Entry) => void;
 }
 
-export function MediaCard({ item, big, selected, bulkSelected, onBulkToggle, onTogglePin, onDelete, onEdit }: MediaCardProps) {
+function MediaCardImpl({ item, big, selected, bulkSelected, onBulkToggle, onTogglePin, onDelete, onEdit }: MediaCardProps) {
   const router = useRouter();
   const onClick = (e: React.MouseEvent) => {
     if (e.shiftKey && onBulkToggle) { e.preventDefault(); onBulkToggle(item.id, e); return; }
@@ -118,6 +119,15 @@ export function MediaCard({ item, big, selected, bulkSelected, onBulkToggle, onT
     </div>
   );
 }
+
+/**
+ * Lists of these cards can be 50–200 nodes long.  Memoising them
+ * keeps re-renders proportional to "items that actually changed"
+ * — sort / filter / bulk-toggle no longer redraw every card.
+ * Default shallow comparison is enough because all callback props
+ * are stable from CategoryView (useCallback / hook-returned).
+ */
+export const MediaCard = memo(MediaCardImpl);
 
 /** Pluck a format tag (webp/png/jpeg/...) out of a cover URL.  Returns
  *  null when the URL has no usable extension (e.g. external CDN URLs

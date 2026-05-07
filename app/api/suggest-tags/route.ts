@@ -36,25 +36,12 @@ export const POST = withErrorHandler(async (req: Request) => {
   if (limited) return limited;
   const { title, description } = await parseBody(req, schema);
 
-  // Pull the user's top-50 most-used tags so the model gets a
-  // preference signal — it picks from this list when relevant
-  // before inventing new ones.
-  const supabase = await createClient();
-  const { data: rows } = await supabase
-    .from("entries")
-    .select("tags")
-    .eq("user_id", user.id)
-    .limit(500);
-  const counts = new Map<string, number>();
-  for (const r of rows ?? []) {
-    for (const t of (r.tags as string[] | null) ?? []) {
-      counts.set(t, (counts.get(t) ?? 0) + 1);
-    }
-  }
-  const topTags = Array.from(counts.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 50)
-    .map(([t]) => t);
+  // Pull the user's top-50 most-used tags from a 5-minute in-process
+  // cache.  The vocabulary doesn't change between keystrokes so a
+  // tight refresh cycle saves a 200 row Postgres round-trip per
+  // debounced suggestion call.  Cache key = userId; eviction is
+  // pure TTL (no LRU complexity needed at 1-user scale).
+  const topTags = await getTopTagsCached(user.id);
 
   const prompt = buildPrompt(title, description, topTags);
   const result = await callPollinations(prompt);
@@ -143,3 +130,32 @@ function parseSuggestion(result: PollinationsResult): Suggestion {
 export const dynamic = "force-dynamic";
 
 void HttpError;
+
+/* ---------- top-tag cache ---------- */
+
+const TOP_TAG_TTL_MS = 5 * 60 * 1000;
+const topTagCache = new Map<string, { tags: string[]; expiresAt: number }>();
+
+async function getTopTagsCached(userId: string): Promise<string[]> {
+  const hit = topTagCache.get(userId);
+  if (hit && hit.expiresAt > Date.now()) return hit.tags;
+  const supabase = await createClient();
+  const { data: rows } = await supabase
+    .from("entries")
+    .select("tags")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(200); // recent 200 — biased towards the user's current vocabulary
+  const counts = new Map<string, number>();
+  for (const r of rows ?? []) {
+    for (const t of (r.tags as string[] | null) ?? []) {
+      counts.set(t, (counts.get(t) ?? 0) + 1);
+    }
+  }
+  const top = Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 50)
+    .map(([t]) => t);
+  topTagCache.set(userId, { tags: top, expiresAt: Date.now() + TOP_TAG_TTL_MS });
+  return top;
+}
