@@ -194,6 +194,7 @@ export function ShareButton({ entryId }: { entryId: string }) {
                           type="button"
                           onClick={() => revoke(l.id)}
                           className="item-actions-btn danger"
+                          aria-label="Отозвать share-ссылку"
                           title="Отозвать"
                         >
                           <Icon name="x" size={11} />

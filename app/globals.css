@@ -215,3 +215,16 @@ body {
   outline-offset: 2px;
   border-radius: 4px;
 }
+
+/* Reduced-motion: kill all transitions and animations system-wide
+   when the user has set the OS preference.  Keeps essential UI
+   feedback (focus rings, instant state changes) intact, just
+   removes the motion. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

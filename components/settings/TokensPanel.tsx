@@ -116,17 +116,19 @@ export function TokensPanel() {
                 catch { /* ignore */ }
               }}
               className="item-actions-btn"
+              aria-label="Скопировать токен"
               title="Скопировать"
             >
-              <Icon name="copy" size={12} />
+              <Icon name="copy" size={12} aria-hidden="true" />
             </button>
             <button
               type="button"
               onClick={() => setRevealed(null)}
               className="item-actions-btn"
+              aria-label="Скрыть токен"
               title="Скрыть"
             >
-              <Icon name="x" size={12} />
+              <Icon name="x" size={12} aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -153,9 +155,10 @@ export function TokensPanel() {
                 type="button"
                 onClick={() => revoke(t.id)}
                 className="item-actions-btn danger"
+                aria-label={`Отозвать токен ${t.name}`}
                 title="Отозвать"
               >
-                <Icon name="x" size={12} />
+                <Icon name="x" size={12} aria-hidden="true" />
               </button>
             </div>
           ))}

@@ -64,17 +64,22 @@ export function TodayHeatmap({
                   key={day}
                   href={`/today?d=${day}`}
                   title={`${day} · ${n} ${plural(n)}`}
+                  aria-label={`${day} — ${n} ${plural(n)}`}
                   style={{ backgroundColor: bg }}
-                  className="block w-3 h-3 rounded-sm border border-white/5 hover:ring-1 hover:ring-gold/60 transition"
+                  className="relative block w-3 h-3 rounded-sm border border-white/5 hover:ring-1 hover:ring-gold/60 transition before:absolute before:inset-[-6px] before:content-['']"
                 />
               );
             })}
           </div>
         ))}
       </div>
-      <div className="flex items-center gap-2 mt-2 font-mono text-[8px] uppercase tracking-widest text-ivory-mute">
+      <div
+        className="flex items-center gap-2 mt-2 font-mono text-[8px] uppercase tracking-widest text-ivory-mute"
+        role="img"
+        aria-label="Легенда интенсивности — от тише к чаще"
+      >
         <span>тише</span>
-        <div className="flex gap-1">
+        <div className="flex gap-1" aria-hidden="true">
           {[0, 0.25, 0.5, 0.75, 1].map((i) => (
             <div
               key={i}

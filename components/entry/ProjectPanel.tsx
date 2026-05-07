@@ -247,18 +247,20 @@ export function ProjectPanel({ entry }: { entry: Entry }) {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="item-actions-btn"
+                      aria-label={`Открыть ссылку ${l.label || l.url}`}
                       title="Открыть"
                     >
-                      <Icon name="arrow" size={12} />
+                      <Icon name="arrow" size={12} aria-hidden="true" />
                     </a>
                   )}
                   <button
                     type="button"
                     onClick={() => removeLink(i)}
                     className="item-actions-btn danger"
+                    aria-label={`Удалить ссылку ${l.label || l.url || ""}`}
                     title="Удалить"
                   >
-                    <Icon name="x" size={12} />
+                    <Icon name="x" size={12} aria-hidden="true" />
                   </button>
                 </div>
               </div>
@@ -318,9 +320,11 @@ export function ProjectPanel({ entry }: { entry: Entry }) {
                       type="button"
                       onClick={() => toggleReveal(i)}
                       className="item-actions-btn"
+                      aria-label={isRevealed ? `Скрыть значение ${c.label}` : `Показать значение ${c.label}`}
+                      aria-pressed={isRevealed}
                       title={isRevealed ? "Скрыть" : "Показать"}
                     >
-                      <Icon name={isRevealed ? "eyeOff" : "eye"} size={12} />
+                      <Icon name={isRevealed ? "eyeOff" : "eye"} size={12} aria-hidden="true" />
                     </button>
                     <button
                       type="button"
@@ -328,18 +332,20 @@ export function ProjectPanel({ entry }: { entry: Entry }) {
                         if (c.value) navigator.clipboard.writeText(c.value).catch(() => {});
                       }}
                       className="item-actions-btn"
+                      aria-label={`Скопировать значение ${c.label}`}
                       title="Скопировать значение"
                       disabled={!c.value}
                     >
-                      <Icon name="copy" size={12} />
+                      <Icon name="copy" size={12} aria-hidden="true" />
                     </button>
                     <button
                       type="button"
                       onClick={() => removeCred(i)}
                       className="item-actions-btn danger"
+                      aria-label={`Удалить запись ${c.label}`}
                       title="Удалить"
                     >
-                      <Icon name="x" size={12} />
+                      <Icon name="x" size={12} aria-hidden="true" />
                     </button>
                   </div>
                 </div>
