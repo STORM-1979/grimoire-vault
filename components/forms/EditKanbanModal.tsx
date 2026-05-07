@@ -3,18 +3,29 @@
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/icons/Icon";
 import { Field } from "./Field";
-import { ThemedSelect } from "./ThemedSelect";
+import { ThemedSelect, type SelectOption } from "./ThemedSelect";
 import { CATEGORY_OPTS, COLUMN_OPTS, PRIORITY_OPTS } from "./kanban-options";
 import type { UpdateKanbanInput } from "@/lib/schemas/kanban";
-import type { CategoryId, KanbanCard, KanbanColumn, Priority } from "@/lib/types";
+import type { CategoryId, KanbanCard, KanbanColumn, KanbanColumnDef, Priority } from "@/lib/types";
 
 interface Props {
   card: KanbanCard;
+  /** Live column list from useKanban; when omitted falls back to
+   *  the hardcoded defaults from kanban-options. */
+  columns?: KanbanColumnDef[];
   onClose: () => void;
   onSubmit: (id: string, patch: UpdateKanbanInput) => Promise<void>;
 }
 
-export function EditKanbanModal({ card, onClose, onSubmit }: Props) {
+export function EditKanbanModal({ card, columns, onClose, onSubmit }: Props) {
+  const columnOpts: SelectOption[] = columns && columns.length > 0
+    ? columns.map((c) => ({
+        value: c.slug,
+        label: c.custom
+          ? c.name
+          : `${c.name} · ${c.slug === "backlog" ? "в очереди" : c.slug === "doing" ? "в работе" : "сделано"}`,
+      }))
+    : COLUMN_OPTS;
   const [form, setForm] = useState({
     title: card.title,
     description: card.description ?? "",
@@ -104,7 +115,7 @@ export function EditKanbanModal({ card, onClose, onSubmit }: Props) {
           <div className="grid grid-cols-2 gap-3">
             <Field label="Колонка">
               <ThemedSelect
-                options={COLUMN_OPTS}
+                options={columnOpts}
                 value={form.columnName}
                 onChange={(v) => setForm({ ...form, columnName: (v || "backlog") as KanbanColumn })}
                 placeholder="Backlog"

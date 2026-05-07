@@ -14,9 +14,13 @@ export async function listKanbanBoard(): Promise<Record<KanbanColumn, KanbanCard
     .order("column_name")
     .order("position");
   if (error) throw new DataError(error.message, 500);
+  // Three defaults are always present so an empty board still
+  // renders the standard layout.  Custom columns get auto-vivified
+  // when their first card lands.
   const board: Record<KanbanColumn, KanbanCard[]> = { backlog: [], doing: [], done: [] };
   for (const r of data ?? []) {
     const card = rowToKanbanCard(r);
+    if (!board[card.columnName]) board[card.columnName] = [];
     board[card.columnName].push(card);
   }
   return board;

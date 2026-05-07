@@ -164,7 +164,23 @@ export interface CredentialDecrypted {
   updatedAt: string;
 }
 
-export type KanbanColumn = "backlog" | "doing" | "done";
+/**
+ * Kanban column slug.  The three defaults — backlog / doing / done —
+ * are guaranteed to exist on every board.  Users can add custom
+ * columns; their slugs follow the same `[a-z0-9_-]{1,40}` shape but
+ * are otherwise arbitrary.
+ */
+export type KanbanColumn = string;
+
+/** Display metadata for a column on the board.  `custom` flips on
+ *  for user-added columns so the UI can offer rename / delete on
+ *  hover (defaults stay fixed). */
+export interface KanbanColumnDef {
+  slug: KanbanColumn;
+  name: string;
+  custom: boolean;
+}
+
 export type Priority = "low" | "medium" | "high";
 
 export interface KanbanCard {

@@ -1,14 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { kanbanApi } from "@/lib/api-client";
 import { createClient } from "@/lib/supabase/client";
-import type { KanbanCard, KanbanColumn } from "@/lib/types";
+import type { KanbanCard, KanbanColumn, KanbanColumnDef } from "@/lib/types";
 import type { CreateKanbanInput, UpdateKanbanInput } from "@/lib/schemas/kanban";
 
 type Board = Record<KanbanColumn, KanbanCard[]>;
 
 const empty: Board = { backlog: [], doing: [], done: [] };
+
+// Default columns shipped with every board.  Cannot be deleted or
+// renamed from the UI — they're the canonical Kanban triplet and
+// other components (e.g. card detail labels) refer to their slugs
+// directly.  Custom columns sit *after* these and can be reordered
+// among themselves.
+const DEFAULT_COLUMNS: KanbanColumnDef[] = [
+  { slug: "backlog", name: "Backlog", custom: false },
+  { slug: "doing",   name: "Doing",   custom: false },
+  { slug: "done",    name: "Done",    custom: false },
+];
+
+const CUSTOM_COLS_LS_KEY = "grimoire:kanban:custom-cols";
 
 // Realtime refetch coalescing window. The server-side reorder issues
 // up to N sequential UPDATEs (one per shifted neighbour + the moved
@@ -21,23 +34,69 @@ const REFETCH_DEBOUNCE_MS = 400;
 // reorder cascade (~10 sequential updates @ ~50 ms each on Vercel).
 const LOCAL_WRITE_QUIET_MS = 1500;
 
+/** Slugify a user-supplied column name into the kebab-case shape
+ *  Zod expects.  Cyrillic and accented Latin all degrade to ASCII
+ *  via NFKD + non-letter stripping; if nothing usable survives we
+ *  fall back to a short random id so the user can still create the
+ *  column. */
+function slugify(name: string): string {
+  const base = name
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+  return base || `col-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function readCustomCols(): KanbanColumnDef[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(CUSTOM_COLS_LS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as Array<{ slug: string; name: string }>;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((x) => x && typeof x.slug === "string" && typeof x.name === "string")
+      .map((x) => ({ slug: x.slug, name: x.name, custom: true }));
+  } catch {
+    return [];
+  }
+}
+
+function writeCustomCols(cols: KanbanColumnDef[]) {
+  if (typeof window === "undefined") return;
+  const payload = cols.map(({ slug, name }) => ({ slug, name }));
+  window.localStorage.setItem(CUSTOM_COLS_LS_KEY, JSON.stringify(payload));
+}
+
 export function useKanban(initial: Board = empty) {
   const [board, setBoard] = useState<Board>(initial);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Custom columns only — defaults are merged in below.  Hydrated
+  // from localStorage on mount so the picks survive reloads.
+  const [customColumns, setCustomColumns] = useState<KanbanColumnDef[]>([]);
   // Suppress realtime echoes of our own writes until this timestamp.
   const localWriteUntil = useRef(0);
   const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Hydrate custom columns once on mount.
+  useEffect(() => { setCustomColumns(readCustomCols()); }, []);
 
   const refetch = useCallback(async () => {
     setLoading(true);
     try {
       const fresh = await kanbanApi.list();
-      setBoard({
-        backlog: (fresh.backlog ?? []).slice().sort((a, b) => a.position - b.position),
-        doing: (fresh.doing ?? []).slice().sort((a, b) => a.position - b.position),
-        done: (fresh.done ?? []).slice().sort((a, b) => a.position - b.position),
-      });
+      // Build a column-keyed bucket from whatever the API returned.
+      // Cards live in arbitrary slugs (custom columns), so we do a
+      // generic copy instead of the old hardcoded triplet.
+      const next: Board = { backlog: [], doing: [], done: [] };
+      for (const [slug, cards] of Object.entries(fresh)) {
+        next[slug] = (cards as KanbanCard[]).slice().sort((a, b) => a.position - b.position);
+      }
+      setBoard(next);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");
@@ -78,6 +137,28 @@ export function useKanban(initial: Board = empty) {
     };
   }, [scheduleRefetch]);
 
+  // Effective column list shown on the board: defaults first, then
+  // custom (in localStorage order), then any orphan slug found in
+  // cards but not yet in either list — that catches the case where
+  // a custom column was created on another device but its localStorage
+  // entry never made it here.  Orphans render with their slug as the
+  // display name until the user renames them.
+  const columns: KanbanColumnDef[] = useMemo(() => {
+    const seen = new Set<string>();
+    const out: KanbanColumnDef[] = [];
+    for (const c of [...DEFAULT_COLUMNS, ...customColumns]) {
+      if (seen.has(c.slug)) continue;
+      seen.add(c.slug);
+      out.push(c);
+    }
+    for (const slug of Object.keys(board)) {
+      if (seen.has(slug)) continue;
+      seen.add(slug);
+      out.push({ slug, name: slug, custom: true });
+    }
+    return out;
+  }, [customColumns, board]);
+
   // Stamp the quiet window before each local mutation so the
   // realtime channel ignores its own echo. The window is short and
   // re-extended on every write, so cross-device events that arrive
@@ -89,10 +170,10 @@ export function useKanban(initial: Board = empty) {
   const create = useCallback(async (input: CreateKanbanInput) => {
     markLocalWrite();
     const created = await kanbanApi.create(input);
-    setBoard((prev) => ({
-      ...prev,
-      [input.columnName ?? "backlog"]: [...(prev[input.columnName ?? "backlog"] ?? []), created],
-    }));
+    setBoard((prev) => {
+      const col = input.columnName ?? "backlog";
+      return { ...prev, [col]: [...(prev[col] ?? []), created] };
+    });
     return created;
   }, []);
 
@@ -104,10 +185,9 @@ export function useKanban(initial: Board = empty) {
     // final position after the server-side reorder cascade lands via
     // the next refetch (which fires once the quiet window expires).
     setBoard((prev) => {
-      const cols: KanbanColumn[] = ["backlog", "doing", "done"];
       let fromCol: KanbanColumn | null = null;
       let card: KanbanCard | null = null;
-      for (const c of cols) {
+      for (const c of Object.keys(prev)) {
         const found = prev[c].find((x) => x.id === id);
         if (found) { fromCol = c; card = found; break; }
       }
@@ -123,13 +203,11 @@ export function useKanban(initial: Board = empty) {
         tags: patch.tags ?? card.tags,
         columnName: patch.columnName ?? card.columnName,
       };
-      const next: Board = {
-        backlog: [...prev.backlog],
-        doing: [...prev.doing],
-        done: [...prev.done],
-      };
+      const next: Board = { ...prev };
+      for (const k of Object.keys(prev)) next[k] = [...prev[k]];
       if (patch.columnName && patch.columnName !== fromCol) {
         next[fromCol] = next[fromCol].filter((c) => c.id !== id);
+        if (!next[patch.columnName]) next[patch.columnName] = [];
         next[patch.columnName] = [...next[patch.columnName], merged];
       } else {
         next[fromCol] = next[fromCol].map((c) => (c.id === id ? merged : c));
@@ -141,7 +219,7 @@ export function useKanban(initial: Board = empty) {
 
   const remove = useCallback(async (id: string, fromCol: KanbanColumn) => {
     markLocalWrite();
-    setBoard((prev) => ({ ...prev, [fromCol]: prev[fromCol].filter((c) => c.id !== id) }));
+    setBoard((prev) => ({ ...prev, [fromCol]: (prev[fromCol] ?? []).filter((c) => c.id !== id) }));
     try {
       await kanbanApi.delete(id);
     } catch (e) {
@@ -156,9 +234,9 @@ export function useKanban(initial: Board = empty) {
    */
   const moveCard = useCallback(
     async (cardId: string, toCol: KanbanColumn, toIndex: number) => {
-      // Find current location
+      // Find current location across every known column slug.
       let fromCol: KanbanColumn | null = null;
-      for (const c of ["backlog", "doing", "done"] as KanbanColumn[]) {
+      for (const c of Object.keys(board)) {
         if (board[c].some((card) => card.id === cardId)) { fromCol = c; break; }
       }
       if (!fromCol) return;
@@ -168,11 +246,9 @@ export function useKanban(initial: Board = empty) {
 
       markLocalWrite();
       // Optimistic
-      const next: Board = {
-        backlog: [...board.backlog],
-        doing: [...board.doing],
-        done: [...board.done],
-      };
+      const next: Board = {};
+      for (const k of Object.keys(board)) next[k] = [...board[k]];
+      if (!next[toCol]) next[toCol] = [];
       next[fromCol] = next[fromCol].filter((c) => c.id !== cardId);
       const insertAt = Math.min(toIndex, next[toCol].length);
       next[toCol].splice(insertAt, 0, { ...card, columnName: toCol });
@@ -188,5 +264,70 @@ export function useKanban(initial: Board = empty) {
     [board, refetch],
   );
 
-  return { board, loading, error, refetch, create, update, remove, moveCard };
+  // Persist custom-column edits to localStorage on every change.
+  // Defaults are filtered out — they're recomputed at render time.
+  const persistCustom = (next: KanbanColumnDef[]) => {
+    setCustomColumns(next);
+    writeCustomCols(next);
+  };
+
+  /** Add a new column.  Returns the slug if created, or null when
+   *  the name collides with an existing column.  Empty / whitespace
+   *  names also return null (caller surfaces the error). */
+  const addColumn = useCallback((name: string): string | null => {
+    const trimmed = name.trim();
+    if (!trimmed) return null;
+    const slug = slugify(trimmed);
+    const existing = [...DEFAULT_COLUMNS, ...customColumns];
+    if (existing.some((c) => c.slug === slug || c.name.toLowerCase() === trimmed.toLowerCase())) {
+      return null;
+    }
+    persistCustom([...customColumns, { slug, name: trimmed, custom: true }]);
+    // Make the column visible right away even before the first card
+    // lands — the board reads from `columns` (which includes custom)
+    // and renders empty buckets via the `board[slug] ?? []` lookup.
+    setBoard((prev) => (prev[slug] ? prev : { ...prev, [slug]: [] }));
+    return slug;
+  }, [customColumns]);
+
+  /** Rename a custom column.  Default columns are immutable. */
+  const renameColumn = useCallback((slug: string, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const next = customColumns.map((c) => (c.slug === slug ? { ...c, name: trimmed } : c));
+    persistCustom(next);
+  }, [customColumns]);
+
+  /** Delete a custom column.  Refuses if the column still holds
+   *  cards — the caller should move / delete cards first. */
+  const removeColumn = useCallback((slug: string): { ok: boolean; reason?: string } => {
+    if (DEFAULT_COLUMNS.some((c) => c.slug === slug)) {
+      return { ok: false, reason: "default column" };
+    }
+    if ((board[slug]?.length ?? 0) > 0) {
+      return { ok: false, reason: "column not empty" };
+    }
+    persistCustom(customColumns.filter((c) => c.slug !== slug));
+    setBoard((prev) => {
+      const { [slug]: _drop, ...rest } = prev;
+      void _drop;
+      return rest;
+    });
+    return { ok: true };
+  }, [customColumns, board]);
+
+  return {
+    board,
+    columns,
+    loading,
+    error,
+    refetch,
+    create,
+    update,
+    remove,
+    moveCard,
+    addColumn,
+    renameColumn,
+    removeColumn,
+  };
 }

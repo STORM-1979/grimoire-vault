@@ -3,18 +3,30 @@
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/icons/Icon";
 import { Field } from "./Field";
-import { ThemedSelect } from "./ThemedSelect";
+import { ThemedSelect, type SelectOption } from "./ThemedSelect";
 import { CATEGORY_OPTS, COLUMN_OPTS, PRIORITY_OPTS } from "./kanban-options";
 import type { CreateKanbanInput } from "@/lib/schemas/kanban";
-import type { CategoryId, KanbanColumn, Priority } from "@/lib/types";
+import type { CategoryId, KanbanColumn, KanbanColumnDef, Priority } from "@/lib/types";
 
 interface Props {
   defaultCol?: KanbanColumn;
+  /** Live column list from useKanban — when provided, the column
+   *  picker shows custom columns alongside the defaults instead of
+   *  the hardcoded triplet. */
+  columns?: KanbanColumnDef[];
   onClose: () => void;
   onSubmit: (input: CreateKanbanInput) => Promise<void>;
 }
 
-export function AddKanbanModal({ defaultCol = "backlog", onClose, onSubmit }: Props) {
+export function AddKanbanModal({ defaultCol = "backlog", columns, onClose, onSubmit }: Props) {
+  const columnOpts: SelectOption[] = columns && columns.length > 0
+    ? columns.map((c) => ({
+        value: c.slug,
+        label: c.custom
+          ? c.name
+          : `${c.name} · ${c.slug === "backlog" ? "в очереди" : c.slug === "doing" ? "в работе" : "сделано"}`,
+      }))
+    : COLUMN_OPTS;
   const [form, setForm] = useState({
     title: "", description: "", relatedCategory: "" as CategoryId | "",
     columnName: defaultCol, dueDate: "", priority: "medium" as Priority, tags: "",
@@ -81,7 +93,7 @@ export function AddKanbanModal({ defaultCol = "backlog", onClose, onSubmit }: Pr
           <div className="grid grid-cols-2 gap-3">
             <Field label="Колонка">
               <ThemedSelect
-                options={COLUMN_OPTS}
+                options={columnOpts}
                 value={form.columnName}
                 onChange={(v) => setForm({ ...form, columnName: (v || "backlog") as KanbanColumn })}
                 placeholder="Backlog"
