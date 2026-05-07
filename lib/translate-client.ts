@@ -43,3 +43,14 @@ export async function translateArrayToRussianBrowser(items: string[]): Promise<s
   );
   return results;
 }
+
+/**
+ * Translate a single string to Russian.  No-op when the input
+ * already looks Russian (≥ 30 % Cyrillic letters) or the network
+ * call fails — returns the original string in both cases so callers
+ * can use the result unconditionally.
+ */
+export async function translateToRussianBrowser(text: string): Promise<string> {
+  if (!text || looksRussian(text)) return text;
+  return (await tryGoogleTranslateBrowser(text)) ?? text;
+}

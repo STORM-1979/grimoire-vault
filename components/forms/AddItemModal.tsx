@@ -12,6 +12,7 @@ import { extractApi, ApiError } from "@/lib/api-client";
 import { humanSize } from "@/lib/utils";
 import { resolveYouTubeDuration, youtubeVideoId } from "@/lib/youtube-client";
 import { siteScreenshot } from "@/lib/screenshot";
+import { translateToRussianBrowser } from "@/lib/translate-client";
 import type { CategoryId, EntryCollection } from "@/lib/types";
 import type { CreateEntryInput } from "@/lib/schemas/entries";
 
@@ -174,6 +175,20 @@ export function AddItemModal({
             setVideoExpanded(true);
           }
           return;
+        }
+        // Auto-translate the og:title / og:description to Russian
+        // when extraction lands an English (or other non-Russian)
+        // page — most Skills sources are GitHub repos or English
+        // tutorials.  Translation is a no-op for already-Russian
+        // text and falls through to the original on network error.
+        // Applied to text-first AND web/video so every category
+        // benefits, while staying skip-on-Russian for existing
+        // RU-source workflows.
+        if (meta.title) {
+          meta.title = await translateToRussianBrowser(meta.title);
+        }
+        if (meta.description) {
+          meta.description = await translateToRussianBrowser(meta.description);
         }
         // Reveal the rest of the video form now that we have content to show.
         if (isVideo) setVideoExpanded(true);
