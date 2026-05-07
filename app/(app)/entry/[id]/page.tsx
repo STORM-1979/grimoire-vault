@@ -10,6 +10,7 @@ import { EntryBoard } from "@/components/entry/EntryBoard";
 import { EntryPrimaryView } from "@/components/entry/EntryPrimaryView";
 import { VideoSummary } from "@/components/entry/VideoSummary";
 import { ProjectPanel } from "@/components/entry/ProjectPanel";
+import { BacklinksPanel } from "@/components/entry/BacklinksPanel";
 
 /**
  * /entry/[id] — full-detail view of one entry, with the interactive
@@ -125,6 +126,11 @@ export default async function EntryPage({
       {entry.categoryId === "portfolio" && <ProjectPanel entry={entry} />}
 
       <EntryBoard entry={entry} initial={attachments} />
+
+      {/* "Упоминается в" — pulled client-side so the page itself
+          stays cacheable and renders fast. Renders nothing when no
+          inbound [[wikilinks]] point at this entry. */}
+      <BacklinksPanel entryId={entry.id} />
     </div>
   );
 }
