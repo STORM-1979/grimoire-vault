@@ -140,8 +140,29 @@ export function AddItemModal({
     // so close-with-pending can try again on the new value.
     if (failedUrl.current && failedUrl.current !== url) failedUrl.current = null;
     if (!(isWeb || isVideo || isText || isDesign) || url.length < 8) return;
+
+    // Try the input as-is first.  If that fails, scan for the first
+    // embedded http(s) URL — handy when the user pastes a shell
+    // command like `npx skills add https://github.com/foo/bar` and
+    // expects metadata extraction to "just work".  We auto-clean the
+    // field to the bare URL so the extracted entry actually points
+    // somewhere usable; the user's intent was the link, not the
+    // command around it.
     let parsed: URL | null = null;
-    try { parsed = new URL(url); } catch { return; }
+    try { parsed = new URL(url); } catch { /* embedded-URL fallback below */ }
+    if (!parsed) {
+      const m = url.match(/https?:\/\/[^\s)>"'`]+/);
+      if (!m) return;
+      try { parsed = new URL(m[0]); } catch { return; }
+      // Auto-clean the field — but only once per paste, so the user
+      // can still edit it afterwards without us fighting them.
+      if (lastExtractedUrl.current !== m[0]) {
+        setForm((f) => ({ ...f, url: m[0] }));
+        // The setForm call retriggers this effect with the cleaned
+        // URL; we'll do the actual extraction on that pass.
+        return;
+      }
+    }
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return;
     if (lastExtractedUrl.current === url) return;
     if (extractTimer.current) clearTimeout(extractTimer.current);
