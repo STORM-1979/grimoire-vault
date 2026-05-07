@@ -1,5 +1,5 @@
 /**
- * Grimoire Vault — Service Worker (v2.1 — passthrough, force-reload bump)
+ * Grimoire Vault — Service Worker (v2.2 — passthrough, force-reload bump)
  *
  * Earlier versions tried to act as a clever offline cache (cache-first on
  * /_next/static/*, network-first on HTML, stale-while-revalidate on
