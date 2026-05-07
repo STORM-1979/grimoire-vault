@@ -15,6 +15,7 @@ import { resolveYouTubeDuration, youtubeVideoId } from "@/lib/youtube-client";
 import { siteScreenshot } from "@/lib/screenshot";
 import { translateToRussianBrowser } from "@/lib/translate-client";
 import { useEntryTemplates, type EntryTemplate } from "@/lib/hooks/useEntryTemplates";
+import { TagSuggestions } from "./TagSuggestions";
 import type { CategoryId, EntryCollection } from "@/lib/types";
 import type { CreateEntryInput } from "@/lib/schemas/entries";
 
@@ -844,6 +845,22 @@ export function AddItemModal({
               <Field label="Теги (через запятую)" hint="Например: frontend, чтение, важное">
                 <input type="text" className="field-input" value={form.tags} onChange={set("tags")} placeholder="tag1, tag2, tag3" />
               </Field>
+              <TagSuggestions
+                title={form.title}
+                description={form.desc}
+                currentTags={form.tags.split(",").map((t) => t.trim()).filter(Boolean)}
+                onAdd={(tag) => {
+                  // Append tag (deduped, case-insensitive) to the
+                  // comma-separated input value the user is editing.
+                  const existing = form.tags
+                    .split(",")
+                    .map((t) => t.trim())
+                    .filter(Boolean);
+                  if (existing.map((x) => x.toLowerCase()).includes(tag.toLowerCase())) return;
+                  const next = [...existing, tag].join(", ");
+                  setForm((f) => ({ ...f, tags: next }));
+                }}
+              />
 
               <label className="flex items-center gap-3 mt-2 mb-6 cursor-pointer select-none">
                 <input

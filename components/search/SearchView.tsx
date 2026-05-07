@@ -7,6 +7,7 @@ import { CATEGORIES, getCategory } from "@/lib/categories";
 import { searchApi, entriesApi, type SearchHit } from "@/lib/api-client";
 import { formatDateTime } from "@/lib/utils";
 import { BulkActionsBar } from "@/components/category/BulkActionsBar";
+import { VoiceSearchButton } from "@/components/search/VoiceSearchButton";
 import { useLocalStorageState } from "@/lib/hooks/useLocalStorageState";
 import type { CategoryId } from "@/lib/types";
 
@@ -214,6 +215,9 @@ export function SearchView() {
           />
           <span className="absolute left-5 top-1/2 -translate-y-1/2 text-ivory-mute">
             <Icon name="search" size={22} />
+          </span>
+          <span className="absolute right-16 top-1/2 -translate-y-1/2">
+            <VoiceSearchButton onTranscript={(t) => setQ((prev) => (prev ? `${prev} ${t}` : t))} />
           </span>
           {q && (
             <button

@@ -103,9 +103,35 @@ export const POST = withErrorHandler(async (_req: Request, ctx: RouteContext) =>
     });
   }
 
-  if (!entry.url) throw new HttpError("Entry has no URL to summarize", 400);
-  const vid = youtubeVideoId(entry.url);
-  if (!vid) throw new HttpError("Not a YouTube entry", 400);
+  // Generic content path — use entry.body if it has substantial
+  // text (≥ 200 chars).  This unlocks summarisation for skills /
+  // ideas / portfolio / documents / any category whose body the
+  // user has filled out, not just YouTube.  YouTube falls through
+  // to the transcript flow below.
+  const vid = entry.url ? youtubeVideoId(entry.url) : null;
+  if (!vid && entry.body && entry.body.trim().length >= 200) {
+    const rawTheses = summarize(entry.body, 5);
+    if (rawTheses.length === 0) {
+      throw new HttpError("Не удалось выделить тезисы из текста", 422);
+    }
+    let finalTheses = rawTheses;
+    let translatedFlag = false;
+    if (!looksRussian(rawTheses[0])) {
+      finalTheses = await translateArrayToRussian(rawTheses);
+      translatedFlag = true;
+    }
+    const m = { ...(entry.metadata ?? {}), summary: finalTheses, summarySource: "extractive-body" };
+    await updateEntry(id, { metadata: m });
+    return NextResponse.json({
+      summary: finalTheses,
+      cached: false,
+      translated: translatedFlag,
+      source: "extractive-body",
+    });
+  }
+
+  if (!entry.url) throw new HttpError("Entry has no URL or body to summarize", 400);
+  if (!vid) throw new HttpError("Not a YouTube entry and body is too short", 400);
 
   const transcript = await fetchYouTubeTranscript(vid);
   if (!transcript) {
