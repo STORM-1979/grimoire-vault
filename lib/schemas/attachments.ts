@@ -8,7 +8,7 @@ import { z } from "zod";
  * below.
  */
 
-export const attachmentKindSchema = z.enum(["image", "video", "link", "note", "file"]);
+const attachmentKindSchema = z.enum(["image", "video", "link", "note", "file"]);
 
 /**
  * URL validator that accepts absolute http(s) URLs OR our internal
@@ -82,4 +82,3 @@ export const reorderAttachmentsSchema = z.object({
 
 export type CreateAttachmentInput = z.infer<typeof createAttachmentSchema>;
 export type UpdateAttachmentInput = z.infer<typeof updateAttachmentSchema>;
-export type ReorderAttachmentsInput = z.infer<typeof reorderAttachmentsSchema>;

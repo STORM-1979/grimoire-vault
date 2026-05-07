@@ -45,4 +45,3 @@ export const importPayloadSchema = z.object({
   credentials: z.array(credentialRowSchema).max(5000).default([]),
 }).passthrough();
 
-export type ImportPayload = z.infer<typeof importPayloadSchema>;

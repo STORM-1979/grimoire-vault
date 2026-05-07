@@ -28,7 +28,7 @@ const KOME_TIMEOUT_MS = 8_000;
 const TRANSCRIPT_ERROR_PATTERN =
   /transcripts?\s+(?:for\s+this\s+video\s+)?(?:are|is)\s+unavailable|publisher\s+may\s+have\s+restricted|we\s+apologi[sz]e\s+for|no\s+transcripts?\s+(?:are\s+)?available|captions?\s+(?:are\s+)?(?:disabled|unavailable)|this\s+video\s+does\s+not\s+have|transcript\s+not\s+found|стенограммы?\s+.*?недоступн/i;
 
-export function looksLikeTranscriptError(text: string): boolean {
+function looksLikeTranscriptError(text: string): boolean {
   if (!text) return false;
   if (text.length > 1200) return false;
   return TRANSCRIPT_ERROR_PATTERN.test(text);

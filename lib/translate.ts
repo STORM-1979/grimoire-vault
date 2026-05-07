@@ -76,7 +76,7 @@ async function tryMyMemory(text: string): Promise<string | null> {
 }
 
 /** Translate a single string to Russian.  Returns null if both providers fail. */
-export async function translateToRussian(text: string): Promise<string | null> {
+async function translateToRussian(text: string): Promise<string | null> {
   if (!text?.trim()) return null;
   const fromGoogle = await tryGoogleTranslate(text);
   if (fromGoogle) return fromGoogle;

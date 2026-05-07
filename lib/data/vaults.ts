@@ -80,15 +80,6 @@ export async function getVault(vaultId: string): Promise<Vault | null> {
   return { id: data.id, name: data.name, ownerId: data.owner_id, createdAt: data.created_at };
 }
 
-export async function isMember(vaultId: string, userId: string): Promise<{ role: "owner" | "editor" } | null> {
-  const svc = createServiceClient();
-  const { data, error } = await svc
-    .from("vault_members").select("role")
-    .eq("vault_id", vaultId).eq("user_id", userId).maybeSingle();
-  if (error || !data) return null;
-  return { role: data.role as "owner" | "editor" };
-}
-
 export async function listMembers(vaultId: string): Promise<VaultMember[]> {
   // Read members via RLS-scoped client first (membership check is automatic).
   const supabase = await createClient();

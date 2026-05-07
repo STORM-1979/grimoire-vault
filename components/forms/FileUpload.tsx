@@ -11,7 +11,7 @@ import { compressImage } from "@/lib/image-compress";
  * itself fails (e.g. unsupported MIME) — that way the user doesn't have
  * to retype after fixing the issue.
  */
-export interface FileMeta {
+interface FileMeta {
   name: string;
   size: number;
   type: string;

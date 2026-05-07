@@ -93,18 +93,6 @@ export async function compressImage(
   return new File([blob], renamed, { type: blob.type, lastModified: Date.now() });
 }
 
-/**
- * @deprecated  Kept as a thin alias for callers that only want
- * compression to kick in when the source is over the cap.  New
- * call-sites should use `compressImage` directly.
- */
-export async function compressImageIfNeeded(
-  file: File,
-  opts: CompressOptions & { targetBytes: number },
-): Promise<File> {
-  return compressImage(file, opts);
-}
-
 /* ----------------------------- internals --------------------------- */
 
 async function loadBitmap(file: File): Promise<ImageBitmap> {

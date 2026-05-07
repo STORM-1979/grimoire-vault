@@ -9,7 +9,10 @@
  * - PBKDF2 iterations = 600,000 (OWASP 2024 recommendation for SHA-256).
  */
 
-export const PBKDF2_ITERATIONS = 600_000;
+// Internal — used only as the default for deriveKey().  External
+// callers should rely on the function default rather than reading
+// the constant.
+const PBKDF2_ITERATIONS = 600_000;
 const KEY_LENGTH = 256; // bits
 
 /* ---------- base64 helpers (URL-safe-agnostic, regular base64) ---------- */

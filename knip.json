@@ -1,0 +1,14 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "ignore": [
+    "clipper/**",
+    "public/sw.js",
+    "scripts/debug-*.mjs",
+    "scripts/e2e-*.mjs",
+    "scripts/r2-setup.mjs"
+  ],
+  "ignoreDependencies": [
+    "server-only",
+    "playwright"
+  ]
+}

@@ -7,7 +7,6 @@ export const searchQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(25),
 });
 
-export type SearchQuery = z.infer<typeof searchQuerySchema>;
 
 /**
  * POST body for semantic search — the query embedding is computed in the
@@ -30,4 +29,3 @@ export const semanticSearchSchema = z.object({
   mode: z.enum(["semantic", "hybrid"]).default("hybrid"),
 });
 
-export type SemanticSearchBody = z.infer<typeof semanticSearchSchema>;

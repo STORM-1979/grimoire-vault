@@ -91,10 +91,3 @@ export async function embedQuery(query: string): Promise<number[]> {
   return Array.from(out.data as Float32Array);
 }
 
-/**
- * Whether the model has finished loading.  Used by UI to show a
- * "preparing semantic search…" state instead of stalling on first call.
- */
-export function isEmbedderReady(): boolean {
-  return pipelinePromise !== null;
-}

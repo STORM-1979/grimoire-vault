@@ -124,11 +124,3 @@ export async function findUserByChatId(chatId: number): Promise<TelegramSession 
   return data ? rowToSession(data) : null;
 }
 
-export async function setSessionState(userId: string, state: Record<string, unknown>): Promise<void> {
-  const svc = createServiceClient();
-  const { error } = await svc
-    .from("telegram_sessions")
-    .update({ state })
-    .eq("user_id", userId);
-  if (error) throw new DataError(error.message, 500);
-}

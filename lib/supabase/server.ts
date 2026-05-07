@@ -62,14 +62,3 @@ export function createServiceClient(): SupabaseClient {
   return _serviceClient;
 }
 
-/**
- * Supavisor pooler URL for direct Postgres connections.
- * Format: postgres://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres
- *
- * Use this when you need raw SQL (LISTEN/NOTIFY, COPY, advanced CTEs)
- * that PostgREST doesn't expose. Leave undefined unless explicitly needed
- * — Supabase JS via REST is sufficient for everything in this app.
- */
-export function getPoolerUrl(): string | undefined {
-  return process.env.SUPABASE_DB_POOLER_URL;
-}

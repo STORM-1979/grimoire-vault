@@ -15,7 +15,7 @@
  */
 import "server-only";
 import {
-  S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand,
+  S3Client, PutObjectCommand, GetObjectCommand,
   ListObjectsV2Command, DeleteObjectsCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -47,7 +47,7 @@ export function r2(): S3Client {
 /* ---------- Key helpers (path layout) ---------- */
 export type AssetKind = "originals" | "covers" | "thumbs";
 
-export function buildKey(userId: string, kind: AssetKind, fileName: string): string {
+function buildKey(userId: string, kind: AssetKind, fileName: string): string {
   // Drop directory traversal & null bytes; keep last segment
   const safe = fileName.replace(/[\x00-\x1f]/g, "").split(/[\\/]/).pop() ?? "file";
   // Slug: lowercase, replace whitespace with -, keep alnum + - _ .
@@ -99,14 +99,6 @@ export async function presignUpload(opts: {
 /** Stream a stored object back to the user. Used by /api/r2/object/[...key]. */
 export async function getObjectStream(key: string) {
   return r2().send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
-}
-
-export async function headObject(key: string) {
-  return r2().send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }));
-}
-
-export async function deleteObject(key: string) {
-  return r2().send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
 }
 
 /**
@@ -170,7 +162,7 @@ export async function getObjectBytes(key: string): Promise<Uint8Array> {
 }
 
 /* ---------- Public reads via own proxy ---------- */
-export const PUBLIC_BASE = "/api/r2/object";
+const PUBLIC_BASE = "/api/r2/object";
 
 /** Convert a stored R2 key into the URL the browser should request. */
 export function publicUrl(key: string): string {
@@ -180,7 +172,7 @@ export function publicUrl(key: string): string {
 }
 
 /* ---------- Validation ---------- */
-export const ALLOWED_KINDS: AssetKind[] = ["originals", "covers", "thumbs"];
+const ALLOWED_KINDS: AssetKind[] = ["originals", "covers", "thumbs"];
 
 /**
  * MIME allowlist per kind.
@@ -199,7 +191,7 @@ export const ALLOWED_KINDS: AssetKind[] = ["originals", "covers", "thumbs"];
  *   • Old .doc / .xls / .ppt have separate MIMEs from their .docx / .xlsx
  *     siblings; users may upload either.
  */
-export const ALLOWED_MIME: Record<AssetKind, string[]> = {
+const ALLOWED_MIME: Record<AssetKind, string[]> = {
   thumbs: ["image/webp", "image/jpeg", "image/png", "image/avif", "image/gif"],
   covers: ["image/webp", "image/jpeg", "image/png", "image/avif", "image/gif"],
   originals: [
@@ -245,7 +237,7 @@ export const ALLOWED_MIME: Record<AssetKind, string[]> = {
  * other unknown MIME.  We trust the extension here because R2 is private
  * and we've already auth-gated the route.
  */
-export const ALLOWED_EXT: Record<AssetKind, string[]> = {
+const ALLOWED_EXT: Record<AssetKind, string[]> = {
   thumbs: ["webp", "jpg", "jpeg", "png", "avif", "gif"],
   covers: ["webp", "jpg", "jpeg", "png", "avif", "gif"],
   originals: [
@@ -261,7 +253,7 @@ export const ALLOWED_EXT: Record<AssetKind, string[]> = {
   ],
 };
 
-export const MAX_BYTES: Record<AssetKind, number> = {
+const MAX_BYTES: Record<AssetKind, number> = {
   thumbs: 5 * 1024 * 1024,        // 5 MB
   covers: 10 * 1024 * 1024,       // 10 MB
   originals: 100 * 1024 * 1024,   // 100 MB

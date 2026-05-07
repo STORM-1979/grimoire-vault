@@ -199,22 +199,3 @@ export interface KanbanCard {
   updatedAt: string;
 }
 
-export interface ImportLog {
-  id: string;
-  userId: string;
-  sourceType: "youtube" | "pdf" | "html" | "manual" | "telegram" | "image" | "url";
-  sourceUrl?: string | null;
-  manifest?: Record<string, unknown> | null;
-  status: "pending" | "success" | "partial" | "failed";
-  errors?: Record<string, unknown> | null;
-  entryId?: string | null;
-  createdAt: string;
-}
-
-/**
- * Convenience type: Entry decorated for UI display
- * — what most cards/modals receive.
- */
-export type EntryView = Entry & {
-  category: Category;
-};

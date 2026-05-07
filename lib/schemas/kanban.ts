@@ -7,12 +7,12 @@ import { categoryIdSchema } from "./entries";
  * passes — defaults are preserved by the client-side hook, custom
  * slugs are derived from the column name on creation.
  */
-export const kanbanColumnSchema = z
+const kanbanColumnSchema = z
   .string()
   .min(1)
   .max(40)
   .regex(/^[a-z0-9_-]+$/i, "Column slug must be alphanumeric with - or _");
-export const prioritySchema = z.enum(["low", "medium", "high"]);
+const prioritySchema = z.enum(["low", "medium", "high"]);
 
 const tagList = z.array(z.string().min(1).max(40)).max(20).default([]);
 

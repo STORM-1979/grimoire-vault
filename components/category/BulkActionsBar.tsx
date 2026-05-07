@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Icon } from "@/components/icons/Icon";
-import { CATEGORIES, getCategory } from "@/lib/categories";
+import { CATEGORIES } from "@/lib/categories";
 import type { CategoryId } from "@/lib/types";
 
 interface Props {
@@ -172,7 +172,3 @@ export function BulkActionsBar({
   );
 }
 
-/** Helper used by CategoryView for the "select all" toggle UX. */
-export function getCategoryName(id: CategoryId): string {
-  return getCategory(id)?.en ?? id;
-}

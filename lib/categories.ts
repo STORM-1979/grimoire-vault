@@ -37,14 +37,6 @@ export function isVideoCategory(id: CategoryId) {
   return id === "youtube";
 }
 
-export function isCredentialsCategory(id: CategoryId) {
-  return id === "credentials";
-}
-
-export function isKanbanCategory(id: CategoryId) {
-  return id === "kanban";
-}
-
 /**
  * User-defined collections (sub-folders) are exposed for every
  * category EXCEPT Kanban (its own column structure is the
@@ -75,7 +67,8 @@ export function categorySupportsCollections(id: CategoryId): boolean {
  * Russian names because the rest of the UI is Russian; collection
  * slugs are auto-derived server-side.
  */
-export const DEFAULT_COLLECTIONS: Partial<Record<CategoryId, string[]>> = {
+// Internal — exposed via defaultCollectionsFor() helper below.
+const DEFAULT_COLLECTIONS: Partial<Record<CategoryId, string[]>> = {
   documents: ["Договоры", "Чеки", "Инструкции", "Отчёты", "Налоги", "Личное"],
   web: ["Прочитать позже", "Туториалы", "Инструменты", "Референсы", "Вдохновение", "Закладки"],
   youtube: ["Курсы", "Tech-обзоры", "Туториалы", "Развлечения", "Документалки", "Подкасты"],

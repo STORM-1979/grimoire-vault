@@ -4,11 +4,6 @@ import { createClient } from "@/lib/supabase/server";
 import { DataError } from "@/lib/errors";
 import { log } from "@/lib/log";
 
-/** Standard JSON error response. */
-export function jsonError(message: string, status = 400, extra?: Record<string, unknown>) {
-  return NextResponse.json({ error: message, ...extra }, { status });
-}
-
 /** Resolve current user or 401. */
 export async function requireUser() {
   const supabase = await createClient();

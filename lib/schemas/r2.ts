@@ -7,4 +7,3 @@ export const presignUploadSchema = z.object({
   contentLength: z.number().int().min(1).max(200 * 1024 * 1024),
 }).strict();
 
-export type PresignUploadInput = z.infer<typeof presignUploadSchema>;

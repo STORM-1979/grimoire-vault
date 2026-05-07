@@ -57,7 +57,7 @@ const STOPWORDS_RU = new Set([
 ]);
 
 /** Tokenize source into best-effort sentences. */
-export function splitSentences(text: string): string[] {
+function splitSentences(text: string): string[] {
   // Treat newlines as soft separators for caption segments without
   // punctuation. Then split on . ! ? followed by space + capital, plus
   // long-pause em-dashes.

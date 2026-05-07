@@ -23,7 +23,7 @@ import { createHash } from "node:crypto";
  * Returns null for non-http(s) inputs so the caller can fall back to a
  * title-based hash.
  */
-export function normalizeUrl(input: string): string | null {
+function normalizeUrl(input: string): string | null {
   let u: URL;
   try { u = new URL(input.trim()); } catch { return null; }
   if (u.protocol !== "http:" && u.protocol !== "https:") return null;
