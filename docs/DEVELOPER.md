@@ -678,3 +678,167 @@ Bump `VERSION` constant в `public/sw.js`.  Браузер скачает нов
 
 История того, что строилось — в [`PROJECT-STORY.md`](./PROJECT-STORY.md).
 Полный список фичей с описанием — в [`CHANGELOG.md`](./CHANGELOG.md).
+
+---
+
+## 18. Архитектурные паттерны последних волн (22–25)
+
+Эти паттерны новые и стоит понимать прежде чем расширять
+соответствующий код.
+
+### 18.1 ThemedSelect — общий тёмный дропдаун
+
+`components/forms/ThemedSelect.tsx` — generic-замена нативного
+`<select>`.  Принимает `options: SelectOption[]` и стандартный
+`value/onChange`.  Используется в:
+
+- `EditKanbanModal` (Колонка / Приоритет / Связь с категорией)
+- `AddKanbanModal` (то же)
+- `AddItemModal` / `EditEntryModal` для prompts (поле «Модель»)
+- `CollectionSelect` использует тот же UX-паттерн (открытие, ESC,
+  ArrowUp/Down/Enter, mousedown-select), но с депт-вложенностью
+
+Не ходит через portal — рендерится `absolute` относительно
+обёртки.  Если когда-нибудь понадобится в overflow-clip
+контексте — переписать на portal или фиксированное позиционирование.
+
+### 18.2 Sort + tag pipeline в `CategoryView`
+
+Композиция фильтров строго по порядку:
+
+```
+items → collectionFiltered → tagFiltered → sorted → pinned/others
+```
+
+- `collectionFiltered` — берёт `selectedCollection` из
+  `CollectionsTabs`, использует BFS по `parentId`-дереву чтобы
+  выбрать дескендантов (родительская коллекция включает суб-).
+- `tagFiltered` — фильтр по `selectedTag`, активен только в режиме
+  `sortMode === "tags"`.
+- `sorted` — `useMemo([filtered, sortMode])` с пятью режимами,
+  RU-aware `localeCompare("ru", { sensitivity: "base" })`.
+
+Состояние сортировки персистится в localStorage пер-категория
+(`grimoire:sort:<categoryId>`).  При смене режима с «tags» на любой
+другой — `selectedTag` сбрасывается автоматически.
+
+### 18.3 Image compression pipeline
+
+`lib/image-compress.ts` использует Canvas API без внешних
+зависимостей.  Ключевые решения:
+
+- **`createImageBitmap` с `imageOrientation: "from-image"`** — EXIF
+  orientation применяется к битмапу до отрисовки.  Старые браузеры
+  без опции деградируют до raw orientation, не критично.
+- **OffscreenCanvas с fallback на HTMLCanvasElement** — первый
+  быстрее (можно мигрировать в Web Worker позже), второй для совсем
+  старых браузеров.
+- **Try WebP, fallback to JPEG** — некоторые Safari-сборки
+  отказываются от `convertToBlob({ type: "image/webp" })` на
+  OffscreenCanvas.
+- **Always-recompress with size guard** — `compressImage()` всегда
+  пытается re-encode raster, но если результат больше оригинала —
+  возвращает оригинал.  Net loss never.
+
+API: `compressImage(file, { targetBytes?, maxDim?, quality?, onStep? })`.
+Без `targetBytes` — одна попытка с дефолтами.  С `targetBytes` —
+адаптивная цепочка: quality 0.82 → 0.4, потом dim ×0.75 до floor 480px.
+
+### 18.4 Kanban realtime — debounce + quiet window
+
+В `lib/hooks/useKanban.ts` две защиты от каскада postgres_changes
+событий:
+
+1. **Coalescing scheduler** (`REFETCH_DEBOUNCE_MS = 400`) —
+   `scheduleRefetch()` использует один shared timer, перезапускает
+   при каждом событии.
+2. **Local-write quiet window** (`LOCAL_WRITE_QUIET_MS = 1500`) —
+   `markLocalWrite()` ставит `localWriteUntil = Date.now() + 1500`
+   перед каждой мутацией.  Realtime handler игнорирует события если
+   `Date.now() < localWriteUntil`.
+
+Каждая мутация (`create`, `update`, `remove`, `moveCard`) обязана
+вызвать `markLocalWrite()` ПЕРЕД API-вызовом.  Иначе echo-cascade
+прилетит и перезапишет оптимистичный апдейт промежуточным
+состоянием.
+
+`update()` теперь делает **полноценный optimistic patch** локального
+состояния (раньше был только API call) — необходимо потому что
+quiet window блокирует refetch.  Без локального патча UI бы 1.5 с
+показывал старое состояние.
+
+### 18.5 Custom Kanban columns без миграции
+
+Паттерн «слаги фиксированы в БД, имена редактируемы локально»:
+
+- `kanban_cards.column_name` остался `text` (был enum в Zod, теперь
+  `[a-z0-9_-]{1,40}`).  DB допускает любой слаг.
+- Кастомные колонки — массив `{ slug, name }` в localStorage
+  (`grimoire:kanban:custom-cols`).
+- Имена дефолтных колонок — отдельная мапа в localStorage
+  (`grimoire:kanban:default-names`), позволяет переименовать
+  Backlog/Doing/Done без ломки внутренних слагов.
+- При computeColumns: defaults (с применённым override-именем) +
+  customColumns + orphan slugs (найденные в `board[slug]` но
+  отсутствующие в обоих списках, рендерятся со слагом как именем).
+
+Trade-off: пустая custom-колонка не переживает clear-storage / другое
+устройство.  Колонка с хотя бы одной карточкой — выживает через
+`column_name` в Postgres.  Если когда-то понадобится cross-device
+parity — отдельная таблица `kanban_columns` (миграция готова в
+голове, не реализована).
+
+### 18.6 ProjectPanel pattern
+
+`components/entry/ProjectPanel.tsx` — пример «category-specific
+detail panel» на entry detail page.  Условие в
+`app/(app)/entry/[id]/page.tsx`:
+
+```tsx
+{entry.categoryId === "portfolio" && <ProjectPanel entry={entry} />}
+```
+
+Внутри:
+- `entry.body` — ТЗ (textarea с debounced autosave 800 мс)
+- `entry.metadata.vercelUrl / gitUrl / dbUrl` — quick links
+- `entry.metadata.extraLinks: { label, url }[]` — custom links
+- `entry.metadata.creds: { label, value }[]` — passwords (plaintext,
+  не E2E)
+
+Все мутации идут через `entriesApi.update(id, { body?, metadata? })`.
+Метаданные **всегда отправляются объектом целиком** (с merge), чтобы
+очистка поля реально очищала на сервере.
+
+Если когда-то понадобится подобная панель для другой категории —
+паттерн копируется: новый компонент, условный рендер на entry detail
+page, поля в metadata.  Это легче чем тащить per-category поля в
+саму схему `entries`.
+
+### 18.7 Auto-translate via Google gtx
+
+`lib/translate-client.ts` использует unofficial endpoint
+`translate.googleapis.com/translate_a/single?client=gtx`.  Стабилен
+годами, CORS-friendly, без ключа.  5-секундный AbortController
+timeout.  При фейле возвращает оригинал — translation там лучше
+английского, английский лучше пустоты.
+
+Используется в:
+- `AddItemModal` extraction effect — переводит og:title и
+  og:description перед заполнением формы (если ≥30 % кириллицы — no-op)
+- `VideoSummary` — постпроцессинг тезисов LLM-извлечения
+- `translateArrayToRussianBrowser` — массовый параллельный перевод
+
+### 18.8 SW versioning для force-reload
+
+`public/sw.js` имеет VERSION в заголовочном комментарии (v2.x).
+При bump'е версии браузер видит новый файл и активирует SW; в
+`activate` event handler — `clients.matchAll() + navigate(c.url)`
+прогоняет force-reload по всем открытым вкладкам.
+
+Используем когда:
+- Меняется код, который пользователь точно должен подхватить (новые
+  компоненты, фиксы багов)
+- Service-worker fetch-стратегия меняется (passthrough vs cache)
+
+Не нужно при обычных deploy'ях — Vercel CDN с правильными
+Cache-Control headers сам обновит чанки на следующей навигации.

@@ -27,7 +27,7 @@
 
 A personal knowledge base built as a single-tenant web app:
 
-- **Thirteen categories** — Documents, Web Resources, YouTube, Local Data, Designs, Images, Skills, Prompts, Kanban, Ideas, Portfolio, Misc, **Credentials** (encrypted vault)
+- **Thirteen categories** — Documents, Web Resources, YouTube, Local Data, Designs, Images, Skills, Prompts, Kanban (custom columns), Ideas (tile grid), **Active Projects** (per-project ТЗ + creds workspace), Misc, **Credentials** (encrypted vault)
 - **Multi-device** — login on any browser, same data via Supabase Postgres + Realtime
 - **Drag-and-drop kanban** — `@dnd-kit` with touch + keyboard sensors
 - **Direct-to-R2 file uploads** — presigned PUT URLs, zero egress, browser-side WebP transcode for JPEG/PNG (~30-60% smaller payloads)

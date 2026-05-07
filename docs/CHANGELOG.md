@@ -8,7 +8,198 @@
 
 ---
 
-## Волна 21 · Завершающий sprint
+## Волна 25 · Active Projects + per-category UX (2026-05-07)
+
+Большой сессионный апдейт: пять категорий получили специализированный
+UX вместо общего шаблона, плюс косметика для глобальных контролов.
+
+### ⭐ Portfolio → «Активные проекты»
+Полный ребрендинг 11-й категории под лайфцикл проекта.
+
+- Переименование: en `Active Projects` / ru `Активные проекты`. Slug
+  остался `portfolio` — обратная совместимость с записями.
+- Новые поля при создании: **Vercel / прод-ссылка**, **GitHub /
+  репозиторий**, **БД / админ-панель**. Хранятся в `entry.metadata`,
+  никаких миграций схемы.
+- Шапка категории получила editable-кнопку «Открыть сайт с работами»
+  (URL хранится в localStorage `grimoire:portfolio:site-url`).
+- ⭐ Новый компонент **`ProjectPanel`** на `/entry/[id]` для проектных
+  записей: быстрые ссылки чипами, **ТЗ** в `entry.body` с автосейвом
+  через 800 мс, **дополнительные ссылки** массивом `metadata.extraLinks`,
+  **доступы и пароли** массивом `metadata.creds` (с eye-toggle и copy).
+- **Auto-fill из Vercel URL** — при вставке прод-ссылки отрабатывает
+  `/api/extract` (тот же пайплайн, что у Web), подтягиваются название и
+  описание (с переводом на русский), обложка из `og:image` либо из
+  Microlink-скриншота как fallback.
+
+### ⭐ Ideas → плиточная сетка
+Категория «Идеи» теперь рендерится 4-колоночной сеткой `aspect-square`
+плиток вместо плоского списка. Pinned — 3-колоночная `aspect-[4/3]`
+герой-сетка. Новый компонент `IdeaCard` с теми же ховер-actions, что и
+`MediaCard`. Pinterest-feel вместо todo-list.
+
+### Prompts UX
+- Порядок полей: **Название → Текст промпта → Ссылка → Модель → Теги**
+  (раньше URL был первым).
+- «Описание» переименовано в «Текст промпта» с textarea `min-h-[180px]`.
+- Селектор модели — новый `ThemedSelect` вместо нативного `<select>`,
+  больше никакого OS-белого-на-синем.
+- ⭐ **Hover-copy копирует промпт**, не URL. `copyTextFor(item)` для
+  prompts отдаёт `description`, для skills/ideas/portfolio/misc — `url`.
+
+### Skills UX
+- Поле «Источник» переименовано в «Ссылка» (необязательно).
+- ⭐ **Принимает полные shell-команды**: вставляешь
+  `npx skills add https://github.com/foo/bar --skill x` — поле
+  сохраняет всю строку, regex `https?://[^\s]+` достаёт URL внутри
+  для og:meta lookup. Zod-схема `looseUrl` расслаблена под текст с
+  http(s) URL внутри.
+
+### Ideas form order
+Та же логика, что у prompts: сначала название, потом описание, потом
+ссылка. Введён общий флаг `urlBelowDescription = isPrompt || isIdea`
+для будущих расширений.
+
+---
+
+## Волна 24 · Kanban evolution (2026-05-07)
+
+Канбан перестал быть «доской с тремя колонками».
+
+### ⭐ Edit cards
+Раньше карточку можно было только создать и удалить. Теперь:
+- Новая модалка **`EditKanbanModal`** (зеркало AddKanbanModal) с полем
+  «Прогресс (0–100)», которого не было в Add.
+- Карандаш-кнопка появляется на ховере карточки рядом с крестиком.
+- **Двойной клик по карточке** — тоже открывает редактирование.
+- Каждая ховер-кнопка делает `onPointerDown.stopPropagation()` — drag
+  не запускается при клике.
+
+### ⭐ Custom columns
+- Дефолтные `backlog/doing/done` остались (на их слаги ссылается код
+  стилизации), но добавились **пользовательские колонки** через
+  `useKanban`-хелперы `addColumn / renameColumn / removeColumn`.
+- В конце ряда — пунктирная плитка «+ Колонка», клик → inline-инпут.
+- При ховере на заголовок: 🖉 переименовать (любую) и × удалить
+  (только пустые кастомные).
+- **Дефолтные колонки тоже переименовываемы** — слаг остаётся, имя
+  меняется. Hidden split: custom names → `customColumns` массив,
+  default rename → `defaultNames` мапа в localStorage.
+
+### Anti-teleport fix
+Серверный `reorderKanban` шлёт N последовательных UPDATE при
+переносе карточки — каждый триггерит `postgres_changes` событие. Хук
+до фикса делал refetch на каждое и карточка «телепортировалась»
+между промежуточными состояниями.
+- **Debounce realtime refetch** на 400 мс — каскад из 10 апдейтов
+  схлопывается в один сетевой запрос.
+- **Quiet window 1.5 с** после локальной мутации — эхо своих писем
+  игнорируется, мы доверяем оптимистичному состоянию.
+- **Optimistic update в `update()`** — раньше там был только API-вызов,
+  теперь сразу патчит локальный board, включая cross-column move.
+
+### Themed selectors
+Все нативные `<select>` в Add/Edit модалках заменены на `ThemedSelect`:
+Колонка / Приоритет / Связь с категорией. Категории заполняются из
+`CATEGORIES` (kanban исключён — связь канбана с собой не имеет смысла),
+формат `«05 · Дизайны»` с английским как hint.
+
+### Shared options
+`components/forms/kanban-options.ts` — единый источник `COLUMN_OPTS`,
+`PRIORITY_OPTS`, `CATEGORY_OPTS`. Add/Edit модалки не могут разъехаться.
+
+---
+
+## Волна 23 · Image pipeline (2026-05-07)
+
+Сжатие картинок на клиенте, без новых зависимостей.
+
+### ⭐ Always-recompress raster uploads
+- `lib/image-compress.ts` — Canvas-based компрессор. Использует
+  `createImageBitmap` (с EXIF orientation hint) + `OffscreenCanvas`,
+  fallback на обычный `<canvas>`.
+- **Всегда** пересжимаем JPEG / PNG / BMP / TIFF в WebP, не только
+  при превышении лимита. Скриншоты PNG обычно ужимаются в 3–4 раза.
+- Если результат WebP вышел больше оригинала (бывает на крошечных
+  иконках) — оставляем оригинал. Net loss never.
+- Адаптивная стратегия при `targetBytes`: quality 0.82 → 0.4 шагами
+  по 0.1, потом размеры ×0.75 до floor 480px.
+- WebP / AVIF / GIF / SVG пропускаются (re-encode либо бесполезен,
+  либо ломает анимацию/вектор).
+
+### ⭐ Format-aware card chip + file weight
+- На `MediaCard` чип в углу теперь читает реальное расширение из URL
+  (`webp / png / jpeg / gif / …`) вместо hardcoded `webp`.
+- `entry.sizeBytes` + `sizeLabel` пишутся при аплоаде; чип на
+  карточке показывает `WEBP · 412 KB`. Старые записи без размера
+  просто скрывают вес.
+
+### Better error messages
+- **HEIC** (iPhone) теперь даёт явное сообщение «HEIC не поддерживается
+  браузером — сохрани как JPEG или PNG», вместо немой 10MB-ошибки.
+- File-extension fallback для пустых MIME (drag-drop с octet-stream).
+
+### URL input fix
+Раньше `<input type="url">` на полях обложки ругался на наши
+`/api/r2/object/...` пути (HTML5 валидация требует абсолютный
+scheme). Сменено на `type="text"`, Zod продолжает валидировать
+формат серверно.
+
+---
+
+## Волна 22 · Quality of life UX (2026-05-07)
+
+Куча мелких удобств для повседневного использования.
+
+### ⭐ Sort control
+Pill-кнопка в шапке списка категории. Режимы: Новые / Старые / А–Я /
+Я–А / **По тегам**. Выбор персистится в localStorage пер-категория
+(`grimoire:sort:<categoryId>`).
+
+### ⭐ Tag picker
+При выборе режима «По тегам» появляется ряд чипов со всеми тегами в
+текущем скоупе и их количеством записей. Клик — фильтрует список до
+карточек с этим тегом. Счётчики суммируются с «Все · N».
+
+### ⭐ Hover-copy on text-first cards
+В `ItemActions` появилась кнопка «скопировать» при ховере на
+карточке. Активна для skills / prompts / ideas / portfolio / misc —
+там, где в `url` свободный текст или промпт. Иконка copy → check на
+1.4 секунды как подтверждение, fallback на `execCommand("copy")` для
+старых браузеров. Для prompts копирует description (текст промпта),
+для остальных — url.
+
+### ⭐ Auto-translate extracted meta to RU
+`extractApi.fromUrl` теперь прогоняет `meta.title` и `meta.description`
+через `translateToRussianBrowser` перед заполнением формы. Не-русский
+автоматически переводится Google Translate gtx (key-less, CORS-friendly).
+RU-источники не трогаются (≥30 % кириллицы → no-op).
+
+### Embedded URL extraction
+Если в URL-поле text-first категории вставлен текст с http(s) URL
+внутри (shell command, цитата) — `https?://[^\s]+` извлекает первый
+URL для og:meta fetch. Сам текст остаётся в поле как есть.
+
+### 409 self-heal for collections
+Все три create-пути коллекций (одиночный chip, «создать всё», ручной
+ввод) на 409 «Коллекция с таким названием уже есть» теперь не падают
+с ошибкой, а тихо перечитывают список с сервера. Старая ошибка била
+по UX когда несколько вкладок / гонка состояний.
+
+### Microlink screenshot fallback
+Раньше WordPress mShots возвращал permanent placeholder для сайтов,
+которые их краулер не пробивал. Заменено на Microlink (синхронный,
+сразу возвращает PNG через `embed=screenshot.url`). Используется для
+Designs (когда нет og:image) и Active Projects (как Vercel-fallback).
+
+### Vercel git integration
+Подключён auto-deploy из GitHub. Раньше каждый push требовал ручного
+`vercel --prod`. Теперь push в `main` автоматически собирает
+production-деплой; ветки → preview-деплои.
+
+---
+
+
 
 ### ⭐ Shared vaults
 Семейные / командные vault'ы.  Создатель (owner) приглашает участников
@@ -377,7 +568,7 @@ Email magic-link + password.  Middleware (`middleware.ts`)
 
 ---
 
-## Самые полезные фичи для ежедневного использования (топ-10)
+## Самые полезные фичи для ежедневного использования (топ-15)
 
 1. ⭐ **Telegram bot capture** — переслал ссылку → она в правильной категории через 2 секунды
 2. ⭐ **Inbox triage** — daily ритуал «к нулю» через one-click confirm/move/delete
@@ -389,14 +580,24 @@ Email magic-link + password.  Middleware (`middleware.ts`)
 8. ⭐ **Web Push на телефон** — нативные уведомления о новых записях
 9. ⭐ **Export ZIP** — полный self-contained backup
 10. ⭐ **Shared vaults** — для семьи / команды
+11. ⭐ **Sort + tag picker** — переключение режимов сортировки и фильтр по тегу одним кликом
+12. ⭐ **Auto-image-compress** — фотки с DSLR/телефона ужимаются в WebP при загрузке
+13. ⭐ **Hover-copy для промптов** — клик по карточке кладёт текст промпта в буфер
+14. ⭐ **Active Projects panel** — ТЗ + ссылки + креды на странице каждого проекта
+15. ⭐ **Custom Kanban columns** — добавляй колонки помимо Backlog/Doing/Done
 
-## Productivity-fenuremenu для power-users (топ-5)
+## Productivity-features для power-users (топ-10)
 
 1. **Vim keyboard nav** — j/k/E/P/X/Enter/?/Esc на любом списке
 2. **Semantic search** — описательные запросы вместо ключевых слов
 3. **og: auto-fill** — paste URL → title/desc/thumb автозаполнятся
 4. **Cross-channel dedup** — никакого дублирования через web/⌘K/bot
 5. **Realtime collaboration** — если в shared vault два человека, видят changes мгновенно
+6. **Auto-translate extracted meta** — английский og:title переводится в русский на лету
+7. **Embedded URL extraction** — paste shell-command, URL внутри подхватится автоматически
+8. **Adaptive image compression** — quality/dimension steps пока не влезет в лимит
+9. **Kanban anti-teleport** — debounce + quiet-window, drag всегда плавный
+10. **Vercel og auto-fill для проектов** — paste прод-ссылку, всё заполнится
 
 ---
 
