@@ -172,7 +172,18 @@ export function useEntries({ categoryId, initialData = [] }: UseEntriesOptions =
         ? input
         : { ...input, vaultId: activeVaultId };
       const created = await entriesApi.create(enriched);
-      setItems((prev) => prev.map((it) => (it.id === optimistic.id ? created : it)).sort(sortFn.current));
+      // Race-safe replace.  In the gap between starting the API call
+      // and getting the response, the realtime INSERT subscription
+      // can deliver the real row (with the canonical id) and add it
+      // to state — its dedupe check against optimistic.id (a tmp-…
+      // string) doesn't match, so we end up with two rows in the UI:
+      // the optimistic one and the realtime-added real one.  Drop
+      // both the tmp row and any pre-existing duplicate with the
+      // canonical id, then prepend `created` exactly once.
+      setItems((prev) => {
+        const cleaned = prev.filter((it) => it.id !== optimistic.id && it.id !== created.id);
+        return [created, ...cleaned].sort(sortFn.current);
+      });
       // Background: compute + PATCH the embedding so semantic search picks
       // up the new entry.  Doesn't block the modal close / user feedback.
       void computeEmbeddingInBackground(created);
