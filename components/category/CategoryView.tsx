@@ -320,7 +320,17 @@ export function CategoryView({ category, initialItems }: Props) {
           <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-4 flex items-center gap-2">
             <Icon name="pin" size={14} /> Закреплено
           </div>
-          {isVideo ? (
+          {isTile ? (
+            <div className="grid grid-cols-4 gap-4">
+              {pinned.map((it) => (
+                <IdeaCard key={it.id} item={it} category={category} big
+                  selected={selectedId === it.id}
+                  bulkSelected={bulkIds.has(it.id)}
+                  onBulkToggle={toggleBulk}
+                  onTogglePin={togglePin} onDelete={remove} onEdit={setEditing} />
+              ))}
+            </div>
+          ) : isVideo ? (
             <div className="grid grid-cols-3 gap-5">
               {pinned.map((it) => (
                 <VideoCard key={it.id} item={it} big
@@ -334,16 +344,6 @@ export function CategoryView({ category, initialItems }: Props) {
             <div className="grid grid-cols-4 gap-4">
               {pinned.map((it) => (
                 <MediaCard key={it.id} item={it} big
-                  selected={selectedId === it.id}
-                  bulkSelected={bulkIds.has(it.id)}
-                  onBulkToggle={toggleBulk}
-                  onTogglePin={togglePin} onDelete={remove} onEdit={setEditing} />
-              ))}
-            </div>
-          ) : isTile ? (
-            <div className="grid grid-cols-4 gap-4">
-              {pinned.map((it) => (
-                <IdeaCard key={it.id} item={it} category={category} big
                   selected={selectedId === it.id}
                   bulkSelected={bulkIds.has(it.id)}
                   onBulkToggle={toggleBulk}
@@ -416,7 +416,17 @@ export function CategoryView({ category, initialItems }: Props) {
             })}
           </div>
         )}
-        {isVideo ? (
+        {isTile ? (
+          <div className="grid grid-cols-5 gap-3.5">
+            {others.map((it) => (
+              <IdeaCard key={it.id} item={it} category={category}
+                selected={selectedId === it.id}
+                bulkSelected={bulkIds.has(it.id)}
+                onBulkToggle={toggleBulk}
+                onTogglePin={togglePin} onDelete={remove} onEdit={setEditing} />
+            ))}
+          </div>
+        ) : isVideo ? (
           <div className="grid grid-cols-4 gap-5">
             {others.map((it) => (
               <VideoCard key={it.id} item={it}
@@ -430,16 +440,6 @@ export function CategoryView({ category, initialItems }: Props) {
           <div className="grid grid-cols-5 gap-4">
             {others.map((it) => (
               <MediaCard key={it.id} item={it}
-                selected={selectedId === it.id}
-                bulkSelected={bulkIds.has(it.id)}
-                onBulkToggle={toggleBulk}
-                onTogglePin={togglePin} onDelete={remove} onEdit={setEditing} />
-            ))}
-          </div>
-        ) : isTile ? (
-          <div className="grid grid-cols-5 gap-3.5">
-            {others.map((it) => (
-              <IdeaCard key={it.id} item={it} category={category}
                 selected={selectedId === it.id}
                 bulkSelected={bulkIds.has(it.id)}
                 onBulkToggle={toggleBulk}

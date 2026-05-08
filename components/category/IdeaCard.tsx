@@ -20,12 +20,16 @@ interface IdeaCardProps {
 }
 
 /**
- * Square tile for the Ideas category — gives an idea-board feel
- * (think Pinterest / sticky-notes wall) instead of the dense list
- * row ItemCard renders.  Layout: bulb icon + pin chip top-row,
+ * Universal tile renderer for every CategoryView-rendered list.
+ * Layout: category icon + pin chip top-row, optional preview strip,
  * title + description in the middle, tags + date at the bottom.
- * Aspect-square at default size; the `big` variant (used for pinned
- * entries) is taller to match other cards' pinned hero treatment.
+ *
+ * History: started life as the Ideas-only card (Pinterest / sticky-
+ * notes wall), then expanded to Skills/Tools, and as of this commit
+ * is the single tile used by every category that goes through
+ * CategoryView.  Categories with media (YouTube/Images/Designs/
+ * Portfolio) keep their thumbnail/cover visually via the optional
+ * preview strip below the icon row.
  */
 function IdeaCardImpl({
   item, category, big, selected, bulkSelected, onBulkToggle,
@@ -37,6 +41,14 @@ function IdeaCardImpl({
     : selected
     ? "ring-2 ring-gold ring-offset-2 ring-offset-emerald-deep"
     : "";
+
+  // Preview pulls from thumbUrl (YouTube / Web with og:image) first,
+  // falls back to coverUrl (Images / Designs / Portfolio uploads).
+  // Web entries intentionally skip the preview to keep the row clean
+  // — same rule as the row-style ItemCard had before tiles became
+  // universal.
+  const isWeb = category.id === "web";
+  const preview = !isWeb ? (item.thumbUrl || item.coverUrl || null) : null;
 
   const onClick = (e: React.MouseEvent) => {
     if (e.shiftKey && onBulkToggle) { e.preventDefault(); onBulkToggle(item.id, e); return; }
@@ -60,9 +72,9 @@ function IdeaCardImpl({
       )}
       <ItemActions item={item} onTogglePin={onTogglePin} onDelete={onDelete} onEdit={onEdit} />
 
-      {/* Top row: idea icon + pinned badge.  The bulb is bigger on
+      {/* Top row: category icon + pinned badge.  Sized larger on
           the `big` variant so the hero card reads at a glance. */}
-      <div className={`flex items-start justify-between ${big ? "mb-4" : "mb-3"}`}>
+      <div className={`flex items-start justify-between ${preview ? "mb-2" : big ? "mb-4" : "mb-3"}`}>
         <div className="text-emerald-200 group-hover:text-gold transition">
           <Icon name={category.icon} size={big ? 28 : 20} />
         </div>
@@ -70,6 +82,26 @@ function IdeaCardImpl({
           <Icon name="pinFilled" size={big ? 14 : 11} className="text-gold flex-shrink-0" />
         )}
       </div>
+
+      {/* Optional preview strip — keeps the visual richness for
+          YouTube thumbnails, og:image extracts, and uploaded covers
+          while the rest of the tile stays text-uniform across
+          categories.  16:9 to match the typical aspect of og:image
+          and YouTube; clipped via overflow + lazy-loaded so a long
+          list of cards doesn't hammer the network. */}
+      {preview && (
+        <div className={`relative w-full aspect-[16/9] rounded-lg overflow-hidden border border-white/10 mb-3 bg-emerald-deep/40`}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={preview}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="absolute inset-0 w-full h-full object-cover"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = "0"; }}
+          />
+        </div>
+      )}
 
       {/* Body: title + description.  Description wraps with a line
           clamp so a long one doesn't push the tags off the tile.
