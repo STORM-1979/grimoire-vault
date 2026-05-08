@@ -77,6 +77,16 @@ const SEED: Record<CategoryId, EntryTemplate[]> = {
   ],
   misc: [],
   credentials: [],
+  tools: [
+    { id: "tools-saas",
+      name: "SaaS / онлайн-сервис",
+      desc: "## Зачем\n…\n\n## Pricing\n— Free tier: …\n— Paid: …\n\n## Альтернативы\n- …",
+      tags: ["saas"] },
+    { id: "tools-cli",
+      name: "CLI / desktop-утилита",
+      desc: "## Установка\n```\n…\n```\n\n## Базовый workflow\n…\n\n## Почему именно она\n…",
+      tags: ["cli"] },
+  ],
 };
 
 function readAll(): Record<string, EntryTemplate[]> {

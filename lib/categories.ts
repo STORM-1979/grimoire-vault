@@ -21,6 +21,7 @@ export const CATEGORIES: Category[] = [
   { id: "portfolio",   no: "11", en: "Active Projects", ru: "Активные проекты", icon: "portfolio", ordering: 11 },
   { id: "misc",        no: "12", en: "Misc",          ru: "Разное",            icon: "misc",      ordering: 12 },
   { id: "credentials", no: "13", en: "Credentials",   ru: "Пароли и аккаунты", icon: "lock",      ordering: 13, secured: true },
+  { id: "tools",       no: "14", en: "Tools",         ru: "Инструменты",       icon: "tools",     ordering: 14 },
 ];
 
 const _byId = new Map<CategoryId, Category>(CATEGORIES.map((c) => [c.id, c]));
@@ -40,14 +41,14 @@ export function isVideoCategory(id: CategoryId) {
 /**
  * Categories that should render their entry list as a grid of square
  * tiles (idea-board feel) rather than the dense text-rows of
- * ItemCard.  Currently: Ideas (the original tile category) and
- * Skills (one-shot reference cards that scan better as tiles).
+ * ItemCard.  Currently: Ideas (the original tile category), Skills
+ * and Tools (one-shot reference cards that scan better as tiles).
  * Prompts/Misc stay row-based — Prompts has its own copy-affordance
  * UX optimised for the row layout, and Misc tends to have long
  * descriptions that read better in rows.
  */
 export function isTileCategory(id: CategoryId) {
-  return id === "ideas" || id === "skills";
+  return id === "ideas" || id === "skills" || id === "tools";
 }
 
 /**
@@ -93,6 +94,7 @@ const DEFAULT_COLLECTIONS: Partial<Record<CategoryId, string[]>> = {
   ideas: ["Продукт", "Бизнес", "Креатив", "Tech", "Личное", "Research"],
   portfolio: ["Web-приложения", "Mobile", "Open Source", "Клиентские", "Кейсы"],
   misc: ["Путешествия", "Еда", "Книги", "Хобби", "Здоровье", "Финансы"],
+  tools: ["AI", "Dev", "Дизайн", "Продуктивность", "DevOps", "Аналитика"],
 };
 
 export function defaultCollectionsFor(id: CategoryId): string[] {

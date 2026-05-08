@@ -19,6 +19,8 @@ const PATHS: Record<IconName, React.ReactNode> = {
   ideas:     <g><path d="M12 3a6 6 0 0 0-3 11v3h6v-3a6 6 0 0 0-3-11z" fill="none" strokeWidth="1.4"/><path d="M10 20h4M10 22h4" strokeWidth="1.4"/></g>,
   portfolio: <g><rect x="3" y="7" width="18" height="13" rx="1" fill="none" strokeWidth="1.4"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" fill="none" strokeWidth="1.4"/><path d="M3 12h18" strokeWidth="1.4"/></g>,
   misc:      <g><circle cx="6" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="18" cy="12" r="1.5" fill="currentColor"/></g>,
+  // Crossed wrench + screwdriver — universal "tools" glyph.
+  tools:     <g><path d="M14.5 6a3.5 3.5 0 0 0 4.4 4.4l2.6 2.6-3 3-2.6-2.6A3.5 3.5 0 0 1 11.5 9z" fill="none" strokeWidth="1.4" strokeLinejoin="round"/><path d="M4 18l8-8M5 5l3 3-1 1-3-3z" fill="none" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></g>,
   search:    <g><circle cx="11" cy="11" r="7" fill="none" strokeWidth="1.4"/><path d="M16 16l5 5" strokeWidth="1.4"/></g>,
   inbox:     <g><path d="M3 12h6l1 2h4l1-2h6" fill="none" strokeWidth="1.4"/><path d="M3 12V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5M3 12v6a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6" fill="none" strokeWidth="1.4"/></g>,
   settings:  <g><circle cx="12" cy="12" r="3" fill="none" strokeWidth="1.4"/><path d="M19 12c0 .5 0 1-.1 1.5l2 1.5-2 3.5-2.4-1c-.7.6-1.5 1-2.4 1.3l-.4 2.5h-4l-.4-2.5c-.9-.3-1.7-.7-2.4-1.3l-2.4 1-2-3.5 2-1.5C5.1 13 5 12.5 5 12s0-1 .1-1.5l-2-1.5 2-3.5 2.4 1c.7-.6 1.5-1 2.4-1.3l.4-2.5h4l.4 2.5c.9.3 1.7.7 2.4 1.3l2.4-1 2 3.5-2 1.5c.1.5.1 1 .1 1.5z" fill="none" strokeWidth="1.2"/></g>,
