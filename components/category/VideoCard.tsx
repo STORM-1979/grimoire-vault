@@ -91,18 +91,18 @@ function VideoCardImpl({ item, big, selected, bulkSelected, onBulkToggle, onTogg
           </div>
         )}
       </div>
-      <div className="mt-4 cursor-pointer" onClick={openInternal} title="Открыть запись">
-        <h4 className="font-display text-[19px] font-medium leading-tight text-ivory group-hover:text-emerald-200 transition">
+      <div className="mt-2.5 cursor-pointer" onClick={openInternal} title="Открыть запись">
+        <h4 className="font-display text-[15px] font-medium leading-tight text-ivory group-hover:text-emerald-200 transition line-clamp-2">
           {item.title}
         </h4>
         {item.description && (
-          <p className="text-[13px] text-ivory-dim mt-2 leading-snug font-light">{item.description}</p>
+          <p className="text-[12px] text-ivory-dim mt-1 leading-snug font-light line-clamp-2">{item.description}</p>
         )}
-        <div className="flex items-center justify-between mt-3">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {item.tags.slice(0, 3).map((t) => <span key={t} className="tag-soft">{t}</span>)}
+        <div className="flex items-center justify-between mt-2 gap-2">
+          <div className="flex items-center gap-1 flex-wrap min-w-0">
+            {item.tags.slice(0, 2).map((t) => <span key={t} className="tag-soft">{t}</span>)}
           </div>
-          <span className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute">
+          <span className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute flex-shrink-0">
             {formatDateTime(item.createdAt)}
           </span>
         </div>

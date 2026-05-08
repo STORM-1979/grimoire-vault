@@ -49,8 +49,8 @@ function IdeaCardImpl({
     <div
       data-entry-id={item.id}
       onClick={onClick}
-      className={`cat-card group block cursor-pointer relative rounded-xl border border-white/10 bg-gradient-to-br from-emerald-deep/70 via-emerald-deep/50 to-emerald-deep/70 p-5 transition hover:border-gold/40 hover:from-emerald-700/40 hover:to-emerald-deep/60 flex flex-col ${
-        big ? "aspect-[4/3] p-7" : "aspect-square"
+      className={`cat-card group block cursor-pointer relative rounded-xl border border-white/10 bg-gradient-to-br from-emerald-deep/70 via-emerald-deep/50 to-emerald-deep/70 transition hover:border-gold/40 hover:from-emerald-700/40 hover:to-emerald-deep/60 flex flex-col ${
+        big ? "p-5 min-h-[180px]" : "p-3.5 min-h-[120px]"
       } ${ring}`}
     >
       {bulkSelected && (
@@ -62,23 +62,23 @@ function IdeaCardImpl({
 
       {/* Top row: idea icon + pinned badge.  The bulb is bigger on
           the `big` variant so the hero card reads at a glance. */}
-      <div className="flex items-start justify-between mb-3">
+      <div className="flex items-start justify-between mb-2">
         <div className="text-emerald-200 group-hover:text-gold transition">
-          <Icon name={category.icon} size={big ? 36 : 28} />
+          <Icon name={category.icon} size={big ? 28 : 20} />
         </div>
         {item.pinned && (
-          <Icon name="pinFilled" size={big ? 16 : 13} className="text-gold flex-shrink-0" />
+          <Icon name="pinFilled" size={big ? 14 : 11} className="text-gold flex-shrink-0" />
         )}
       </div>
 
       {/* Body: title + description.  Description wraps with a line
           clamp so a long one doesn't push the tags off the tile. */}
       <div className="flex-1 min-h-0 flex flex-col">
-        <h4 className={`font-display font-medium leading-tight text-ivory ${big ? "text-[22px]" : "text-[16px]"} line-clamp-2 mb-2`}>
+        <h4 className={`font-display font-medium leading-tight text-ivory ${big ? "text-[18px]" : "text-[14px]"} line-clamp-2 mb-1.5`}>
           {item.title}
         </h4>
         {item.description && (
-          <p className={`text-ivory-dim leading-snug font-light ${big ? "text-[13px] line-clamp-4" : "text-[12px] line-clamp-3"}`}>
+          <p className={`text-ivory-dim leading-snug font-light ${big ? "text-[12px] line-clamp-3" : "text-[11px] line-clamp-2"}`}>
             {item.description}
           </p>
         )}
@@ -87,9 +87,9 @@ function IdeaCardImpl({
       {/* Footer: tags (max 2 on the small tile to save space) +
           created-at timestamp.  Mirrors MediaCard's bottom row so
           the visual rhythm across categories stays consistent. */}
-      <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-          {item.tags.slice(0, big ? 3 : 2).map((t) => (
+      <div className="mt-2 pt-2 border-t border-white/10 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1 flex-wrap min-w-0">
+          {item.tags.slice(0, big ? 2 : 1).map((t) => (
             <span key={t} className="tag-soft">{t}</span>
           ))}
         </div>

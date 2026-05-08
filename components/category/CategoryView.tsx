@@ -321,7 +321,7 @@ export function CategoryView({ category, initialItems }: Props) {
             <Icon name="pin" size={14} /> Закреплено
           </div>
           {isVideo ? (
-            <div className="grid grid-cols-2 gap-7">
+            <div className="grid grid-cols-3 gap-5">
               {pinned.map((it) => (
                 <VideoCard key={it.id} item={it} big
                   selected={selectedId === it.id}
@@ -331,7 +331,7 @@ export function CategoryView({ category, initialItems }: Props) {
               ))}
             </div>
           ) : isMedia ? (
-            <div className="grid grid-cols-3 gap-6">
+            <div className="grid grid-cols-4 gap-4">
               {pinned.map((it) => (
                 <MediaCard key={it.id} item={it} big
                   selected={selectedId === it.id}
@@ -341,7 +341,7 @@ export function CategoryView({ category, initialItems }: Props) {
               ))}
             </div>
           ) : isTile ? (
-            <div className="grid grid-cols-3 gap-5">
+            <div className="grid grid-cols-4 gap-4">
               {pinned.map((it) => (
                 <IdeaCard key={it.id} item={it} category={category} big
                   selected={selectedId === it.id}
@@ -351,7 +351,7 @@ export function CategoryView({ category, initialItems }: Props) {
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-3">
               {pinned.map((it) => (
                 <ItemCard key={it.id} item={it} category={category} large
                   selected={selectedId === it.id}
@@ -417,7 +417,7 @@ export function CategoryView({ category, initialItems }: Props) {
           </div>
         )}
         {isVideo ? (
-          <div className="grid grid-cols-3 gap-7">
+          <div className="grid grid-cols-4 gap-5">
             {others.map((it) => (
               <VideoCard key={it.id} item={it}
                 selected={selectedId === it.id}
@@ -427,7 +427,7 @@ export function CategoryView({ category, initialItems }: Props) {
             ))}
           </div>
         ) : isMedia ? (
-          <div className="grid grid-cols-4 gap-6">
+          <div className="grid grid-cols-5 gap-4">
             {others.map((it) => (
               <MediaCard key={it.id} item={it}
                 selected={selectedId === it.id}
@@ -437,7 +437,7 @@ export function CategoryView({ category, initialItems }: Props) {
             ))}
           </div>
         ) : isTile ? (
-          <div className="grid grid-cols-4 gap-5">
+          <div className="grid grid-cols-5 gap-3.5">
             {others.map((it) => (
               <IdeaCard key={it.id} item={it} category={category}
                 selected={selectedId === it.id}
@@ -447,7 +447,7 @@ export function CategoryView({ category, initialItems }: Props) {
             ))}
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {others.map((it) => (
               <ItemCard key={it.id} item={it} category={category}
                 selected={selectedId === it.id}
