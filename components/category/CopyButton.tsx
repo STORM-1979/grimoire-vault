@@ -5,40 +5,34 @@ import { Icon } from "@/components/icons/Icon";
 import type { Entry } from "@/lib/types";
 
 /**
- * Categories where the entry's primary value is something the user
- * wants to paste somewhere else: install commands, prompt text,
- * snippets.  Each gets an always-visible copy chip on its tile so
- * mobile / touch users (no hover) and one-handed flows ("just give
- * me the npx line") don't have to dig.
- *
- * Why a separate set from ItemActions's COPYABLE_CATEGORIES (now
- * removed): same idea, but the visibility model is different —
- * before it was "show on hover", now it's "always show", so it
- * makes sense to own the list here.
- */
-const COPYABLE_CATEGORIES = new Set([
-  "skills", "prompts", "ideas", "portfolio", "misc", "tools",
-]);
-
-/**
  * Pick the right field to copy for a given entry.
  *   • prompts → the prompt text itself (description) takes priority
  *     over the source link, because that's the artefact the user
  *     wants to paste into Claude / ChatGPT / etc.  Falls back to
  *     the URL when description is empty (rare).
- *   • everything else → the url field, which on text-first
- *     categories holds the install command / shell snippet / link.
+ *   • everything else → the url field, which on every other category
+ *     holds the canonical "thing to paste" — a YouTube link, a docs
+ *     URL, an npx install line, a Behance project, etc.
  */
 function copyTextFor(item: Pick<Entry, "categoryId" | "url" | "description">): string {
   if (item.categoryId === "prompts") {
     const desc = item.description?.trim();
     if (desc) return desc;
   }
-  return item.url ?? "";
+  return (item.url ?? "").trim();
 }
 
+/**
+ * Show the copy chip on any entry where there's actually something
+ * to copy.  Originally we had a whitelist of "text-first" categories
+ * but that punished rows in Web / YouTube / Documents / etc. where
+ * "copy this URL" is the most common follow-up action — by far.  No
+ * URL → no chip; otherwise it's free real estate.
+ *
+ * Kanban and Credentials use their own views and never call this,
+ * so we don't need to filter them out here.
+ */
 export function shouldShowCopy(item: Pick<Entry, "categoryId" | "url" | "description">): boolean {
-  if (!COPYABLE_CATEGORIES.has(item.categoryId)) return false;
   return copyTextFor(item).length > 0;
 }
 
