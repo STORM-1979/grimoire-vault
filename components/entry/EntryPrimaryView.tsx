@@ -127,27 +127,70 @@ export function EntryPrimaryView({
     );
   }
 
-  // Fallback: download / open card.  Used for DjVu, EPUB, MOBI, FB2,
-  // DOCX, ZIP, plus any extension we didn't recognise.  Browser doesn't
-  // know how to render these inline, so we make the action obvious
-  // instead of pretending we can preview them.
+  // Two distinct fallbacks:
+  //
+  // 1. URL with a file-style extension we can't preview natively
+  //    (DjVu, EPUB, MOBI, FB2, DOCX, ZIP, etc.) → "Скачать или
+  //    открыть" — the action that makes sense for a binary the
+  //    browser will hand off to an external app.
+  //
+  // 2. URL with NO recognisable file extension (skills.sh,
+  //    notion.so/page, github.com/user/repo, anything that's just
+  //    a website) → "Открыть сайт" — labelling these as "Download"
+  //    misled users into thinking the entry was a file when it was
+  //    really a bookmarked page.
+  const isWebsite = !ext || /^[a-z]{2,4}$/.test(ext) === false;
+  if (!isWebsite) {
+    return (
+      <Container label={`Файл · ${ext.toUpperCase()}${sizeLabel ? ` · ${sizeLabel}` : ""}`}>
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block p-10 rounded-xl border border-gold/40 bg-emerald-900/30 hover:bg-emerald-800/40 hover:border-gold/70 transition text-center group"
+        >
+          <Icon name="documents" size={56} className="mx-auto text-gold mb-4 transition-transform group-hover:scale-105" />
+          <div className="font-display text-[22px] font-medium mb-2">Скачать или открыть</div>
+          <div className="font-mono text-[11px] uppercase tracking-widest text-ivory-mute">
+            {ext.toUpperCase()}{sizeLabel ? ` · ${sizeLabel}` : ""}
+            {!["pdf", ...IMAGE_EXTS, ...VIDEO_EXTS, ...AUDIO_EXTS].includes(ext) && (
+              <span className="block mt-2 normal-case tracking-normal text-[10px] opacity-75">
+                Браузер не отображает этот формат — откроется во внешнем приложении
+              </span>
+            )}
+          </div>
+        </a>
+      </Container>
+    );
+  }
+
+  // Website fallback — strip protocol + trailing slash for a clean
+  // "domain.com/path" display, give the click a "Open in new tab"
+  // affordance instead of a "Download" one.
+  let displayUrl = url;
+  try {
+    const u = new URL(url);
+    displayUrl = `${u.hostname.replace(/^www\./, "")}${u.pathname === "/" ? "" : u.pathname}${u.search}`;
+  } catch { /* keep raw */ }
   return (
-    <Container label={`Файл${ext ? ` · ${ext.toUpperCase()}` : ""}${sizeLabel ? ` · ${sizeLabel}` : ""}`}>
+    <Container label="Сайт">
       <a
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        className="block p-10 rounded-xl border border-gold/40 bg-emerald-900/30 hover:bg-emerald-800/40 hover:border-gold/70 transition text-center group"
+        className="block p-7 rounded-xl border border-gold/40 bg-emerald-900/30 hover:bg-emerald-800/40 hover:border-gold/70 transition group"
       >
-        <Icon name="documents" size={56} className="mx-auto text-gold mb-4 transition-transform group-hover:scale-105" />
-        <div className="font-display text-[22px] font-medium mb-2">Скачать или открыть</div>
-        <div className="font-mono text-[11px] uppercase tracking-widest text-ivory-mute">
-          {ext ? `${ext.toUpperCase()} · ` : ""}{sizeLabel ?? ""}
-          {ext && !["pdf", ...IMAGE_EXTS, ...VIDEO_EXTS, ...AUDIO_EXTS].includes(ext) && (
-            <span className="block mt-2 normal-case tracking-normal text-[10px] opacity-75">
-              Браузер не отображает этот формат — откроется во внешнем приложении
-            </span>
-          )}
+        <div className="flex items-center gap-4">
+          <Icon name="web" size={36} className="text-gold flex-shrink-0 transition-transform group-hover:scale-105" />
+          <div className="flex-1 min-w-0">
+            <div className="font-display text-[18px] font-medium mb-0.5 truncate">
+              Открыть в новой вкладке
+            </div>
+            <div className="font-mono text-[11px] text-ivory-mute truncate">
+              {displayUrl}
+            </div>
+          </div>
+          <Icon name="arrow" size={18} className="text-gold flex-shrink-0 opacity-60 group-hover:opacity-100 transition" />
         </div>
       </a>
     </Container>
