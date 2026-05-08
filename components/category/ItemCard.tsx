@@ -63,7 +63,7 @@ function ItemCardImpl({
       <div
         data-entry-id={item.id}
         onClick={onClick}
-        className={`keynote p-4 rounded-xl flex flex-col group relative cursor-pointer ${ring}`}
+        className={`keynote p-5 rounded-xl flex flex-col group relative cursor-pointer ${ring}`}
       >
         {bulkSelected && (
           <div className="absolute top-3 left-3 z-10 w-5 h-5 rounded-full bg-emerald-300 text-emerald-deep flex items-center justify-center pointer-events-none">
@@ -84,17 +84,17 @@ function ItemCardImpl({
             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
           />
         )}
-        <div className="flex justify-between items-start mb-2">
-          <h4 className="font-display text-[18px] font-medium leading-tight flex-1 mr-3 line-clamp-2">{item.title}</h4>
+        <div className="flex justify-between items-start mb-3">
+          <h4 className="font-display text-[18px] font-medium leading-snug flex-1 mr-3 line-clamp-2">{item.title}</h4>
           {item.pinned && <Icon name="pinFilled" size={14} className="text-gold flex-shrink-0" />}
         </div>
         {item.description && (
-          <p className="text-[13px] text-ivory-dim leading-snug mb-2 font-light line-clamp-2">{item.description}</p>
+          <p className="text-[13px] text-ivory-dim leading-relaxed mb-3 font-light line-clamp-2">{item.description}</p>
         )}
-        <div className="flex items-center gap-1.5 flex-wrap mb-2">
+        <div className="flex items-center gap-1.5 flex-wrap mb-3">
           {item.tags.slice(0, 3).map((t) => <span key={t} className="tag">{t}</span>)}
         </div>
-        <div className="mt-auto flex items-center justify-between pt-2 border-t border-white/10">
+        <div className="mt-auto flex items-center justify-between pt-3 border-t border-white/10">
           <span className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute">{formatDateTime(item.createdAt)}</span>
           {meta && <span className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute">{meta}</span>}
         </div>
@@ -106,7 +106,7 @@ function ItemCardImpl({
     <div
       data-entry-id={item.id}
       onClick={onClick}
-      className={`group relative flex items-start gap-3 p-3 rounded-lg border transition cursor-pointer ${
+      className={`group relative flex items-start gap-4 px-4 py-3.5 rounded-lg border transition cursor-pointer ${
         bulkSelected
           ? "border-emerald-300 bg-emerald-200/[0.06]"
           : selected
@@ -124,12 +124,12 @@ function ItemCardImpl({
       <div className="text-emerald-200 mt-0.5 flex-shrink-0"><Icon name={category.icon} size={16} /></div>
       <div className="flex-1 min-w-0 pr-20 flex items-center gap-3">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 mb-0.5">
+          <div className="flex items-center gap-1.5 mb-1.5">
             <h4 className="font-medium text-[14px] truncate">{item.title}</h4>
             {item.pinned && <Icon name="pinFilled" size={11} className="text-gold flex-shrink-0" />}
           </div>
           {item.description && (
-            <p className="text-[12px] text-ivory-dim leading-snug font-light mb-1.5 line-clamp-1">{item.description}</p>
+            <p className="text-[12px] text-ivory-dim leading-relaxed font-light mb-2 line-clamp-1">{item.description}</p>
           )}
           {item.tags.length > 0 && (
             <div className="flex items-center gap-1 flex-wrap">

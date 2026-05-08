@@ -100,14 +100,14 @@ function MediaCardImpl({ item, big, selected, bulkSelected, onBulkToggle, onTogg
           </div>
         )}
       </div>
-      <div className="mt-2">
-        <h4 className="font-display text-[14px] font-medium leading-tight text-ivory group-hover:text-emerald-200 transition line-clamp-2">
+      <div className="mt-3">
+        <h4 className="font-display text-[14px] font-medium leading-snug text-ivory group-hover:text-emerald-200 transition line-clamp-2">
           {item.title}
         </h4>
         {item.description && (
-          <p className="text-[11.5px] text-ivory-dim mt-1 leading-snug font-light line-clamp-2">{item.description}</p>
+          <p className="text-[11.5px] text-ivory-dim mt-2 leading-relaxed font-light line-clamp-2">{item.description}</p>
         )}
-        <div className="flex items-center justify-between mt-2 gap-2">
+        <div className="flex items-center justify-between mt-3 gap-2">
           <div className="flex items-center gap-1 flex-wrap min-w-0">
             {item.tags.slice(0, 1).map((t) => <span key={t} className="tag-soft">{t}</span>)}
           </div>
