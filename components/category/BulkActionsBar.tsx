@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Icon } from "@/components/icons/Icon";
 import { CATEGORIES } from "@/lib/categories";
-import type { CategoryId } from "@/lib/types";
+import type { CategoryId, EntryCollection } from "@/lib/types";
 
 interface Props {
   count: number;
@@ -11,6 +11,14 @@ interface Props {
   onAddTag: (tag: string) => Promise<void>;
   onTogglePin: (pinned: boolean) => Promise<void>;
   onMoveCategory: (categoryId: CategoryId) => Promise<void>;
+  /** Collections list available in the current category — drives the
+   *  bulk collection-move dropdown.  Omit / empty array hides that
+   *  button (categories without collections, or when none exist). */
+  collections?: EntryCollection[];
+  /** Move every selected entry into this collection (or out of one
+   *  via null = "Без коллекции").  Caller is responsible for the
+   *  PATCH per id. */
+  onMoveCollection?: (collectionId: string | null) => Promise<void>;
   onDelete: () => Promise<void>;
   onClear: () => void;
   /** When all visible items are selected — toggle clears, otherwise selects all. */
@@ -28,13 +36,14 @@ interface Props {
  * to the parent (CategoryView) which surfaces them in its own error pane.
  */
 export function BulkActionsBar({
-  count, onAddTag, onTogglePin, onMoveCategory, onDelete, onClear,
-  onSelectAllToggle, allSelected,
+  count, onAddTag, onTogglePin, onMoveCategory, collections, onMoveCollection,
+  onDelete, onClear, onSelectAllToggle, allSelected,
 }: Props) {
   const [tagInputOpen, setTagInputOpen] = useState(false);
   const [tagDraft, setTagDraft] = useState("");
   const [moveOpen, setMoveOpen] = useState(false);
-  const [busy, setBusy] = useState<null | "tag" | "pin" | "unpin" | "move" | "delete">(null);
+  const [moveCollectionOpen, setMoveCollectionOpen] = useState(false);
+  const [busy, setBusy] = useState<null | "tag" | "pin" | "unpin" | "move" | "moveCollection" | "delete">(null);
 
   const wrap = async (kind: typeof busy, fn: () => Promise<void>) => {
     setBusy(kind);
@@ -152,6 +161,73 @@ export function BulkActionsBar({
           </>
         )}
       </div>
+
+      {/* Bulk-collection-move — only when the parent passed a non-
+          empty collections list AND a handler.  Two reasons we keep
+          it separate from the category dropdown above: (1) categories
+          and collections are different mental models, mixing them in
+          one menu confuses users; (2) categories are static (14 hard-
+          coded), collections are user-defined and can grow long. */}
+      {collections && collections.length > 0 && onMoveCollection && (
+        <div className="relative">
+          <button
+            onClick={() => setMoveCollectionOpen((v) => !v)}
+            disabled={!!busy}
+            className="font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full border border-emerald-300/40 text-emerald-200 hover:bg-emerald-300/[0.08] hover:border-emerald-300 transition flex items-center gap-1.5 disabled:opacity-50"
+            title="Переместить выделенные записи в коллекцию (или вынести в корень)"
+          >
+            <Icon name="arrow" size={11} /> {busy === "moveCollection" ? "…" : "В коллекцию"}
+          </button>
+          {moveCollectionOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setMoveCollectionOpen(false)} />
+              <div className="absolute bottom-full mb-2 right-0 z-50 w-64 max-h-[60vh] overflow-y-auto bg-emerald-deep border border-emerald-300/30 rounded-xl shadow-2xl p-2">
+                {/* "Без коллекции" sentinel — sends collectionId=null
+                    to clear the assignment.  Italicised so it reads
+                    as a meta-action, not a real folder. */}
+                <button
+                  onClick={async () => {
+                    setMoveCollectionOpen(false);
+                    await wrap("moveCollection", () => onMoveCollection(null));
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left hover:bg-white/[0.05] transition italic text-ivory-mute"
+                >
+                  <div className="text-emerald-200/60 flex-shrink-0">
+                    <Icon name="x" size={14} />
+                  </div>
+                  <div className="flex-1 min-w-0 font-display text-[14px] font-light">
+                    — Без коллекции —
+                  </div>
+                </button>
+                <div className="border-t border-white/10 my-1" />
+                {/* Sort by position then name so the order matches
+                    what the user sees in CollectionsTabs. */}
+                {[...collections]
+                  .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name))
+                  .map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={async () => {
+                        setMoveCollectionOpen(false);
+                        await wrap("moveCollection", () => onMoveCollection(c.id));
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left hover:bg-white/[0.05] transition"
+                    >
+                      <div className="text-emerald-200 flex-shrink-0">
+                        <Icon name={c.parentId ? "arrow" : "documents"} size={12} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-display text-[14px] font-medium leading-tight truncate">
+                          {c.name}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       <button
         onClick={() => wrap("delete", onDelete)}

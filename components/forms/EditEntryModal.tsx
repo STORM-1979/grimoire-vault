@@ -6,9 +6,9 @@ import { Field } from "./Field";
 import { FileUpload } from "./FileUpload";
 import { CollectionSelect } from "./CollectionSelect";
 import { ThemedSelect } from "./ThemedSelect";
-import { getCategory, isMediaCategory, isVideoCategory } from "@/lib/categories";
+import { CATEGORIES, getCategory, isMediaCategory, isVideoCategory } from "@/lib/categories";
 import { humanSize } from "@/lib/utils";
-import type { Entry, EntryCollection } from "@/lib/types";
+import type { Entry, EntryCollection, CategoryId } from "@/lib/types";
 import type { UpdateEntryInput } from "@/lib/schemas/entries";
 
 interface Props {
@@ -58,6 +58,12 @@ export function EditEntryModal({ entry, onClose, onSubmit, collections }: Props)
   // Collection assignment lives outside `form` because it's only
   // present for video entries with collections loaded.
   const [collectionId, setCollectionId] = useState<string | null>(entry.collectionId ?? null);
+  // Target category — defaults to the entry's current category but
+  // the user can move it elsewhere via the picker at the top of the
+  // form.  Kept separate from form state because changing it has
+  // side effects (collection picker hides, collection_id resets).
+  const [targetCategory, setTargetCategory] = useState<CategoryId>(entry.categoryId);
+  const movingCategory = targetCategory !== entry.categoryId;
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -105,11 +111,19 @@ export function EditEntryModal({ entry, onClose, onSubmit, collections }: Props)
         patch.thumbUrl = form.thumb.trim() || null;
         patch.duration = form.duration.trim() || null;
       }
-      // Collection patch flows for every collectable category.
-      // Explicit null is the wire format for "remove from current
-      // collection / move to category root" — letting null pass
-      // through is intentional.
-      if (collections && collections.length > 0) {
+      // Category move — only included when actually changed so we
+      // don't pointlessly re-write the same value.  Collection_id
+      // gets nulled at the same time because old-category collections
+      // don't apply in the new category (FK would still hold but the
+      // UI grouping wouldn't make sense).
+      if (movingCategory) {
+        patch.categoryId = targetCategory;
+        patch.collectionId = null;
+      } else if (collections && collections.length > 0) {
+        // Collection patch flows for every collectable category.
+        // Explicit null is the wire format for "remove from current
+        // collection / move to category root" — letting null pass
+        // through is intentional.
         patch.collectionId = collectionId;
       }
       if (isMedia) patch.coverUrl = form.cover.trim() || null;
@@ -176,6 +190,30 @@ export function EditEntryModal({ entry, onClose, onSubmit, collections }: Props)
         </header>
 
         <form onSubmit={handleSubmit} className="p-7">
+          {/* Category picker — moves the entry to a different
+              category on save.  Excludes Kanban (column-based, has
+              its own card type) and Credentials (encrypted, has its
+              own data shape) because moving a generic entry into
+              either would break those views' assumptions. */}
+          <Field
+            label="Категория"
+            hint={
+              movingCategory
+                ? `Запись переедет в № ${getCategory(targetCategory)?.no} · ${getCategory(targetCategory)?.en}.  Привязка к коллекции сбросится — выбери новую после сохранения.`
+                : "Текущая категория записи"
+            }
+          >
+            <ThemedSelect
+              options={CATEGORIES.filter((c) => c.id !== "kanban" && c.id !== "credentials").map((c) => ({
+                value: c.id,
+                label: `№ ${c.no} · ${c.en}`,
+                hint: c.ru,
+              }))}
+              value={targetCategory}
+              onChange={(v) => setTargetCategory((v || entry.categoryId) as CategoryId)}
+            />
+          </Field>
+
           <Field label="Название" required>
             <input autoFocus type="text" className="field-input" value={form.title} onChange={set("title")} />
           </Field>
@@ -278,7 +316,7 @@ export function EditEntryModal({ entry, onClose, onSubmit, collections }: Props)
             </Field>
           )}
 
-          {collections && collections.length > 0 && (
+          {!movingCategory && collections && collections.length > 0 && (
             <Field label="Коллекция" hint="Перенести запись в другую коллекцию или вынести в корень категории">
               <CollectionSelect
                 collections={collections}

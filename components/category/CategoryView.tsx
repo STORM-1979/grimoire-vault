@@ -279,14 +279,32 @@ export function CategoryView({ category, initialItems }: Props) {
     if (toCategory === category.id) { setBulkIds(new Set()); return; }
     setBulkError(null);
     try {
+      // Cross-category moves null out collection_id — the existing
+      // collection belongs to the source category and wouldn't make
+      // sense in the destination.  Same rule the EditEntryModal
+      // applies for single-row moves.
       await Promise.all(
-        Array.from(bulkIds).map((id) => entriesApi.update(id, { categoryId: toCategory })),
+        Array.from(bulkIds).map((id) =>
+          entriesApi.update(id, { categoryId: toCategory, collectionId: null }),
+        ),
       );
       // Rows leave this category immediately (realtime cleans them up);
       // selection clears since the entries are no longer here.
       setBulkIds(new Set());
     } catch (e) { setBulkError(e instanceof Error ? e.message : "Bulk-move failed"); }
   }, [bulkIds, category.id]);
+
+  const bulkMoveCollection = useCallback(async (toCollection: string | null) => {
+    setBulkError(null);
+    try {
+      await Promise.all(
+        Array.from(bulkIds).map((id) => entriesApi.update(id, { collectionId: toCollection })),
+      );
+      // Selection persists — the rows stay in the current category,
+      // they just changed which sub-folder they live in.  The user
+      // might want to keep operating on them.
+    } catch (e) { setBulkError(e instanceof Error ? e.message : "Bulk-collection-move failed"); }
+  }, [bulkIds]);
 
   const bulkDelete = useCallback(async () => {
     // No more "безвозвратно" prompt — soft delete + undo toast +
@@ -539,6 +557,8 @@ export function CategoryView({ category, initialItems }: Props) {
           onAddTag={bulkAddTag}
           onTogglePin={bulkTogglePin}
           onMoveCategory={bulkMove}
+          collections={showCollections ? collections : undefined}
+          onMoveCollection={showCollections ? bulkMoveCollection : undefined}
           onDelete={bulkDelete}
         />
       )}
