@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { Icon } from "@/components/icons/Icon";
+import { CopyButton, shouldShowCopy } from "./CopyButton";
 import type { Entry } from "@/lib/types";
 
 interface Props {
@@ -12,34 +12,15 @@ interface Props {
   position?: "topRight";
 }
 
-// Categories where the card grows a "copy" affordance on hover.
-// What gets copied differs by category — see copyTextFor below —
-// but the goal is the same: one-click access to whatever the user
-// actually wants on their clipboard for that record.
-const COPYABLE_CATEGORIES = new Set([
-  "skills", "prompts", "ideas", "portfolio", "misc",
-]);
-
 /**
- * Pick the right field to copy for a given entry.
- *   • prompts → the prompt text itself (description) takes priority
- *     over the source link, because that's the artefact the user
- *     wants to paste into Claude / ChatGPT / etc.  Falls back to
- *     the URL when description is empty (rare).
- *   • everything else → the url field, which on text-first
- *     categories holds the install command / shell snippet / link.
+ * Hover toolbar over the card: edit / pin / delete.  Copy used to
+ * live here too but moved to a dedicated always-visible CopyButton
+ * because hover-only doesn't work on touch and copying is the
+ * primary action for skills / prompts / tools / etc.  We still
+ * render an icon-variant copy here for parity on row-style ItemCards
+ * where there's no body real estate to plant a chip.
  */
-function copyTextFor(item: { categoryId: string; url?: string | null; description?: string | null }): string {
-  if (item.categoryId === "prompts") {
-    const desc = item.description?.trim();
-    if (desc) return desc;
-  }
-  return item.url ?? "";
-}
-
 export function ItemActions({ item, onTogglePin, onDelete, onEdit, position = "topRight" }: Props) {
-  const [copied, setCopied] = useState(false);
-
   const handlePin = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
@@ -55,34 +36,9 @@ export function ItemActions({ item, onTogglePin, onDelete, onEdit, position = "t
     e.preventDefault();
     if (onEdit) onEdit(item);
   };
-  const copyText = copyTextFor(item);
-  const handleCopy = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    if (!copyText) return;
-    try {
-      await navigator.clipboard.writeText(copyText);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1400);
-    } catch {
-      // Older browsers / iframes without clipboard permissions —
-      // fall back to a hidden textarea + execCommand("copy").
-      const ta = document.createElement("textarea");
-      ta.value = copyText;
-      ta.style.position = "fixed";
-      ta.style.opacity = "0";
-      document.body.appendChild(ta);
-      ta.select();
-      try { document.execCommand("copy"); setCopied(true); setTimeout(() => setCopied(false), 1400); }
-      finally { document.body.removeChild(ta); }
-    }
-  };
 
   const posClass = position === "topRight" ? "absolute top-3 right-3" : "absolute top-2 right-2";
-  const showCopy = !!copyText && COPYABLE_CATEGORIES.has(item.categoryId);
-  const copyTitle = item.categoryId === "prompts"
-    ? (copied ? "Промпт скопирован" : "Скопировать промпт")
-    : (copied ? "Скопировано" : "Скопировать ссылку / команду");
+  const showCopyIcon = shouldShowCopy(item);
 
   return (
     // Solid backdrop on the hover toolbar — without it, the actions
@@ -90,15 +46,7 @@ export function ItemActions({ item, onTogglePin, onDelete, onEdit, position = "t
     // date column on row-style ItemCards, the tag chips on tiles), and
     // half-transparent icons over text reads as broken UI.
     <div className={`${posClass} flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10 px-1.5 py-1 rounded-full bg-emerald-deep/95 backdrop-blur-sm shadow-lg`}>
-      {showCopy && (
-        <button
-          onClick={handleCopy}
-          className={`item-actions-btn ${copied ? "active" : ""}`}
-          title={copyTitle}
-        >
-          <Icon name={copied ? "check" : "copy"} size={13} />
-        </button>
-      )}
+      {showCopyIcon && <CopyButton item={item} variant="icon" />}
       {onEdit && (
         <button onClick={handleEdit} className="item-actions-btn" title="Редактировать">
           <Icon name="edit" size={13} />

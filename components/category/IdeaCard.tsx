@@ -4,6 +4,7 @@ import { memo } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons/Icon";
 import { ItemActions } from "./ItemActions";
+import { CopyButton, shouldShowCopy } from "./CopyButton";
 import { formatDateTime } from "@/lib/utils";
 import type { Entry, Category } from "@/lib/types";
 
@@ -133,6 +134,18 @@ function IdeaCardImpl({
           <p className={`text-ivory-dim leading-relaxed font-light ${big ? "text-[12px] line-clamp-3" : "text-[11px] line-clamp-2"}`}>
             {item.description}
           </p>
+        )}
+        {/* Always-visible copy chip — sits right under the body text
+            for skills / prompts / tools / portfolio / ideas / misc.
+            Touch users (no hover) and people who just want the npx
+            line without thinking get a one-tap path to the clipboard.
+            We swallow the click in CopyButton so this doesn't open
+            the entry's detail page when the user just wanted to copy
+            the snippet. */}
+        {shouldShowCopy(item) && (
+          <div className="mt-3 flex">
+            <CopyButton item={item} />
+          </div>
         )}
       </div>
 
