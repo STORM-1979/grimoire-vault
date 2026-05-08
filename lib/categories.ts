@@ -38,6 +38,19 @@ export function isVideoCategory(id: CategoryId) {
 }
 
 /**
+ * Categories that should render their entry list as a grid of square
+ * tiles (idea-board feel) rather than the dense text-rows of
+ * ItemCard.  Currently: Ideas (the original tile category) and
+ * Skills (one-shot reference cards that scan better as tiles).
+ * Prompts/Misc stay row-based — Prompts has its own copy-affordance
+ * UX optimised for the row layout, and Misc tends to have long
+ * descriptions that read better in rows.
+ */
+export function isTileCategory(id: CategoryId) {
+  return id === "ideas" || id === "skills";
+}
+
+/**
  * User-defined collections (sub-folders) are exposed for every
  * category EXCEPT Kanban (its own column structure is the
  * organisation model) and Credentials (its own per-record types).

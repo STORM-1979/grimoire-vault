@@ -85,7 +85,11 @@ export function ItemActions({ item, onTogglePin, onDelete, onEdit, position = "t
     : (copied ? "Скопировано" : "Скопировать ссылку / команду");
 
   return (
-    <div className={`${posClass} flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10`}>
+    // Solid backdrop on the hover toolbar — without it, the actions
+    // visually collide with whatever sits under them (the right-side
+    // date column on row-style ItemCards, the tag chips on tiles), and
+    // half-transparent icons over text reads as broken UI.
+    <div className={`${posClass} flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10 px-1.5 py-1 rounded-full bg-emerald-deep/95 backdrop-blur-sm shadow-lg`}>
       {showCopy && (
         <button
           onClick={handleCopy}

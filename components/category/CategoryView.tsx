@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useEntries } from "@/lib/hooks/useEntries";
 import { useEntryKeyboardNav } from "@/lib/hooks/useEntryKeyboardNav";
-import { isMediaCategory, isVideoCategory, categorySupportsCollections } from "@/lib/categories";
+import { isMediaCategory, isVideoCategory, isTileCategory, categorySupportsCollections } from "@/lib/categories";
 import { entriesApi } from "@/lib/api-client";
 import { Icon } from "@/components/icons/Icon";
 import { ItemCard } from "./ItemCard";
@@ -71,11 +71,14 @@ export function CategoryView({ category, initialItems }: Props) {
 
   const isVideo = isVideoCategory(category.id);
   const isMedia = isMediaCategory(category.id);
-  // Ideas render as a tiled grid of square cards instead of the
-  // dense list rows ItemCard uses — turns the page into a visual
-  // idea-board where titles + first lines of context can be scanned
-  // at a glance.
-  const isIdea = category.id === "ideas";
+  // Tile categories (Ideas, Skills) render as a grid of square cards
+  // instead of the dense list rows ItemCard uses — turns the page
+  // into a visual board where titles + first lines of context can be
+  // scanned at a glance.  Skills entries are typically one-shot
+  // references (URLs, snippets) that benefit from this layout when
+  // the list is short, and the row-based ItemCard placed its hover
+  // toolbar awkwardly close to the page header.
+  const isTile = isTileCategory(category.id);
   // Every system category except Kanban (column-based) and
   // Credentials (record-typed) supports user-defined collections.
   const showCollections = categorySupportsCollections(category.id);
@@ -337,7 +340,7 @@ export function CategoryView({ category, initialItems }: Props) {
                   onTogglePin={togglePin} onDelete={remove} onEdit={setEditing} />
               ))}
             </div>
-          ) : isIdea ? (
+          ) : isTile ? (
             <div className="grid grid-cols-3 gap-5">
               {pinned.map((it) => (
                 <IdeaCard key={it.id} item={it} category={category} big
@@ -433,7 +436,7 @@ export function CategoryView({ category, initialItems }: Props) {
                 onTogglePin={togglePin} onDelete={remove} onEdit={setEditing} />
             ))}
           </div>
-        ) : isIdea ? (
+        ) : isTile ? (
           <div className="grid grid-cols-4 gap-5">
             {others.map((it) => (
               <IdeaCard key={it.id} item={it} category={category}
