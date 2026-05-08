@@ -125,6 +125,11 @@ export function AddItemModal({
   // double-tap, accidental Enter+click, etc).  Avoids creating two
   // entries for one user intent.
   const submittingRef = useRef(false);
+  // True only while the most recent mousedown landed directly on the
+  // .modal-overlay (not bubbled from a child).  Used by the click
+  // handler to distinguish "click outside" from "drag out of textarea
+  // and release on overlay".
+  const downOnOverlay = useRef(false);
   const [error, setError] = useState<string | null>(null);
   // Set when the server rejects with 409 (unique content_hash hit).
   // The modal stays open and replaces the error banner with a CTA that
@@ -481,7 +486,19 @@ export function AddItemModal({
   const titleDisabled = !form.title.trim() || submitting;
 
   return (
-    <div className="modal-overlay" onClick={() => void requestClose()}>
+    <div
+      className="modal-overlay"
+      // Track where the user pressed down — only treat as a close
+      // if BOTH press and release happened directly on the overlay,
+      // not bubbled from the modal body.  Without this, dragging a
+      // text selection out of a textarea closes the modal and loses
+      // the user's edits.
+      onMouseDown={(e) => { downOnOverlay.current = e.target === e.currentTarget; }}
+      onClick={(e) => {
+        if (downOnOverlay.current && e.target === e.currentTarget) void requestClose();
+        downOnOverlay.current = false;
+      }}
+    >
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <header className="flex items-start justify-between p-7 pb-5 border-b border-white/10">
           <div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/icons/Icon";
 import { Field } from "./Field";
 import { FileUpload } from "./FileUpload";
@@ -73,6 +73,14 @@ export function EditEntryModal({ entry, onClose, onSubmit, collections }: Props)
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  // Overlay click-to-close, hardened against the textarea-drag bug.
+  // If the user mousedowns inside the modal (e.g. starting a text
+  // selection) and releases outside it, the click event's target is
+  // the overlay — which would silently close the modal and lose
+  // their edits.  We only honour overlay clicks where BOTH the
+  // mousedown and the click landed directly on the overlay.
+  const downOnOverlay = useRef(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -135,7 +143,14 @@ export function EditEntryModal({ entry, onClose, onSubmit, collections }: Props)
   if (!cat) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div
+      className="modal-overlay"
+      onMouseDown={(e) => { downOnOverlay.current = e.target === e.currentTarget; }}
+      onClick={(e) => {
+        if (downOnOverlay.current && e.target === e.currentTarget) onClose();
+        downOnOverlay.current = false;
+      }}
+    >
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <header className="flex items-start justify-between p-7 pb-5 border-b border-white/10">
           <div>

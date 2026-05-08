@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/icons/Icon";
 import { Field } from "./Field";
 import { ThemedSelect, type SelectOption } from "./ThemedSelect";
@@ -76,8 +76,20 @@ export function EditKanbanModal({ card, columns, onClose, onSubmit }: Props) {
     }
   };
 
+  // See EditEntryModal for the rationale — closing on overlay click
+  // alone caused mid-edit losses when text-selection drags ended
+  // outside the modal.
+  const downOnOverlay = useRef(false);
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div
+      className="modal-overlay"
+      onMouseDown={(e) => { downOnOverlay.current = e.target === e.currentTarget; }}
+      onClick={(e) => {
+        if (downOnOverlay.current && e.target === e.currentTarget) onClose();
+        downOnOverlay.current = false;
+      }}
+    >
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <header className="flex items-start justify-between p-7 pb-5 border-b border-white/10">
           <div>
