@@ -262,6 +262,96 @@ export function looksLikeTranscriptError(text: string): boolean {
     .test(text);
 }
 
+/**
+ * Invidious public mirrors expose a captions API:
+ *   GET /api/v1/captions/<videoId>           → list of available tracks
+ *   GET /api/v1/captions/<videoId>?label=...  → SRT/VTT body for that track
+ *
+ * They use residential exit nodes that aren't on YouTube's blocklist
+ * the way Vercel egress is, so this often works when both the watch-
+ * page scrape and innertube ANDROID return empty captionTracks.
+ *
+ * We try each instance in order with a short timeout and stop at the
+ * first one that returns a usable track + body.  Caption labels vary
+ * per video (auto-generated vs manually uploaded, language tags),
+ * so we just take the first track Invidious lists.
+ */
+const INVIDIOUS_TRANSCRIPT_INSTANCES = [
+  "https://invidious.f5.si",
+  "https://yewtu.be",
+  "https://invidious.no-logs.com",
+  "https://invidious.tiekoetter.com",
+  "https://inv.nadeko.net",
+  "https://invidious.privacyredirect.com",
+];
+
+async function fetchTranscriptViaInvidious(videoId: string, attempts: string[]): Promise<string | null> {
+  for (const base of INVIDIOUS_TRANSCRIPT_INSTANCES) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 6000);
+      const listRes = await fetch(`${base}/api/v1/captions/${videoId}`, {
+        signal: ctrl.signal,
+        headers: { "User-Agent": USER_AGENT_DESKTOP },
+      });
+      clearTimeout(timer);
+      if (!listRes.ok) {
+        attempts.push(`invidious ${shortHost(base)}: HTTP ${listRes.status}`);
+        continue;
+      }
+      const listData = await listRes.json() as { captions?: Array<{ label?: string; languageCode?: string; url?: string }> };
+      const tracks = listData.captions ?? [];
+      if (tracks.length === 0) {
+        attempts.push(`invidious ${shortHost(base)}: no tracks`);
+        continue;
+      }
+      // Prefer the user's language; fall back to whatever's first.
+      const track = tracks.find((t) => /^en/i.test(t.languageCode ?? ""))
+        ?? tracks.find((t) => /^ru/i.test(t.languageCode ?? ""))
+        ?? tracks[0];
+      // Invidious gives back relative `url` like /api/v1/captions/...?label=English
+      const trackUrl = track.url
+        ? (track.url.startsWith("http") ? track.url : `${base}${track.url}`)
+        : `${base}/api/v1/captions/${videoId}?label=${encodeURIComponent(track.label ?? "English")}`;
+      const ctrl2 = new AbortController();
+      const timer2 = setTimeout(() => ctrl2.abort(), 8000);
+      const bodyRes = await fetch(trackUrl, {
+        signal: ctrl2.signal,
+        headers: { "User-Agent": USER_AGENT_DESKTOP },
+      });
+      clearTimeout(timer2);
+      if (!bodyRes.ok) {
+        attempts.push(`invidious ${shortHost(base)}: track HTTP ${bodyRes.status}`);
+        continue;
+      }
+      const raw = await bodyRes.text();
+      // Strip SRT/VTT timing lines and dedupe whitespace — same shape
+      // we hand back from kome.ai so the summariser doesn't care.
+      const cleaned = raw
+        .replace(/^WEBVTT.*$/m, "")
+        .replace(/^\d+$/gm, "")               // SRT cue numbers
+        .replace(/^\d{2}:\d{2}:\d{2}[,.]\d{3} -->.*$/gm, "")
+        .replace(/<[^>]+>/g, "")              // VTT inline tags like <c>
+        .replace(/\s+/g, " ")
+        .trim();
+      if (cleaned.length < 50 || looksLikeTranscriptError(cleaned)) {
+        attempts.push(`invidious ${shortHost(base)}: short/error body (${cleaned.length})`);
+        continue;
+      }
+      attempts.push(`invidious ${shortHost(base)}: ${cleaned.length} chars`);
+      return cleaned;
+    } catch (e) {
+      attempts.push(`invidious ${shortHost(base)}: exception ${(e as Error).message}`);
+    }
+  }
+  return null;
+}
+
+function shortHost(url: string): string {
+  try { return new URL(url).hostname.replace(/^invidious\./, "").replace(/^www\./, ""); }
+  catch { return url; }
+}
+
 async function fetchTranscriptViaKomeAi(videoId: string, attempts: string[]): Promise<string | null> {
   try {
     const ctrl = new AbortController();
@@ -316,10 +406,20 @@ export async function fetchYouTubeTranscript(videoId: string): Promise<Transcrip
     return { text: fromKome, lang: "en", source: "scrape", attempts };
   }
 
-  // 1-3. Fall back to direct YouTube paths — captionTracks via watch
+  // 1. Invidious public mirrors — separate residential-friendly
+  // captions API.  Catches videos kome.ai missed (often Russian-
+  // language manual captions that kome's English-default fetch
+  // skips, or videos where YouTube transiently blocks kome).
+  const fromInvidious = await fetchTranscriptViaInvidious(videoId, attempts);
+  if (fromInvidious) {
+    console.log(JSON.stringify({ msg: "transcript.attempts", videoId, attempts, source: "invidious", sourceLen: fromInvidious.length }));
+    return { text: fromInvidious, lang: "en", source: "scrape", attempts };
+  }
+
+  // 2-4. Fall back to direct YouTube paths — captionTracks via watch
   // page or innertube, then fetch the signed timedtext URL with
   // multiple format variants.  Less reliable from Vercel IPs but kept
-  // around for the day kome.ai goes offline.
+  // around for the day both proxies go offline.
   const trackSet = await fetchCaptionTracks(videoId, attempts);
   if (!trackSet) {
     attempts.push("FINAL: no captionTracks found anywhere");
