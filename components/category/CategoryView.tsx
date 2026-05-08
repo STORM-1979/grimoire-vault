@@ -6,6 +6,7 @@ import { useEntries } from "@/lib/hooks/useEntries";
 import { useEntryKeyboardNav } from "@/lib/hooks/useEntryKeyboardNav";
 import { isMediaCategory, isVideoCategory, isTileCategory, categorySupportsCollections } from "@/lib/categories";
 import { entriesApi } from "@/lib/api-client";
+import { useUndoToast } from "@/components/ui/UndoToast";
 import { Icon } from "@/components/icons/Icon";
 import { ItemCard } from "./ItemCard";
 import { VideoCard } from "./VideoCard";
@@ -18,6 +19,17 @@ import type { Category, CategoryId, Entry, EntryCollection } from "@/lib/types";
 
 const SORT_LS_PREFIX = "grimoire:sort:";
 const VALID_SORTS: SortMode[] = ["newest", "oldest", "title", "titleZ", "tags"];
+
+/** Russian plural helper — pick the right form for `n` from
+ *  (one, few, many) variants. 1, 21, 31… → one; 2-4, 22-24… → few;
+ *  everything else (5-20, 0, 11-14) → many. */
+function plural(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
+}
 
 // Lazy-load modals: both pull in FileUpload + XHR helpers (~6 KB each).
 // They're rarely opened on a page visit, so we keep them out of the
@@ -41,10 +53,35 @@ export function CategoryView({ category, initialItems }: Props) {
     categoryId: category.id,
     initialData: initialItems,
   });
+  const undoToast = useUndoToast();
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<Entry | null>(null);
   const [bulkIds, setBulkIds] = useState<Set<string>>(new Set());
   const [bulkError, setBulkError] = useState<string | null>(null);
+
+  // Wrap the raw soft-delete with an undo-toast: the row goes to
+  // trash on the server, vanishes from items[] locally, and the user
+  // gets an 8-second window to fish it back out.  The toast handler
+  // calls /restore, which flips deleted_at back to NULL.  Realtime
+  // delivers the resulting UPDATE so items[] re-pops without us
+  // touching local state.
+  const removeWithUndo = useCallback(
+    async (id: string) => {
+      const target = items.find((it) => it.id === id);
+      await remove(id);
+      undoToast.show({
+        message: target ? `Удалено · «${target.title}»` : "Запись перемещена в корзину",
+        onUndo: async () => {
+          await entriesApi.restore(id);
+          // Realtime UPDATE will deliver the un-tombstoned row; if
+          // the user is on a different tab when the realtime fires
+          // we still call refetch to be safe.
+          await refetch();
+        },
+      });
+    },
+    [items, remove, refetch, undoToast],
+  );
   // Collections sub-filter — null = all, "none" = uncategorised, uuid = that collection.
   const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
   const [collections, setCollections] = useState<EntryCollection[]>([]);
@@ -206,7 +243,7 @@ export function CategoryView({ category, initialItems }: Props) {
   const { selectedId } = useEntryKeyboardNav(flat, {
     onTogglePin: togglePin,
     onEdit: setEditing,
-    onDelete: remove,
+    onDelete: removeWithUndo,
     onToggleBulk: toggleBulk,
     onSelectAll: selectAllToggle,
   });
@@ -252,13 +289,25 @@ export function CategoryView({ category, initialItems }: Props) {
   }, [bulkIds, category.id]);
 
   const bulkDelete = useCallback(async () => {
-    if (!confirm(`Удалить ${bulkIds.size} записей безвозвратно?`)) return;
+    // No more "безвозвратно" prompt — soft delete + undo toast +
+    // /trash makes the action recoverable, so the modal-confirm
+    // friction got swapped for a single toast that fires after
+    // success.  Restore-all calls /restore on every id in parallel.
+    const ids = Array.from(bulkIds);
+    if (ids.length === 0) return;
     setBulkError(null);
     try {
-      await Promise.all(Array.from(bulkIds).map((id) => remove(id)));
+      await Promise.all(ids.map((id) => remove(id)));
       setBulkIds(new Set());
+      undoToast.show({
+        message: `Удалено: ${ids.length} ${plural(ids.length, "запись", "записи", "записей")}`,
+        onUndo: async () => {
+          await Promise.all(ids.map((id) => entriesApi.restore(id)));
+          await refetch();
+        },
+      });
     } catch (e) { setBulkError(e instanceof Error ? e.message : "Bulk-delete failed"); }
-  }, [bulkIds, remove]);
+  }, [bulkIds, remove, refetch, undoToast]);
 
   return (
     <div>
@@ -333,7 +382,7 @@ export function CategoryView({ category, initialItems }: Props) {
                   bulkSelected={bulkIds.has(it.id)}
                   uncategorized={showCollections && collections.length > 0 && !it.collectionId}
                   onBulkToggle={toggleBulk}
-                  onTogglePin={togglePin} onDelete={remove} onEdit={setEditing} />
+                  onTogglePin={togglePin} onDelete={removeWithUndo} onEdit={setEditing} />
               ))}
             </div>
           ) : isVideo ? (
@@ -343,7 +392,7 @@ export function CategoryView({ category, initialItems }: Props) {
                   selected={selectedId === it.id}
                   bulkSelected={bulkIds.has(it.id)}
                   onBulkToggle={toggleBulk}
-                  onTogglePin={togglePin} onDelete={remove} onEdit={setEditing} />
+                  onTogglePin={togglePin} onDelete={removeWithUndo} onEdit={setEditing} />
               ))}
             </div>
           ) : isMedia ? (
@@ -353,7 +402,7 @@ export function CategoryView({ category, initialItems }: Props) {
                   selected={selectedId === it.id}
                   bulkSelected={bulkIds.has(it.id)}
                   onBulkToggle={toggleBulk}
-                  onTogglePin={togglePin} onDelete={remove} onEdit={setEditing} />
+                  onTogglePin={togglePin} onDelete={removeWithUndo} onEdit={setEditing} />
               ))}
             </div>
           ) : (
@@ -363,7 +412,7 @@ export function CategoryView({ category, initialItems }: Props) {
                   selected={selectedId === it.id}
                   bulkSelected={bulkIds.has(it.id)}
                   onBulkToggle={toggleBulk}
-                  onTogglePin={togglePin} onDelete={remove} onEdit={setEditing} />
+                  onTogglePin={togglePin} onDelete={removeWithUndo} onEdit={setEditing} />
               ))}
             </div>
           )}
@@ -430,7 +479,7 @@ export function CategoryView({ category, initialItems }: Props) {
                 bulkSelected={bulkIds.has(it.id)}
                 uncategorized={showCollections && collections.length > 0 && !it.collectionId}
                 onBulkToggle={toggleBulk}
-                onTogglePin={togglePin} onDelete={remove} onEdit={setEditing} />
+                onTogglePin={togglePin} onDelete={removeWithUndo} onEdit={setEditing} />
             ))}
           </div>
         ) : isVideo ? (
@@ -440,7 +489,7 @@ export function CategoryView({ category, initialItems }: Props) {
                 selected={selectedId === it.id}
                 bulkSelected={bulkIds.has(it.id)}
                 onBulkToggle={toggleBulk}
-                onTogglePin={togglePin} onDelete={remove} onEdit={setEditing} />
+                onTogglePin={togglePin} onDelete={removeWithUndo} onEdit={setEditing} />
             ))}
           </div>
         ) : isMedia ? (
@@ -450,7 +499,7 @@ export function CategoryView({ category, initialItems }: Props) {
                 selected={selectedId === it.id}
                 bulkSelected={bulkIds.has(it.id)}
                 onBulkToggle={toggleBulk}
-                onTogglePin={togglePin} onDelete={remove} onEdit={setEditing} />
+                onTogglePin={togglePin} onDelete={removeWithUndo} onEdit={setEditing} />
             ))}
           </div>
         ) : (
@@ -460,7 +509,7 @@ export function CategoryView({ category, initialItems }: Props) {
                 selected={selectedId === it.id}
                 bulkSelected={bulkIds.has(it.id)}
                 onBulkToggle={toggleBulk}
-                onTogglePin={togglePin} onDelete={remove} onEdit={setEditing} />
+                onTogglePin={togglePin} onDelete={removeWithUndo} onEdit={setEditing} />
             ))}
           </div>
         )}

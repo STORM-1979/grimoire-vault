@@ -8,6 +8,7 @@ import { entriesApi } from "@/lib/api-client";
 import { createClient } from "@/lib/supabase/client";
 import { rowToEntry } from "@/lib/data/mappers";
 import { useLocalStorageState } from "@/lib/hooks/useLocalStorageState";
+import { useUndoToast } from "@/components/ui/UndoToast";
 import type { Entry, CategoryId } from "@/lib/types";
 
 type View = "untriaged" | "triaged";
@@ -35,6 +36,7 @@ const isView = (v: unknown): v is View => v === "untriaged" || v === "triaged";
  * requiring the user to refresh.
  */
 export function InboxView() {
+  const undoToast = useUndoToast();
   // View persists so the user lands back on whichever side (Pending /
   // History) they were last working with.  Validator guards renames.
   const [view, setView] = useLocalStorageState<View>("gv:inbox.view", "untriaged", { validate: isView });
@@ -137,16 +139,25 @@ export function InboxView() {
   }, [items]);
 
   const deleteOne = useCallback(async (id: string) => {
-    if (!confirm("Удалить запись безвозвратно?")) return;
+    // No more "безвозвратно" prompt — delete is a soft tombstone
+    // and the toast covers undo for ~8s.  /trash is the only place
+    // a permanent delete happens.
     const target = items.find((it) => it.id === id);
     setItems((prev) => prev.filter((it) => it.id !== id));
     try {
       await entriesApi.delete(id);
+      undoToast.show({
+        message: target ? `Удалено · «${target.title}»` : "Запись перемещена в корзину",
+        onUndo: async () => {
+          await entriesApi.restore(id);
+          if (target) setItems((prev) => [target, ...prev]);
+        },
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось удалить");
       if (target) setItems((prev) => [target, ...prev]);
     }
-  }, [items]);
+  }, [items, undoToast]);
 
   const bulkTriage = useCallback(async (newCategory?: CategoryId) => {
     const ids = Array.from(selected);
@@ -174,20 +185,28 @@ export function InboxView() {
   const bulkDelete = useCallback(async () => {
     const ids = Array.from(selected);
     if (ids.length === 0) return;
-    if (!confirm(`Удалить ${ids.length} записей безвозвратно?`)) return;
     setBusy(true);
     const snapshot = items;
     setItems((prev) => prev.filter((it) => !selected.has(it.id)));
     try {
       await Promise.all(ids.map((id) => entriesApi.delete(id)));
       clearSelection();
+      undoToast.show({
+        message: `Удалено: ${ids.length} ${ids.length === 1 ? "запись" : "записей"}`,
+        onUndo: async () => {
+          await Promise.all(ids.map((id) => entriesApi.restore(id)));
+          // Restoring multiple rows; just refetch instead of trying
+          // to splice each back into the right sort position.
+          setItems(snapshot);
+        },
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Bulk-удаление не удалось");
       setItems(snapshot);
     } finally {
       setBusy(false);
     }
-  }, [selected, items]);
+  }, [selected, items, undoToast]);
 
   return (
     <section className="max-w-[1180px] mx-auto px-10 py-8">

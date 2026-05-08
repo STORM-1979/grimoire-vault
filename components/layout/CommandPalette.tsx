@@ -61,6 +61,7 @@ const NAV_ITEMS: NavItem[] = [
   { kind: "nav", id: "search", label: "Поиск", hint: "Полный поиск с фильтрами", href: "/search", icon: "search" },
   { kind: "nav", id: "kanban", label: "Канбан", hint: "Доска задач", href: "/kanban", icon: "kanban" },
   { kind: "nav", id: "inbox", label: "Inbox", hint: "Импорт из бота", href: "/inbox", icon: "inbox" },
+  { kind: "nav", id: "trash", label: "Корзина", hint: "Удалённые записи · восстановить или стереть", href: "/trash", icon: "x" },
   { kind: "nav", id: "settings", label: "Настройки", hint: "Аккаунт · Telegram · Reindex", href: "/settings", icon: "settings" },
 ];
 

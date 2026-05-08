@@ -6,6 +6,7 @@ import { IdlePreload } from "@/components/layout/IdlePreload";
 import { CommandPalette } from "@/components/layout/CommandPalette";
 import { KeyboardHelp } from "@/components/layout/KeyboardHelp";
 import { QuickCapture } from "@/components/layout/QuickCapture";
+import { UndoToastProvider } from "@/components/ui/UndoToast";
 
 export default async function AppLayout({
   children,
@@ -19,7 +20,7 @@ export default async function AppLayout({
   if (!user) redirect("/login");
 
   return (
-    <>
+    <UndoToastProvider>
       <Header user={user} />
       <main className="flex-1">{children}</main>
       <Footer />
@@ -27,6 +28,6 @@ export default async function AppLayout({
       <CommandPalette />
       <KeyboardHelp />
       <QuickCapture />
-    </>
+    </UndoToastProvider>
   );
 }

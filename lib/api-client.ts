@@ -52,10 +52,23 @@ export const entriesApi = {
    * instead of after a 409.
    */
   checkDuplicate: (input: { url?: string | null; title: string }) =>
-    call<{ duplicate: { id: string; categoryId: string; title: string } | null }>(
+    call<{ duplicate: { id: string; categoryId: string; title: string; trashed: boolean } | null }>(
       "/api/entries/check-duplicate",
       { method: "POST", body: JSON.stringify(input) },
     ),
+  /** Soft-delete is the default DELETE — see entries/[id]/route.ts. */
+  restore: (id: string) =>
+    call<Entry>(`/api/entries/${id}/restore`, { method: "POST" }),
+  /** Permanent delete from /trash — see entries/[id]/purge/route.ts. */
+  purge: (id: string) =>
+    call<void>(`/api/entries/${id}/purge`, { method: "DELETE" }),
+  /** /trash listing. */
+  trash: (query: { limit?: number; offset?: number } = {}) => {
+    const params = new URLSearchParams();
+    if (query.limit !== undefined) params.set("limit", String(query.limit));
+    if (query.offset !== undefined) params.set("offset", String(query.offset));
+    return call<{ items: Entry[]; total: number }>(`/api/entries/trash?${params.toString()}`);
+  },
 };
 
 /* ---------- SEARCH ---------- */

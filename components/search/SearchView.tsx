@@ -9,6 +9,7 @@ import { formatDateTime } from "@/lib/utils";
 import { BulkActionsBar } from "@/components/category/BulkActionsBar";
 import { VoiceSearchButton } from "@/components/search/VoiceSearchButton";
 import { useLocalStorageState } from "@/lib/hooks/useLocalStorageState";
+import { useUndoToast } from "@/components/ui/UndoToast";
 import type { CategoryId } from "@/lib/types";
 
 const SUGGESTIONS = ["Next.js", "Supabase", "design", "промпт", "идеи", "Telegram", "kanban"];
@@ -19,6 +20,7 @@ const isCategoryFilter = (v: unknown): v is CategoryId | null =>
   v === null || (typeof v === "string" && CATEGORIES.some((c) => c.id === v));
 
 export function SearchView() {
+  const undoToast = useUndoToast();
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<SearchHit[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -189,16 +191,25 @@ export function SearchView() {
   }, [bulkIds, runSearch]);
 
   const bulkDelete = useCallback(async () => {
-    if (!confirm(`Удалить ${bulkIds.size} записей безвозвратно?`)) return;
+    // Soft-delete + undo-toast — same flow as CategoryView.
+    const ids = Array.from(bulkIds);
+    if (ids.length === 0) return;
     setBulkError(null);
     try {
-      await Promise.all(Array.from(bulkIds).map((id) => entriesApi.delete(id)));
+      await Promise.all(ids.map((id) => entriesApi.delete(id)));
       setBulkIds(new Set());
       await runSearch();
+      undoToast.show({
+        message: `Удалено: ${ids.length} ${ids.length === 1 ? "запись" : "записей"}`,
+        onUndo: async () => {
+          await Promise.all(ids.map((id) => entriesApi.restore(id)));
+          await runSearch();
+        },
+      });
     } catch (e) {
       setBulkError(e instanceof Error ? e.message : "Bulk-delete failed");
     }
-  }, [bulkIds, runSearch]);
+  }, [bulkIds, runSearch, undoToast]);
 
   return (
     <>

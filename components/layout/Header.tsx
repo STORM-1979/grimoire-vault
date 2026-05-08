@@ -29,6 +29,7 @@ export function Header({ user }: HeaderProps) {
           <NavLink href="/review">Review</NavLink>
           <NavLink href="/graph">Граф</NavLink>
           <NavLink href="/settings">Настройки</NavLink>
+          <NavLink href="/trash">Корзина</NavLink>
         </nav>
 
         <div className="flex items-center gap-4">

@@ -108,6 +108,13 @@ export interface Entry {
    * the root of the category.
    */
   collectionId?: string | null;
+  /**
+   * Soft-delete tombstone.  Null = live; ISO timestamp = in the
+   * trash, surfaces only on /trash, restorable via the restore
+   * endpoint, permanently deletable via /purge.  All live-list
+   * queries filter `deleted_at IS NULL` automatically.
+   */
+  deletedAt?: string | null;
   createdAt: string;                // ISO timestamp
   updatedAt: string;
 }

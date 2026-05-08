@@ -27,6 +27,7 @@ export function rowToEntry(r: Record<string, unknown>): Entry {
     triagedAt: (r.triaged_at as string | null) ?? null,
     vaultId: (r.vault_id as string | null) ?? null,
     collectionId: (r.collection_id as string | null) ?? null,
+    deletedAt: (r.deleted_at as string | null) ?? null,
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
   };

@@ -30,13 +30,26 @@ async function clientFor(opts?: DataOpts) {
 // Re-export so existing call sites (`import { DataError } from "@/lib/data/entries"`) keep working.
 export { DataError };
 
-export async function listEntries(query: ListEntriesQuery, opts?: DataOpts & { userId?: string }): Promise<{ items: Entry[]; total: number }> {
+export async function listEntries(
+  query: ListEntriesQuery,
+  opts?: DataOpts & { userId?: string; trashed?: boolean },
+): Promise<{ items: Entry[]; total: number }> {
   const supabase = await clientFor(opts);
   let q = supabase
     .from("entries")
     .select("*", { count: "exact" })
     .order("pinned", { ascending: false })
     .order("created_at", { ascending: false });
+
+  // Soft-delete filter: by default we hide trashed rows from every
+  // surface (category lists, search, inbox, exports).  /trash flips
+  // the flag to show ONLY trashed rows.  No "show both" mode — trash
+  // is its own separate workflow.
+  if (opts?.trashed) {
+    q = q.filter("deleted_at", "not.is", "null");
+  } else {
+    q = q.is("deleted_at", null);
+  }
 
   // Service-role client bypasses RLS, so we have to scope by user_id
   // explicitly when callers came in via Bearer PAT.  Cookie callers
@@ -67,9 +80,14 @@ export async function listEntries(query: ListEntriesQuery, opts?: DataOpts & { u
   return { items: (data ?? []).map(rowToEntry), total: count ?? 0 };
 }
 
-export async function getEntry(id: string): Promise<Entry | null> {
+export async function getEntry(id: string, opts?: { includeTrashed?: boolean }): Promise<Entry | null> {
   const supabase = await createClient();
-  const { data, error } = await supabase.from("entries").select("*").eq("id", id).maybeSingle();
+  let q = supabase.from("entries").select("*").eq("id", id);
+  // Trashed rows hide from the public detail page — only the
+  // trash UI passes includeTrashed:true to surface them for
+  // restore/purge.
+  if (!opts?.includeTrashed) q = q.is("deleted_at", null);
+  const { data, error } = await q.maybeSingle();
   if (error) throw new DataError(error.message, 500);
   return data ? rowToEntry(data) : null;
 }
@@ -90,14 +108,19 @@ export async function getEntry(id: string): Promise<Entry | null> {
 export async function findDuplicateByContent(
   userId: string,
   input: { url?: string | null; title: string },
-): Promise<{ id: string; categoryId: string; title: string } | null> {
+): Promise<{ id: string; categoryId: string; title: string; trashed: boolean } | null> {
   const { computeContentHash } = await import("@/lib/dedup");
   const hash = computeContentHash(input);
   if (!hash) return null;
   const supabase = await createClient();
+  // Trashed hits are still returned — the unique-content-hash index
+  // covers trashed rows too, so a fresh insert with the same URL would
+  // fail anyway.  Surfacing the trashed row lets the modal route the
+  // user to "восстановить из корзины" instead of pretending no
+  // conflict exists and then erroring on save.
   const { data, error } = await supabase
     .from("entries")
-    .select("id, category_id, title")
+    .select("id, category_id, title, deleted_at")
     .eq("user_id", userId)
     .eq("content_hash", hash)
     .limit(1)
@@ -108,6 +131,7 @@ export async function findDuplicateByContent(
     id: data.id as string,
     categoryId: data.category_id as string,
     title: data.title as string,
+    trashed: data.deleted_at != null,
   };
 }
 
@@ -128,7 +152,7 @@ export async function createEntry(userId: string, input: CreateEntryInput, opts?
     if (error.code === "23505" && row.content_hash) {
       const { data: existing } = await supabase
         .from("entries")
-        .select("id, category_id, title")
+        .select("id, category_id, title, deleted_at")
         .eq("user_id", userId)
         .eq("content_hash", row.content_hash)
         .maybeSingle();
@@ -141,6 +165,7 @@ export async function createEntry(userId: string, input: CreateEntryInput, opts?
                 id: existing.id as string,
                 categoryId: existing.category_id as string,
                 title: existing.title as string,
+                trashed: existing.deleted_at != null,
               },
             }
           : undefined,
@@ -163,7 +188,41 @@ export async function updateEntry(id: string, input: UpdateEntryInput): Promise<
   return rowToEntry(data);
 }
 
+/**
+ * Soft delete — flips deleted_at to now() so the row drops out of
+ * every live list but can still be restored from /trash.  The
+ * physical delete only runs via purgeEntry (called from the trash
+ * UI) or eventual cron retention.
+ */
 export async function deleteEntry(id: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("entries")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw new DataError(error.message, 500);
+}
+
+/** Bring a trashed entry back to life. */
+export async function restoreEntry(id: string): Promise<Entry> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("entries")
+    .update({ deleted_at: null })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw new DataError(error.message, 500);
+  return rowToEntry(data);
+}
+
+/**
+ * Permanent delete from the trash UI ("Удалить навсегда").
+ * Distinct from deleteEntry so an accidental DELETE call elsewhere
+ * in the codebase can't blow rows away — purge has to be asked for
+ * by name.
+ */
+export async function purgeEntry(id: string): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.from("entries").delete().eq("id", id);
   if (error) throw new DataError(error.message, 500);
