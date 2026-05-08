@@ -156,11 +156,16 @@ export function AddItemModal({
   const failedUrl = useRef<string | null>(null);
   const urlInputRef = useRef<HTMLInputElement>(null);
 
+  // Functional setState — see EditEntryModal for the full rationale.
+  // Without it, typing fast across two fields can drop edits because
+  // each `setForm({ ...form, ... })` reads the same stale `form`
+  // captured at render time.
   const set = (k: keyof typeof form) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-      setForm({ ...form, [k]: (e.target as HTMLInputElement).type === "checkbox"
-        ? (e.target as HTMLInputElement).checked
-        : e.target.value });
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+      const target = e.target as HTMLInputElement;
+      const value = target.type === "checkbox" ? target.checked : target.value;
+      setForm((f) => ({ ...f, [k]: value }));
+    };
 
   // requestClose is declared later (it depends on submitInput which
   // depends on the form state).  We expose it via a ref so the

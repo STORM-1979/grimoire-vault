@@ -36,7 +36,7 @@ export function AddKanbanModal({ defaultCol = "backlog", columns, onClose, onSub
 
   const set = (k: keyof typeof form) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-      setForm({ ...form, [k]: e.target.value });
+      setForm((f) => ({ ...f, [k]: e.target.value }));
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -107,7 +107,7 @@ export function AddKanbanModal({ defaultCol = "backlog", columns, onClose, onSub
               <ThemedSelect
                 options={columnOpts}
                 value={form.columnName}
-                onChange={(v) => setForm({ ...form, columnName: (v || "backlog") as KanbanColumn })}
+                onChange={(v) => setForm((f) => ({ ...f, columnName: (v || "backlog") as KanbanColumn }))}
                 placeholder="Backlog"
               />
             </Field>
@@ -115,7 +115,7 @@ export function AddKanbanModal({ defaultCol = "backlog", columns, onClose, onSub
               <ThemedSelect
                 options={PRIORITY_OPTS}
                 value={form.priority}
-                onChange={(v) => setForm({ ...form, priority: (v || "medium") as Priority })}
+                onChange={(v) => setForm((f) => ({ ...f, priority: (v || "medium") as Priority }))}
                 placeholder="medium"
               />
             </Field>
@@ -129,7 +129,7 @@ export function AddKanbanModal({ defaultCol = "backlog", columns, onClose, onSub
               <ThemedSelect
                 options={CATEGORY_OPTS}
                 value={form.relatedCategory}
-                onChange={(v) => setForm({ ...form, relatedCategory: (v as CategoryId | "") })}
+                onChange={(v) => setForm((f) => ({ ...f, relatedCategory: (v as CategoryId | "") }))}
                 placeholder="— Без привязки —"
               />
             </Field>

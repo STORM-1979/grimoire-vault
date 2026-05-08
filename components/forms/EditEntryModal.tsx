@@ -61,10 +61,18 @@ export function EditEntryModal({ entry, onClose, onSubmit, collections }: Props)
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Functional setState — without it, typing fast across multiple
+  // fields can drop edits.  setForm({ ...form, [k]: value }) closes
+  // over the `form` from render time; if React batches two onChange
+  // events from different fields (or from input + composition events
+  // on Russian keyboards), the second call's spread of the SAME stale
+  // `form` overwrites the first call's change.  Functional setState
+  // reads the latest committed state on every call.
   const set = (k: keyof typeof form) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
       const target = e.target as HTMLInputElement;
-      setForm({ ...form, [k]: target.type === "checkbox" ? target.checked : target.value });
+      const value = target.type === "checkbox" ? target.checked : target.value;
+      setForm((f) => ({ ...f, [k]: value }));
     };
 
   useEffect(() => {
@@ -265,7 +273,7 @@ export function EditEntryModal({ entry, onClose, onSubmit, collections }: Props)
                   { value: "Gemini 2.5", label: "Gemini 2.5" },
                 ]}
                 value={form.model}
-                onChange={(v) => setForm({ ...form, model: v })}
+                onChange={(v) => setForm((f) => ({ ...f, model: v }))}
               />
             </Field>
           )}

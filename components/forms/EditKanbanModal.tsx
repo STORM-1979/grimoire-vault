@@ -110,7 +110,7 @@ export function EditKanbanModal({ card, columns, onClose, onSubmit }: Props) {
               autoFocus
               type="text"
               value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
               className="field-input"
             />
           </Field>
@@ -118,7 +118,7 @@ export function EditKanbanModal({ card, columns, onClose, onSubmit }: Props) {
           <Field label="Описание">
             <textarea
               value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               className="field-textarea"
               placeholder="Детали, ссылки, контекст…"
             />
@@ -129,7 +129,7 @@ export function EditKanbanModal({ card, columns, onClose, onSubmit }: Props) {
               <ThemedSelect
                 options={columnOpts}
                 value={form.columnName}
-                onChange={(v) => setForm({ ...form, columnName: (v || "backlog") as KanbanColumn })}
+                onChange={(v) => setForm((f) => ({ ...f, columnName: (v || "backlog") as KanbanColumn }))}
                 placeholder="Backlog"
               />
             </Field>
@@ -137,7 +137,7 @@ export function EditKanbanModal({ card, columns, onClose, onSubmit }: Props) {
               <ThemedSelect
                 options={PRIORITY_OPTS}
                 value={form.priority}
-                onChange={(v) => setForm({ ...form, priority: (v || "medium") as Priority })}
+                onChange={(v) => setForm((f) => ({ ...f, priority: (v || "medium") as Priority }))}
                 placeholder="medium"
               />
             </Field>
@@ -149,14 +149,14 @@ export function EditKanbanModal({ card, columns, onClose, onSubmit }: Props) {
                 type="date"
                 className="field-input"
                 value={form.dueDate}
-                onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+                onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))}
               />
             </Field>
             <Field label="Связь с категорией">
               <ThemedSelect
                 options={CATEGORY_OPTS}
                 value={form.relatedCategory}
-                onChange={(v) => setForm({ ...form, relatedCategory: (v as CategoryId | "") })}
+                onChange={(v) => setForm((f) => ({ ...f, relatedCategory: (v as CategoryId | "") }))}
                 placeholder="— Без привязки —"
               />
             </Field>
@@ -169,7 +169,7 @@ export function EditKanbanModal({ card, columns, onClose, onSubmit }: Props) {
               max="100"
               className="field-input"
               value={form.progress}
-              onChange={(e) => setForm({ ...form, progress: e.target.value })}
+              onChange={(e) => setForm((f) => ({ ...f, progress: e.target.value }))}
               placeholder="—"
             />
           </Field>
@@ -179,7 +179,7 @@ export function EditKanbanModal({ card, columns, onClose, onSubmit }: Props) {
               type="text"
               className="field-input"
               value={form.tags}
-              onChange={(e) => setForm({ ...form, tags: e.target.value })}
+              onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
               placeholder="security, migration"
             />
           </Field>
