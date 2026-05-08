@@ -49,6 +49,18 @@ export function VideoSummary({
     initial && initial.length ? "done" : "idle",
   );
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Manual-paste escape hatch.  By late 2025 every public transcript
+  // proxy (kome.ai, Invidious mirrors, tactiq, savesubs, etc.) gets
+  // intermittently blocked by YouTube. When all auto paths fail we
+  // give the user a textarea to drop the transcript copied from the
+  // YouTube player's "Show transcript" panel — the rest of the
+  // pipeline (extractive + translate + LLM polish) doesn't care
+  // where the text came from.
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualText, setManualText] = useState("");
+  const [manualBusy, setManualBusy] = useState(false);
+  // Attempt counter — bumping it re-runs the auto pipeline.
+  const [retryNonce, setRetryNonce] = useState(0);
 
   useEffect(() => {
     // Already polished and cached on the server — don't re-run anything.
@@ -144,7 +156,54 @@ export function VideoSummary({
     })();
 
     return () => { cancelled = true; };
-  }, [entryId, videoUrl, initial, initialSource]);
+  }, [entryId, videoUrl, initial, initialSource, retryNonce]);
+
+  // Run the same extractive + LLM pipeline against a transcript the
+  // user pasted manually.  Doesn't go through fetchTranscriptFromBrowser
+  // — the transcript is already in hand.
+  const runWithManualTranscript = async () => {
+    const transcript = manualText.trim();
+    if (transcript.length < 200) return;
+    setManualBusy(true);
+    setErrorMsg(null);
+    setStage("extractive");
+    try {
+      const raw = summarize(transcript, 5);
+      let extractive = raw;
+      if (raw.length > 0 && !looksRussian(raw[0])) {
+        extractive = await translateArrayToRussianBrowser(raw);
+      }
+      if (extractive.length > 0) {
+        setTheses(extractive);
+        setSource("extractive");
+        void persistSummary(entryId, extractive, "extractive", transcript);
+      }
+      setStage("polishing");
+      const polished = await polishWithLLMBrowser(transcript);
+      if (!polished || polished.length < 3) {
+        setStage("done");
+        if (extractive.length === 0) {
+          setStage("fail");
+          setErrorMsg("Не удалось выделить тезисы из вставленного текста");
+        }
+        return;
+      }
+      let polishedRu = polished;
+      if (!looksRussian(polished[0])) {
+        polishedRu = await translateArrayToRussianBrowser(polished);
+      }
+      setTheses(polishedRu);
+      setSource("llm");
+      setStage("done");
+      void persistSummary(entryId, polishedRu, "llm", transcript);
+      setManualOpen(false);
+    } catch (e) {
+      setStage("fail");
+      setErrorMsg(`Не удалось обработать вставленный текст: ${(e as Error).message}`);
+    } finally {
+      setManualBusy(false);
+    }
+  };
 
   if (stage === "idle" && !theses?.length) return null;
 
@@ -170,9 +229,59 @@ export function VideoSummary({
         )}
       </div>
       {stage === "fail" && (
-        <div className="font-mono text-[11px] text-amber-300/80 flex items-start gap-2">
-          <Icon name="x" size={12} className="mt-0.5 flex-shrink-0" />
-          <span>{errorMsg ?? "Не удалось получить тезисы"}</span>
+        <div className="space-y-3">
+          <div className="font-mono text-[11px] text-amber-300/80 flex items-start gap-2">
+            <Icon name="x" size={12} className="mt-0.5 flex-shrink-0" />
+            <span>{errorMsg ?? "Не удалось получить тезисы"}</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setStage("idle");
+                setErrorMsg(null);
+                setRetryNonce((n) => n + 1);
+              }}
+              className="font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full border border-white/15 text-ivory-mute hover:text-gold hover:border-gold/40 transition flex items-center gap-1.5"
+            >
+              <Icon name="refresh" size={11} /> Повторить попытку
+            </button>
+            <button
+              type="button"
+              onClick={() => setManualOpen((v) => !v)}
+              className="font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full border border-emerald-300/30 text-emerald-200 hover:border-emerald-300 hover:bg-emerald-300/[0.06] transition flex items-center gap-1.5"
+            >
+              <Icon name="add" size={11} /> Вставить транскрипт вручную
+            </button>
+          </div>
+          {manualOpen && (
+            <div className="space-y-2 pt-2">
+              <div className="font-mono text-[10px] text-ivory-mute/80 leading-relaxed">
+                Открой видео на YouTube → ⋮ под плеером → «Показать расшифровку».
+                Скопируй текст (Ctrl+A, Ctrl+C) и вставь сюда.  Pipeline тот же —
+                извлечение тезисов, перевод на русский, LLM-полировка.
+              </div>
+              <textarea
+                className="field-textarea min-h-[160px] font-mono text-[12px]"
+                placeholder="Вставь транскрипт целиком…"
+                value={manualText}
+                onChange={(e) => setManualText(e.target.value)}
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={runWithManualTranscript}
+                  disabled={manualBusy || manualText.trim().length < 200}
+                  className="bg-ivory text-emerald-950 px-4 py-2 rounded-full font-mono text-[10px] uppercase tracking-widest hover:bg-emerald-100 disabled:opacity-40 transition flex items-center gap-1.5"
+                >
+                  <Icon name="check" size={11} /> {manualBusy ? "Обрабатываю…" : "Обработать"}
+                </button>
+                <span className="font-mono text-[9px] text-ivory-mute/70">
+                  минимум 200 символов · сейчас {manualText.trim().length}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       )}
       {theses && theses.length > 0 && (
