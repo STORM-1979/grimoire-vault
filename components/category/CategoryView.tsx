@@ -315,6 +315,10 @@ export function CategoryView({ category, initialItems }: Props) {
         />
       )}
 
+      {/* "Uncategorized" highlight only kicks in when the user has
+          actually created collections in this category — until then,
+          every row would qualify and the visual cue would be useless
+          noise. */}
       {/* Pinned section */}
       {pinned.length > 0 && (
         <section className="max-w-[1480px] mx-auto px-10 py-10">
@@ -327,6 +331,7 @@ export function CategoryView({ category, initialItems }: Props) {
                 <IdeaCard key={it.id} item={it} category={category} big
                   selected={selectedId === it.id}
                   bulkSelected={bulkIds.has(it.id)}
+                  uncategorized={showCollections && collections.length > 0 && !it.collectionId}
                   onBulkToggle={toggleBulk}
                   onTogglePin={togglePin} onDelete={remove} onEdit={setEditing} />
               ))}
@@ -423,6 +428,7 @@ export function CategoryView({ category, initialItems }: Props) {
               <IdeaCard key={it.id} item={it} category={category}
                 selected={selectedId === it.id}
                 bulkSelected={bulkIds.has(it.id)}
+                uncategorized={showCollections && collections.length > 0 && !it.collectionId}
                 onBulkToggle={toggleBulk}
                 onTogglePin={togglePin} onDelete={remove} onEdit={setEditing} />
             ))}

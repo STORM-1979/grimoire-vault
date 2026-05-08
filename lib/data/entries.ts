@@ -74,6 +74,43 @@ export async function getEntry(id: string): Promise<Entry | null> {
   return data ? rowToEntry(data) : null;
 }
 
+/**
+ * Look up a potential duplicate by content_hash before the user
+ * actually submits the create form.  Same hashing strategy as
+ * createEntry — normalised URL preferred, normalised title as
+ * fallback — so a hit here means the unique-index would reject the
+ * insert downstream.
+ *
+ * Returns the slim shape needed for the inline warning (id +
+ * categoryId + title) so we can deep-link to the existing entry.
+ * Cross-category lookup is intentional — the user's question
+ * "did I save this already?" doesn't care which folder it landed in.
+ * Falls back to NULL when there's not enough signal to hash.
+ */
+export async function findDuplicateByContent(
+  userId: string,
+  input: { url?: string | null; title: string },
+): Promise<{ id: string; categoryId: string; title: string } | null> {
+  const { computeContentHash } = await import("@/lib/dedup");
+  const hash = computeContentHash(input);
+  if (!hash) return null;
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("entries")
+    .select("id, category_id, title")
+    .eq("user_id", userId)
+    .eq("content_hash", hash)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new DataError(error.message, 500);
+  if (!data) return null;
+  return {
+    id: data.id as string,
+    categoryId: data.category_id as string,
+    title: data.title as string,
+  };
+}
+
 export async function createEntry(userId: string, input: CreateEntryInput, opts?: DataOpts): Promise<Entry> {
   const supabase = await clientFor(opts);
   const row: Record<string, unknown> = { ...entryToRow(input), user_id: userId };

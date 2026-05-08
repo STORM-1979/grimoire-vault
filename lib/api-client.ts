@@ -46,6 +46,16 @@ export const entriesApi = {
     call<Entry>(`/api/entries/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
   delete: (id: string) =>
     call<void>(`/api/entries/${id}`, { method: "DELETE" }),
+  /**
+   * Proactive dup-check used by the Add modal — pings the server
+   * with {url, title} as the user types so we can warn before save
+   * instead of after a 409.
+   */
+  checkDuplicate: (input: { url?: string | null; title: string }) =>
+    call<{ duplicate: { id: string; categoryId: string; title: string } | null }>(
+      "/api/entries/check-duplicate",
+      { method: "POST", body: JSON.stringify(input) },
+    ),
 };
 
 /* ---------- SEARCH ---------- */

@@ -9,7 +9,7 @@ import { FileUpload } from "./FileUpload";
 import { CollectionSelect } from "./CollectionSelect";
 import { ThemedSelect, type SelectOption } from "./ThemedSelect";
 import { getCategory, isMediaCategory, isVideoCategory } from "@/lib/categories";
-import { extractApi, ApiError } from "@/lib/api-client";
+import { extractApi, entriesApi, ApiError } from "@/lib/api-client";
 import { humanSize } from "@/lib/utils";
 import { resolveYouTubeDuration, youtubeVideoId } from "@/lib/youtube-client";
 import { siteScreenshot } from "@/lib/screenshot";
@@ -156,6 +156,11 @@ export function AddItemModal({
   // again.  Cleared whenever the user changes the URL.
   const failedUrl = useRef<string | null>(null);
   const urlInputRef = useRef<HTMLInputElement>(null);
+  // Proactive duplicate-check timer + cancel handle.  Distinct from
+  // the og-extraction timer so the two pipelines can race without
+  // stomping each other.  Cleared whenever the URL/title changes.
+  const dupCheckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dupCheckSeq = useRef(0);
 
   // Functional setState — see EditEntryModal for the full rationale.
   // Without it, typing fast across two fields can drop edits because
@@ -180,6 +185,41 @@ export function AddItemModal({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // Proactive dup check — debounce on (url || title) and ping the
+  // server.  When a hit comes back we plant it into `duplicate` state
+  // so the same banner the 409 path uses lights up before the user
+  // ever clicks save.  Sequence-numbered so a stale response from
+  // an earlier-typed URL can't override the latest answer.
+  useEffect(() => {
+    if (dupCheckTimer.current) clearTimeout(dupCheckTimer.current);
+    const url = (isPortfolio ? form.vercelUrl : form.url).trim();
+    const title = form.title.trim();
+    // Need either a URL (any length we'd hash) OR a non-trivial title.
+    // Mirror computeContentHash's threshold (4 chars) so we don't pester
+    // the server with hashes it would reject.
+    const enoughSignal = url.length > 0 || title.length >= 4;
+    if (!enoughSignal) {
+      // Clear stale duplicate state when the user empties the form.
+      // Don't touch `duplicate` if it came from a 409 — failedUrl pins
+      // it until the URL changes, and that path clears it on its own.
+      return;
+    }
+    const seq = ++dupCheckSeq.current;
+    dupCheckTimer.current = setTimeout(async () => {
+      try {
+        const { duplicate: hit } = await entriesApi.checkDuplicate({ url: url || null, title });
+        if (seq !== dupCheckSeq.current) return; // a newer check has already started
+        setDuplicate(hit);
+      } catch {
+        // Silent — this is advisory.  If the precheck fails we still
+        // get the authoritative 409 from POST /api/entries on save.
+      }
+    }, 500);
+    return () => {
+      if (dupCheckTimer.current) clearTimeout(dupCheckTimer.current);
+    };
+  }, [form.url, form.vercelUrl, form.title, isPortfolio]);
 
   // Auto-extract og: meta when the URL field becomes a real URL.
   // Only fills *empty* fields — the user's typing always wins.
@@ -905,7 +945,7 @@ export function AddItemModal({
               <Icon name="check" size={14} className="text-gold mt-0.5 flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-1">
-                  Уже сохранено · № {getCategory(duplicate.categoryId as CategoryId)?.no} · {getCategory(duplicate.categoryId as CategoryId)?.en} · перехожу к записи…
+                  Уже сохранено · № {getCategory(duplicate.categoryId as CategoryId)?.no} · {getCategory(duplicate.categoryId as CategoryId)?.en}
                 </div>
                 <div className="font-display text-[15px] font-medium leading-tight truncate mb-2">
                   «{duplicate.title}»

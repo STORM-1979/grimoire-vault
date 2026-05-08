@@ -13,6 +13,11 @@ interface IdeaCardProps {
   big?: boolean;
   selected?: boolean;
   bulkSelected?: boolean;
+  /** Visual nudge: this category has user-defined collections but
+   *  this entry isn't filed in any of them.  Adds an amber dashed
+   *  outline + "без коллекции" pill so the user can spot orphan
+   *  rows at a glance and decide whether to file them. */
+  uncategorized?: boolean;
   onBulkToggle?: (id: string, e: React.MouseEvent) => void;
   onTogglePin: (id: string) => void | Promise<void>;
   onDelete: (id: string) => void | Promise<void>;
@@ -32,7 +37,7 @@ interface IdeaCardProps {
  * preview strip below the icon row.
  */
 function IdeaCardImpl({
-  item, category, big, selected, bulkSelected, onBulkToggle,
+  item, category, big, selected, bulkSelected, uncategorized, onBulkToggle,
   onTogglePin, onDelete, onEdit,
 }: IdeaCardProps) {
   const router = useRouter();
@@ -40,6 +45,8 @@ function IdeaCardImpl({
     ? "ring-2 ring-emerald-300 ring-offset-2 ring-offset-emerald-deep"
     : selected
     ? "ring-2 ring-gold ring-offset-2 ring-offset-emerald-deep"
+    : uncategorized
+    ? "ring-1 ring-amber-400/40 ring-offset-2 ring-offset-emerald-deep"
     : "";
 
   // Preview pulls from thumbUrl (YouTube / Web with og:image) first,
@@ -68,6 +75,15 @@ function IdeaCardImpl({
       {bulkSelected && (
         <div className="absolute top-3 left-3 z-10 w-6 h-6 rounded-full bg-emerald-300 text-emerald-deep flex items-center justify-center pointer-events-none shadow-md">
           <Icon name="check" size={13} />
+        </div>
+      )}
+      {uncategorized && !bulkSelected && (
+        // Amber pill in the top-left — same visual slot as the bulk
+        // checkmark, but mutually exclusive (the check wins when
+        // both could apply).  Tells the user "this row has no
+        // collection yet" without burning a full row of chrome.
+        <div className="absolute -top-1.5 -left-1.5 z-10 px-1.5 py-0.5 rounded-full bg-amber-400/15 border border-amber-400/40 font-mono text-[8px] uppercase tracking-widest text-amber-300 pointer-events-none shadow-sm">
+          без коллекции
         </div>
       )}
       <ItemActions item={item} onTogglePin={onTogglePin} onDelete={onDelete} onEdit={onEdit} />
