@@ -37,7 +37,7 @@ interface Props {
 }
 
 export function CategoryView({ category, initialItems }: Props) {
-  const { items, loading, error, create, update, togglePin, remove } = useEntries({
+  const { items, loading, error, refetch, create, update, togglePin, remove } = useEntries({
     categoryId: category.id,
     initialData: initialItems,
   });
@@ -311,6 +311,7 @@ export function CategoryView({ category, initialItems }: Props) {
           selected={selectedCollection}
           onSelect={setSelectedCollection}
           onCollectionsChange={setCollections}
+          onEntriesMayHaveChanged={() => void refetch()}
         />
       )}
 

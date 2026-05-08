@@ -28,11 +28,18 @@ export function CollectionsTabs({
   selected,
   onSelect,
   onCollectionsChange,
+  onEntriesMayHaveChanged,
 }: {
   categoryId: CategoryId;
   selected: string | null;
   onSelect: (next: string | null) => void;
   onCollectionsChange?: (collections: EntryCollection[]) => void;
+  /** Fired after a collection mutation that may have nulled entries'
+   *  collection_id (delete cascade → ON DELETE SET NULL).  Realtime
+   *  events for FK-cascaded UPDATEs aren't always reliable on
+   *  Supabase, so the parent uses this to force-refetch entries and
+   *  keep the items[] state honest. */
+  onEntriesMayHaveChanged?: () => void;
 }) {
   const [collections, setCollections] = useState<EntryCollection[] | null>(null);
   // creating === null  → no inline input
@@ -258,13 +265,22 @@ export function CollectionsTabs({
     try {
       await collectionsApi.delete(c.id);
       // FK on entry_collections.parent_id is ON DELETE CASCADE, so
-      // children are gone too — refetch to stay consistent.
+      // children are gone too — refetch collections to stay consistent.
       const r = await collectionsApi.list(categoryId);
       broadcast(r.items);
       // Clear selection if it pointed inside the deleted subtree.
       if (selected === c.id || (selected && !r.items.some((x) => x.id === selected))) {
         onSelect(null);
       }
+      // Force-refetch entries: when this collection was deleted,
+      // every row that had collection_id = c.id (or = a cascaded
+      // child) had its collection_id set to NULL by Postgres.  In
+      // theory Realtime delivers an UPDATE for each, but Supabase
+      // Realtime sometimes drops FK-cascaded UPDATE events (we've
+      // seen entries silently disappear from collection-filtered
+      // views even though the rows are still in the DB).  A direct
+      // refetch is the only sure way to keep items[] honest.
+      onEntriesMayHaveChanged?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "delete failed");
     }
