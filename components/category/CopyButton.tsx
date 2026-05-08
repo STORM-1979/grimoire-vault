@@ -5,21 +5,22 @@ import { Icon } from "@/components/icons/Icon";
 import type { Entry } from "@/lib/types";
 
 /**
- * Pick the right field to copy for a given entry.
- *   • prompts → the prompt text itself (description) takes priority
- *     over the source link, because that's the artefact the user
- *     wants to paste into Claude / ChatGPT / etc.  Falls back to
- *     the URL when description is empty (rare).
- *   • everything else → the url field, which on every other category
- *     holds the canonical "thing to paste" — a YouTube link, a docs
- *     URL, an npx install line, a Behance project, etc.
+ * Pick the right field to copy for a given entry.  Prompts have
+ * inverted priority — the prompt text in `description` is what the
+ * user actually pastes into the LLM, while `url` is just the source
+ * link they may have grabbed from somewhere.  For every other
+ * category the URL wins, but we fall back to description when URL
+ * is empty so entries that stash an install command / shell snippet
+ * in the description field (common pattern for Skills:
+ * `npx skills add https://…`) still get a copy chip.
  */
 function copyTextFor(item: Pick<Entry, "categoryId" | "url" | "description">): string {
+  const url = (item.url ?? "").trim();
+  const desc = (item.description ?? "").trim();
   if (item.categoryId === "prompts") {
-    const desc = item.description?.trim();
-    if (desc) return desc;
+    return desc || url;
   }
-  return (item.url ?? "").trim();
+  return url || desc;
 }
 
 /**
