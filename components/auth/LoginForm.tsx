@@ -23,11 +23,16 @@ export function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // null  → idle
+  // true  → recovery email just dispatched, show confirmation
+  // false → recovery in flight (button busy)
+  const [recoverySent, setRecoverySent] = useState<boolean | null>(null);
   const [pending, startTransition] = useTransition();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setRecoverySent(null);
     startTransition(async () => {
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -37,6 +42,34 @@ export function LoginForm() {
         router.refresh();
         router.push(next);
       }
+    });
+  };
+
+  // Send a recovery email to whatever's in the email field.  We
+  // require the email to be filled — without it Supabase wouldn't
+  // know who to write to and we'd waste a click.
+  const handleRecover = () => {
+    const trimmed = email.trim();
+    setError(null);
+    if (!trimmed) {
+      setError("Введи email и нажми «Забыли пароль?» снова");
+      return;
+    }
+    setRecoverySent(false);
+    startTransition(async () => {
+      const supabase = createClient();
+      const { error } = await supabase.auth.resetPasswordForEmail(trimmed, {
+        // Callback exchanges the recovery code for a session, then
+        // forwards to /auth/update-password where the user picks
+        // a new password.
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/auth/update-password")}`,
+      });
+      if (error) {
+        setError(error.message);
+        setRecoverySent(null);
+        return;
+      }
+      setRecoverySent(true);
     });
   };
 
@@ -73,6 +106,15 @@ export function LoginForm() {
           <Icon name="x" size={12} /> {error}
         </div>
       )}
+      {recoverySent === true && (
+        <div className="font-mono text-[11px] text-emerald-300 flex items-start gap-2 leading-relaxed">
+          <Icon name="check" size={12} className="mt-0.5 flex-shrink-0" />
+          <span>
+            Письмо отправлено на <span className="text-emerald-200">{email}</span>.
+            Открой ссылку из письма — попадёшь на страницу установки нового пароля.
+          </span>
+        </div>
+      )}
 
       <button
         type="submit"
@@ -83,9 +125,19 @@ export function LoginForm() {
         {!pending && <Icon name="arrow" size={14} />}
       </button>
 
-      <p className="text-center font-mono text-[10px] uppercase tracking-widest text-ivory-mute pt-2">
-        Email + пароль
-      </p>
+      <div className="flex items-center justify-between pt-1">
+        <span className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute">
+          Email + пароль
+        </span>
+        <button
+          type="button"
+          onClick={handleRecover}
+          disabled={pending}
+          className="font-mono text-[10px] uppercase tracking-widest text-gold hover:text-emerald-200 disabled:opacity-50 transition"
+        >
+          {recoverySent === false ? "…" : "Забыли пароль?"}
+        </button>
+      </div>
     </form>
   );
 }
