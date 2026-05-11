@@ -5,52 +5,39 @@ import { categoryCounts } from "@/lib/data/entries";
 import { createClient } from "@/lib/supabase/server";
 import { rowToEntry } from "@/lib/data/mappers";
 import { Icon } from "@/components/icons/Icon";
-import type { CategoryId } from "@/lib/types";
+import { AnalogClock } from "@/components/home/AnalogClock";
+import { MonthCalendar } from "@/components/home/MonthCalendar";
 
 /**
- * Home is a Server Component. Hero (static text) renders immediately;
- * the DB-dependent parts (featured card + per-category counts) stream in
- * via Suspense so first paint is independent of Postgres latency.
+ * Home is a Server Component.  The hero is now a clean two-column
+ * panel — analog clock on the left, month calendar on the right —
+ * both live, both client-rendered.  Below it the "Recently added"
+ * strip and the categories grid still stream in via Suspense.
+ *
+ * Why this hero instead of the old marketing copy: this is a
+ * personal vault, the user lives here every day, and "A library of
+ * everything worth keeping" earns its keep on a landing page, not
+ * on a working dashboard.  Clock + calendar give the page a
+ * functional anchor and a daily rhythm without nagging the user
+ * about anything.
  */
 export default function HomePage() {
   return (
     <div className="fade-in">
-      {/* Hero — pure static text, paints in the first frame */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 grid-bg opacity-30 pointer-events-none" />
-        <div className="max-w-[1480px] mx-auto px-10 pt-20 pb-24 grid grid-cols-12 gap-12 relative">
-          <div className="col-span-7">
-            <div className="badge mb-7">Volume I — A.D. 2026</div>
-            <h1 className="font-display tracking-tightest leading-[0.88] font-light">
-              <span className="block text-[120px]">A library of</span>
-              <span className="block text-[136px] italic font-medium text-gold">everything</span>
-              <span className="block text-[120px]">worth keeping.</span>
-            </h1>
-            <p className="font-display italic font-light text-[22px] text-ivory-dim mt-8 max-w-2xl leading-[1.4]">
-              Пятнадцать категорий. Один пароль. Один Telegram-нунций.
-              Личная база знаний — изящная, тихая, всегда под рукой.
-            </p>
-            <div className="flex items-center gap-4 mt-9">
-              <Link
-                href="/categories"
-                className="bg-ivory text-emerald-950 px-7 py-3.5 rounded-full font-medium tracking-tight hover:bg-emerald-100 transition flex items-center gap-2"
-              >
-                Открыть Vault <Icon name="arrow" size={16} />
-              </Link>
-              <Link
-                href="/inbox"
-                className="border border-white/30 text-ivory px-7 py-3.5 rounded-full font-medium tracking-tight hover:border-gold hover:text-gold transition"
-              >
-                Открыть Inbox
-              </Link>
-            </div>
+        <div className="max-w-[1480px] mx-auto px-10 pt-12 pb-16 grid grid-cols-12 gap-10 relative">
+          {/* Clock — left column, big enough to read across the room */}
+          <div className="col-span-5 flex items-center justify-center">
+            <AnalogClock />
           </div>
-
-          <aside className="col-span-5 flex flex-col gap-4 self-end min-h-[260px]">
-            <Suspense fallback={<FeaturedSkeleton />}>
-              <FeaturedCard />
-            </Suspense>
-          </aside>
+          {/* Calendar — right column, the dashboard's primary
+              orientation device.  Today is gold-filled; clicked
+              dates get a thin gold ring (selection is local-only
+              for now). */}
+          <div className="col-span-7">
+            <MonthCalendar />
+          </div>
         </div>
       </section>
 
@@ -169,57 +156,6 @@ async function loadCounts(): Promise<Record<string, number>> {
   }
 }
 
-async function FeaturedCard() {
-  const counts = await loadCounts();
-  const featuredId = (Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "ideas") as CategoryId;
-  const featured = CATEGORIES.find((c) => c.id === featuredId)!;
-  const total = Object.values(counts).reduce((a, b) => a + b, 0);
-
-  return (
-    <>
-      <Link href={`/category/${featured.id}`} className="keynote p-7 rounded-xl block">
-        <div className="flex justify-between items-baseline mb-3">
-          <div className="font-mono text-[10px] uppercase tracking-widest text-gold">Featured · максимум записей</div>
-          <span className="font-mono text-[10px] text-ivory-mute">№ {featured.no}</span>
-        </div>
-        <h3 className="font-display italic text-[36px] font-medium leading-none">{featured.en}</h3>
-        <p className="text-[14px] leading-snug text-ivory-dim mt-3">
-          Самая активная категория. {counts[featured.id] ?? 0} записей.
-        </p>
-        <div className="hairline-gold my-5" />
-        <div className="flex justify-between items-end">
-          <div>
-            <div className="font-display text-[44px] font-light text-gold leading-none">
-              {counts[featured.id] ?? 0}
-            </div>
-            <div className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute mt-1">items</div>
-          </div>
-          <span className="font-mono text-[11px] uppercase tracking-widest text-gold flex items-center gap-1">
-            Open <Icon name="arrow" size={14} />
-          </span>
-        </div>
-      </Link>
-
-      <div className="grid grid-cols-3 gap-3">
-        <div className="keynote p-4 rounded-lg">
-          <div className="font-display text-[28px] font-light text-gold leading-none">{CATEGORIES.length}</div>
-          <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute mt-2">Категорий</div>
-        </div>
-        <div className="keynote p-4 rounded-lg">
-          <div className="font-display text-[28px] font-light text-gold leading-none">
-            {total.toLocaleString("ru-RU").replace(",", " ")}
-          </div>
-          <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute mt-2">Записей</div>
-        </div>
-        <div className="keynote p-4 rounded-lg">
-          <div className="font-display text-[28px] font-light text-gold leading-none">∞</div>
-          <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute mt-2">Подкатегорий</div>
-        </div>
-      </div>
-    </>
-  );
-}
-
 async function CategoriesGrid() {
   const counts = await loadCounts();
   return (
@@ -256,28 +192,6 @@ async function CategoriesGrid() {
 }
 
 /* ---- Skeletons (rendered while DB query is in-flight) ---- */
-
-function FeaturedSkeleton() {
-  return (
-    <>
-      <div className="keynote p-7 rounded-xl block animate-pulse min-h-[220px]">
-        <div className="font-mono text-[10px] uppercase tracking-widest text-gold/50 mb-3">Featured · …</div>
-        <div className="h-9 w-32 rounded bg-white/5 mb-3" />
-        <div className="h-4 w-48 rounded bg-white/5" />
-        <div className="hairline-gold my-5 opacity-40" />
-        <div className="h-12 w-20 rounded bg-white/5" />
-      </div>
-      <div className="grid grid-cols-3 gap-3">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="keynote p-4 rounded-lg animate-pulse">
-            <div className="h-7 w-10 rounded bg-white/5" />
-            <div className="h-3 w-16 mt-3 rounded bg-white/5" />
-          </div>
-        ))}
-      </div>
-    </>
-  );
-}
 
 function CategoriesGridSkeleton() {
   return (

@@ -17,7 +17,9 @@ export function Header({ user }: HeaderProps) {
         <Logo />
 
         <nav className="flex items-center gap-6">
-          <NavLink href="/" exact>Главная</NavLink>
+          {/* "Главная" intentionally absent — the Grimoire Vault
+              wordmark on the left is the home link.  Keeping both
+              would be redundant and would crowd the nav row. */}
           <NavLink href="/today">Сегодня</NavLink>
           <NavLink href="/categories">Категории</NavLink>
           <span className="inline-flex items-center">

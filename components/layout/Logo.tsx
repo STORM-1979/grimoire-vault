@@ -1,40 +1,38 @@
 import Link from "next/link";
 
 interface LogoProps {
+  /** Kept for API compatibility with /login and /update-password
+   *  pages that pass size="lg"; visual size is now driven by the
+   *  text class on each call site since the icon + subtitle are
+   *  gone. */
   size?: "sm" | "md" | "lg";
+  /** Kept for API compatibility. */
   showText?: boolean;
 }
 
-export function Logo({ size = "md", showText = true }: LogoProps) {
-  const dim = size === "sm" ? 26 : size === "lg" ? 44 : 34;
+/**
+ * Wordmark-only logo: "Grimoire Vault" as a single link to home.
+ * The previous "g" circle + "Atelier · Personal Edition" subtitle
+ * carried no information once the user is already inside the app;
+ * stripping them frees space in the header and makes the brand
+ * read as a clean nav landmark instead of a stacked badge.
+ */
+export function Logo({ size = "md" }: LogoProps) {
+  // Larger on the login screen where the wordmark stands alone as
+  // the page brand, smaller in the in-app header where it shares
+  // space with the nav row.
+  const cls = size === "lg"
+    ? "text-[36px]"
+    : size === "sm"
+    ? "text-[18px]"
+    : "text-[22px]";
   return (
-    <Link href="/" className="inline-flex items-center gap-3 group">
-      <svg width={dim} height={dim} viewBox="0 0 34 34" aria-hidden="true">
-        <circle
-          cx="17" cy="17" r="16"
-          fill="none" stroke="var(--color-gold)" strokeWidth="1"
-          className="transition-stroke group-hover:stroke-gold-soft"
-        />
-        <text
-          x="17" y="22.5"
-          fontFamily="var(--font-fraunces), serif"
-          fontStyle="italic"
-          fontWeight="500"
-          fontSize="18"
-          textAnchor="middle"
-          fill="var(--color-ivory)"
-        >g</text>
-      </svg>
-      {showText && (
-        <div className="leading-none">
-          <div className="font-display italic font-medium text-[22px] text-ivory tracking-tightest">
-            Grimoire <span className="not-italic font-normal text-emerald-200">Vault</span>
-          </div>
-          <div className="font-mono text-[11px] tracking-widest uppercase text-ivory-mute mt-1.5">
-            Atelier · Personal Edition
-          </div>
-        </div>
-      )}
+    <Link
+      href="/"
+      className={`font-display italic font-medium ${cls} text-ivory tracking-tightest hover:text-emerald-200 transition leading-none`}
+      title="На главную"
+    >
+      Grimoire <span className="not-italic font-normal text-emerald-200">Vault</span>
     </Link>
   );
 }
