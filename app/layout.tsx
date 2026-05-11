@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     template: "%s · Grimoire Vault",
   },
   description:
-    "Personal knowledge base — thirteen rooms, one password, multi-device sync, Telegram attaché.",
+    "Personal knowledge base — fourteen rooms, one password, multi-device sync, Telegram attaché.",
   applicationName: "Grimoire Vault",
   authors: [{ name: "Storm-1979" }],
   keywords: ["knowledge base", "personal", "kanban", "ai", "second brain"],
