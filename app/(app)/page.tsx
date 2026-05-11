@@ -26,16 +26,17 @@ export default function HomePage() {
     <div className="fade-in">
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 grid-bg opacity-30 pointer-events-none" />
-        <div className="max-w-[1480px] mx-auto px-10 pt-12 pb-16 grid grid-cols-12 gap-10 relative">
-          {/* Clock — left column, big enough to read across the room */}
-          <div className="col-span-5 flex items-center justify-center">
+        <div className="max-w-[1480px] mx-auto px-10 pt-12 pb-16 grid grid-cols-12 gap-10 relative items-center">
+          {/* Clock — gets the wider column and centres in it.
+              Without the strap-lugs the case sits more like an
+              independent object, so we let it breathe. */}
+          <div className="col-span-7 flex items-center justify-center">
             <AnalogClock />
           </div>
-          {/* Calendar — right column, the dashboard's primary
-              orientation device.  Today is gold-filled; clicked
-              dates get a thin gold ring (selection is local-only
-              for now). */}
-          <div className="col-span-7">
+          {/* Calendar — compact 5/12 column.  Today is gold-filled;
+              clicked dates get a thin gold ring (selection is
+              local-only for now). */}
+          <div className="col-span-5">
             <MonthCalendar />
           </div>
         </div>

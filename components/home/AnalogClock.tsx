@@ -47,8 +47,10 @@ export function AnalogClock() {
   const secondAngle = seconds * 6;                     // 60 seconds × 6°
 
   // Helper: project a hand-end point given a rotation about the
-  // dial centre.  SVG uses cy-down, so we negate cosine.
-  const project = (angleDeg: number, length: number, cx = 150, cy = 180) => {
+  // dial centre.  SVG uses cy-down, so we negate cosine.  Centre
+  // sits at (150,150) — the viewBox is square now that the strap
+  // lugs are gone.
+  const project = (angleDeg: number, length: number, cx = 150, cy = 150) => {
     const rad = (angleDeg - 90) * (Math.PI / 180);
     return {
       x: cx + length * Math.cos(rad),
@@ -56,16 +58,16 @@ export function AnalogClock() {
     };
   };
 
-  const hourEnd = project(hourAngle, 52);
-  const minuteEnd = project(minuteAngle, 78);
-  const secondEnd = project(secondAngle, 86);
-  const secondTail = project(secondAngle + 180, 18);
+  const hourEnd = project(hourAngle, 62);
+  const minuteEnd = project(minuteAngle, 92);
+  const secondEnd = project(secondAngle, 102);
+  const secondTail = project(secondAngle + 180, 22);
 
   return (
     <div className="flex items-center justify-center">
       <svg
-        viewBox="0 0 300 360"
-        className="w-full max-w-[300px] h-auto"
+        viewBox="0 0 300 300"
+        className="w-full max-w-[440px] h-auto"
         role="img"
         aria-label={
           now
@@ -73,45 +75,31 @@ export function AnalogClock() {
             : "Аналоговые часы"
         }
       >
-        {/* Lugs — top and bottom strap bars.  Trapezoidal so they
-            read as machined-metal tabs rather than plain rectangles. */}
-        <path
-          d="M 124 24 L 176 24 L 178 54 L 122 54 Z"
-          fill="rgba(250,246,233,0.18)"
-          stroke="rgba(212,183,106,0.45)"
-          strokeWidth="1"
-        />
-        <path
-          d="M 122 306 L 178 306 L 176 336 L 124 336 Z"
-          fill="rgba(250,246,233,0.18)"
-          stroke="rgba(212,183,106,0.45)"
-          strokeWidth="1"
-        />
-
-        {/* Case — outer metal ring */}
+        {/* Case — outer metal ring.  Lugs removed by request; just
+            the round body floats on the emerald background. */}
         <circle
-          cx="150" cy="180" r="125"
+          cx="150" cy="150" r="142"
           fill="rgba(250,246,233,0.10)"
           stroke="rgba(212,183,106,0.50)"
           strokeWidth="2"
         />
         {/* Case — inner bevel */}
         <circle
-          cx="150" cy="180" r="116"
+          cx="150" cy="150" r="132"
           fill="none"
           stroke="rgba(212,183,106,0.30)"
           strokeWidth="1"
         />
 
         {/* Dial face — cream ivory */}
-        <circle cx="150" cy="180" r="110" fill="#FAF6E9" />
+        <circle cx="150" cy="150" r="125" fill="#FAF6E9" />
 
         {/* Minute ticks — 60 short marks; every 5th is longer + bolder */}
         {Array.from({ length: 60 }, (_, i) => {
           const angle = i * 6;
           const isMajor = i % 5 === 0;
-          const outer = project(angle, 104);
-          const inner = project(angle, isMajor ? 92 : 98);
+          const outer = project(angle, 118);
+          const inner = project(angle, isMajor ? 104 : 111);
           return (
             <line
               key={`tick-${i}`}
@@ -129,14 +117,14 @@ export function AnalogClock() {
         {Array.from({ length: 12 }, (_, i) => {
           const minute = (i + 1) * 5;
           const angle = (i + 1) * 30;
-          const pos = project(angle, 80);
+          const pos = project(angle, 92);
           return (
             <text
               key={`min-${minute}`}
               x={pos.x} y={pos.y}
               fontFamily="var(--font-mono), monospace"
               fontWeight="500"
-              fontSize="12"
+              fontSize="13"
               textAnchor="middle"
               dominantBaseline="middle"
               fill="#0D2E22"
@@ -148,7 +136,7 @@ export function AnalogClock() {
 
         {/* Triangle index at 12 — orientation cue, gold for brand */}
         <path
-          d="M 144 80 L 156 80 L 150 92 Z"
+          d="M 144 50 L 156 50 L 150 64 Z"
           fill="#D4B76A"
           stroke="#0D2E22"
           strokeWidth="0.5"
@@ -158,14 +146,14 @@ export function AnalogClock() {
         {Array.from({ length: 12 }, (_, i) => {
           const hour = i + 1;
           const angle = hour * 30;
-          const pos = project(angle, 60);
+          const pos = project(angle, 70);
           return (
             <text
               key={`hr-${hour}`}
               x={pos.x} y={pos.y}
               fontFamily="var(--font-fraunces), serif"
               fontWeight="500"
-              fontSize="14"
+              fontSize="16"
               textAnchor="middle"
               dominantBaseline="middle"
               fill="#0D2E22"
@@ -180,11 +168,11 @@ export function AnalogClock() {
             hour ring and the centre.  Same restraint as on real
             watches that print the maker name. */}
         <text
-          x="150" y="148"
+          x="150" y="118"
           fontFamily="var(--font-fraunces), serif"
           fontStyle="italic"
           fontWeight="400"
-          fontSize="10"
+          fontSize="11"
           textAnchor="middle"
           fill="#0D2E22"
           opacity="0.6"
@@ -194,18 +182,18 @@ export function AnalogClock() {
 
         {/* Hour hand — solid, blunt tip, dark for legibility */}
         <line
-          x1="150" y1="180"
+          x1="150" y1="150"
           x2={hourEnd.x} y2={hourEnd.y}
           stroke="#0D2E22"
-          strokeWidth="5"
+          strokeWidth="6"
           strokeLinecap="round"
         />
         {/* Minute hand — slimmer + longer */}
         <line
-          x1="150" y1="180"
+          x1="150" y1="150"
           x2={minuteEnd.x} y2={minuteEnd.y}
           stroke="#0D2E22"
-          strokeWidth="3"
+          strokeWidth="3.5"
           strokeLinecap="round"
         />
         {/* Second hand with counterweight tail — gold for pop */}
@@ -213,12 +201,12 @@ export function AnalogClock() {
           x1={secondTail.x} y1={secondTail.y}
           x2={secondEnd.x} y2={secondEnd.y}
           stroke="#D4B76A"
-          strokeWidth="1.5"
+          strokeWidth="1.7"
           strokeLinecap="round"
         />
         {/* Centre cap on top of all hands */}
-        <circle cx="150" cy="180" r="5" fill="#D4B76A" stroke="#0D2E22" strokeWidth="1" />
-        <circle cx="150" cy="180" r="1.5" fill="#0D2E22" />
+        <circle cx="150" cy="150" r="6" fill="#D4B76A" stroke="#0D2E22" strokeWidth="1" />
+        <circle cx="150" cy="150" r="1.7" fill="#0D2E22" />
       </svg>
     </div>
   );

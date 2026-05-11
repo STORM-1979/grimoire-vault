@@ -91,24 +91,24 @@ export function MonthCalendar() {
     && selected.d === d;
 
   return (
-    <div className="keynote rounded-2xl p-6 flex flex-col gap-4 h-full">
+    <div className="keynote rounded-2xl p-4 flex flex-col gap-3">
       {/* Header — month name + nav controls.  "Сегодня" only shows
           when the user has wandered off the current month, to keep
           the chrome quiet during normal use. */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-2">
         <button
           type="button"
           onClick={goPrev}
           title="Предыдущий месяц"
           className="item-actions-btn"
         >
-          <Icon name="arrow" size={12} className="rotate-180" />
+          <Icon name="arrow" size={11} className="rotate-180" />
         </button>
         <div className="flex-1 text-center">
-          <div className="font-display text-[22px] font-medium text-ivory leading-none">
+          <div className="font-display text-[17px] font-medium text-ivory leading-none">
             {RU_MONTHS[view.month]}
           </div>
-          <div className="font-mono text-[10px] uppercase tracking-widest text-gold mt-1.5">
+          <div className="font-mono text-[9px] uppercase tracking-widest text-gold mt-1">
             {view.year}
           </div>
         </div>
@@ -118,17 +118,17 @@ export function MonthCalendar() {
           title="Следующий месяц"
           className="item-actions-btn"
         >
-          <Icon name="arrow" size={12} />
+          <Icon name="arrow" size={11} />
         </button>
       </div>
 
       {/* Weekday row */}
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-0.5">
         {RU_WEEKDAYS.map((wd, i) => (
           <div
             key={wd}
             className={
-              "font-mono text-[10px] uppercase tracking-widest text-center py-1 " +
+              "font-mono text-[9px] uppercase tracking-widest text-center py-0.5 " +
               (i >= 5 ? "text-gold/70" : "text-ivory-mute")
             }
           >
@@ -139,11 +139,13 @@ export function MonthCalendar() {
 
       {/* Day grid.  Empty leading cells keep the weekday columns
           aligned; trailing cells are absent rather than empty so
-          the calendar's bottom edge doesn't bloat. */}
-      <div className="grid grid-cols-7 gap-1 flex-1 content-start">
+          the calendar's bottom edge doesn't bloat.  Cells are
+          smaller (h-9 instead of aspect-square) so the calendar
+          packs into a narrower column without growing tall. */}
+      <div className="grid grid-cols-7 gap-0.5">
         {grid.map((d, i) => {
           if (d === null) {
-            return <div key={`empty-${i}`} className="aspect-square" />;
+            return <div key={`empty-${i}`} className="h-9" />;
           }
           const t = isToday(d);
           const s = isSelected(d);
@@ -154,7 +156,7 @@ export function MonthCalendar() {
               type="button"
               onClick={() => setSelected({ y: view.year, m: view.month, d })}
               className={
-                "aspect-square rounded-lg flex items-center justify-center font-display text-[15px] transition relative " +
+                "h-9 rounded-md flex items-center justify-center font-display text-[13px] transition relative " +
                 (t
                   ? "bg-gold text-emerald-deep font-medium shadow-md"
                   : s
@@ -166,24 +168,14 @@ export function MonthCalendar() {
               aria-label={`${d} ${RU_MONTHS[view.month]} ${view.year}${t ? ", сегодня" : ""}`}
             >
               {d}
-              {t && (
-                // Tiny dot under today's number when it's the
-                // selected one too — confirms "yes, this is the
-                // current date even though we styled it as the
-                // primary highlight".  Subtle.
-                <span
-                  aria-hidden
-                  className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-emerald-deep/60"
-                />
-              )}
             </button>
           );
         })}
       </div>
 
       {/* Footer — "Сегодня" reset (only when not already there) */}
-      <div className="flex items-center justify-between pt-2 border-t border-white/10">
-        <div className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute">
+      <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/10">
+        <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute truncate">
           {today.toLocaleDateString("ru-RU", {
             weekday: "long",
             day: "numeric",
@@ -194,9 +186,9 @@ export function MonthCalendar() {
           <button
             type="button"
             onClick={goToday}
-            className="font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full border border-gold/40 text-gold hover:bg-gold hover:text-emerald-deep transition flex items-center gap-1.5"
+            className="font-mono text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-full border border-gold/40 text-gold hover:bg-gold hover:text-emerald-deep transition flex items-center gap-1 flex-shrink-0"
           >
-            <Icon name="refresh" size={11} /> Сегодня
+            <Icon name="refresh" size={10} /> Сегодня
           </button>
         )}
       </div>
