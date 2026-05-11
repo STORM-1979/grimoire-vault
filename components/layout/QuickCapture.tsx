@@ -236,7 +236,7 @@ function prettyName(id: CategoryId): string {
     prompts: "Prompts",
     kanban: "Kanban",
     ideas: "Ideas",
-    portfolio: "Active Projects",
+    portfolio: "Projects",
     misc: "Misc",
     credentials: "Credentials",
   };
