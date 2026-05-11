@@ -328,7 +328,7 @@ export function CollectionsTabs({
           <button
             type="button"
             onClick={() => { setCreating({ parentId: null }); setDraft(""); }}
-            className="font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full border border-emerald-300/30 text-emerald-200 hover:border-emerald-300 hover:bg-emerald-300/[0.06] transition flex items-center gap-1.5"
+            className="font-mono text-[11px] uppercase tracking-widest px-3.5 py-2 rounded-full border border-emerald-300/30 text-emerald-200 hover:border-emerald-300 hover:bg-emerald-300/[0.06] transition flex items-center gap-1.5"
             title="Создать новую коллекцию верхнего уровня"
           >
             <Icon name="add" size={11} /> Новая коллекция
@@ -340,7 +340,7 @@ export function CollectionsTabs({
           has children or the user is mid-creation under it. */}
       {showSubRow && (
         <div className="mt-2.5 pl-4 border-l-2 border-gold/20 flex flex-wrap gap-2 items-center">
-          <span className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute pr-1">
+          <span className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute pr-1">
             подкатегории →
           </span>
           {subRow.map((c) =>
@@ -370,7 +370,7 @@ export function CollectionsTabs({
             <button
               type="button"
               onClick={() => { setCreating({ parentId: activeRootId }); setDraft(""); }}
-              className="font-mono text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-full border border-emerald-300/25 text-emerald-200/80 hover:border-emerald-300 hover:bg-emerald-300/[0.06] transition flex items-center gap-1.5"
+              className="font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full border border-emerald-300/25 text-emerald-200/80 hover:border-emerald-300 hover:bg-emerald-300/[0.06] transition flex items-center gap-1.5"
               title="Создать новую подкатегорию внутри текущей"
             >
               <Icon name="add" size={10} /> Новая подкатегория
@@ -385,7 +385,7 @@ export function CollectionsTabs({
           forever. */}
       {(collections?.length ?? 0) === 0 && suggestions.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5 items-center">
-          <span className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute pr-1">
+          <span className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute pr-1">
             популярные →
           </span>
           {suggestions.map((name) => (
@@ -393,7 +393,7 @@ export function CollectionsTabs({
               key={name}
               type="button"
               onClick={() => void quickCreate(name)}
-              className="font-mono text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-full border border-emerald-300/25 text-emerald-200/80 hover:border-emerald-300 hover:bg-emerald-300/[0.06] transition flex items-center gap-1"
+              className="font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full border border-emerald-300/25 text-emerald-200/80 hover:border-emerald-300 hover:bg-emerald-300/[0.06] transition flex items-center gap-1"
               title={`Создать «${name}» одним кликом`}
             >
               <Icon name="add" size={10} /> {name}
@@ -402,7 +402,7 @@ export function CollectionsTabs({
           <button
             type="button"
             onClick={() => void quickCreateAll()}
-            className="font-mono text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-full border border-gold/40 text-gold hover:bg-gold hover:text-emerald-deep transition"
+            className="font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full border border-gold/40 text-gold hover:bg-gold hover:text-emerald-deep transition"
             title="Создать сразу весь набор"
           >
             создать всё
@@ -411,7 +411,7 @@ export function CollectionsTabs({
       )}
 
       {error && (
-        <div className="mt-2 font-mono text-[10px] text-red-400 flex items-center gap-1.5">
+        <div className="mt-2 font-mono text-[11px] text-red-400 flex items-center gap-1.5">
           <Icon name="x" size={11} /> {error}
         </div>
       )}
@@ -440,7 +440,7 @@ function renderChip(c: EntryCollection, s: ChipState) {
       <span key={c.id} className="inline-flex items-center gap-1">
         <input
           autoFocus
-          className="font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full bg-emerald-deep border border-gold/40 text-ivory min-w-[120px] focus:outline-none focus:border-gold"
+          className="font-mono text-[11px] uppercase tracking-widest px-3.5 py-2 rounded-full bg-emerald-deep border border-gold/40 text-ivory min-w-[140px] focus:outline-none focus:border-gold"
           value={s.renameDraft}
           onChange={(e) => s.setRenameDraft(e.target.value)}
           onKeyDown={(e) => {
@@ -469,14 +469,14 @@ function renderChip(c: EntryCollection, s: ChipState) {
         type="button"
         onClick={(e) => { e.stopPropagation(); s.onDelete(); }}
         className={
-          "hidden group-hover/chip:flex items-center px-2 rounded-r-full border border-l-0 transition " +
+          "hidden group-hover/chip:flex items-center px-2.5 rounded-r-full border border-l-0 transition " +
           (s.isSelected
             ? "bg-gold text-emerald-deep border-gold hover:bg-red-400 hover:border-red-400"
             : "border-white/15 text-ivory-mute hover:text-red-400 hover:border-red-400/40")
         }
         title={`Удалить «${c.name}»`}
       >
-        <Icon name="x" size={11} />
+        <Icon name="x" size={12} />
       </button>
     </span>
   );
@@ -496,7 +496,7 @@ function InlineCreate({
       <input
         autoFocus
         placeholder={placeholder}
-        className="font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full bg-emerald-deep border border-gold/40 text-ivory min-w-[160px] focus:outline-none focus:border-gold"
+        className="font-mono text-[11px] uppercase tracking-widest px-3.5 py-2 rounded-full bg-emerald-deep border border-gold/40 text-ivory min-w-[180px] focus:outline-none focus:border-gold"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => {
@@ -521,10 +521,10 @@ function InlineCreate({
  */
 function chipClass(selected: boolean, active = false): string {
   if (selected) {
-    return "font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full bg-gold text-emerald-deep transition";
+    return "font-mono text-[11px] uppercase tracking-widest px-3.5 py-2 rounded-full bg-gold text-emerald-deep transition";
   }
   if (active) {
-    return "font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full border border-gold/60 text-gold hover:bg-gold/[0.06] transition";
+    return "font-mono text-[11px] uppercase tracking-widest px-3.5 py-2 rounded-full border border-gold/60 text-gold hover:bg-gold/[0.06] transition";
   }
-  return "font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full border border-white/15 text-ivory-mute hover:text-gold hover:border-gold/40 transition";
+  return "font-mono text-[11px] uppercase tracking-widest px-3.5 py-2 rounded-full border border-white/15 text-ivory-mute hover:text-gold hover:border-gold/40 transition";
 }
