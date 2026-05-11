@@ -393,7 +393,7 @@ export function CategoryView({ category, initialItems }: Props) {
             <Icon name="pin" size={14} /> Закреплено
           </div>
           {isTile ? (
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-3 gap-5">
               {pinned.map((it) => (
                 <IdeaCard key={it.id} item={it} category={category} big
                   selected={selectedId === it.id}
@@ -440,7 +440,7 @@ export function CategoryView({ category, initialItems }: Props) {
       {/* Main list */}
       <section className="max-w-[1480px] mx-auto px-10 py-10">
         <div className="flex items-center justify-between mb-4 gap-4">
-          <div className="font-mono text-[10px] uppercase tracking-widest text-gold">Все записи · {others.length}</div>
+          <div className="font-mono text-[11px] uppercase tracking-widest text-gold">Все записи · {others.length}</div>
           <SortControl value={sortMode} onChange={updateSort} />
         </div>
 
@@ -490,7 +490,7 @@ export function CategoryView({ category, initialItems }: Props) {
           </div>
         )}
         {isTile ? (
-          <div className="grid grid-cols-5 gap-3.5">
+          <div className="grid grid-cols-4 gap-5">
             {others.map((it) => (
               <IdeaCard key={it.id} item={it} category={category}
                 selected={selectedId === it.id}

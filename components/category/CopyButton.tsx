@@ -104,13 +104,13 @@ export function CopyButton({
       onClick={handleCopy}
       title={title}
       className={
-        "font-mono text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full border transition flex items-center gap-1.5 " +
+        "font-mono text-[11px] uppercase tracking-widest px-3 py-1.5 rounded-full border transition flex items-center gap-1.5 " +
         (copied
           ? "bg-emerald-300/15 border-emerald-300/50 text-emerald-200"
           : "border-gold/30 text-gold hover:bg-gold hover:text-emerald-deep")
       }
     >
-      <Icon name={copied ? "check" : "copy"} size={11} />
+      <Icon name={copied ? "check" : "copy"} size={12} />
       {copied ? "Скопировано" : "Копировать"}
     </button>
   );

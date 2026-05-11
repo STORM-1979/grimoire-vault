@@ -115,21 +115,21 @@ body {
 
 /* ===== Tag pills (used in cards + modals) ===== */
 .tag {
-  display: inline-block; padding: 2px 8px;
+  display: inline-block; padding: 3px 9px;
   border: 1px solid rgba(212,183,106,.35); border-radius: 4px;
-  font-family: var(--font-mono); font-size: 10px; letter-spacing: .06em;
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: .06em;
   color: var(--color-gold);
 }
 .tag-emerald {
-  display: inline-block; padding: 2px 8px;
+  display: inline-block; padding: 3px 9px;
   background: rgba(38,163,115,.15);
   border: 1px solid rgba(38,163,115,.35); border-radius: 4px;
-  font-family: var(--font-mono); font-size: 10px; color: var(--color-emerald-200);
+  font-family: var(--font-mono); font-size: 11px; color: var(--color-emerald-200);
 }
 .tag-soft {
-  display: inline-block; padding: 2px 8px;
+  display: inline-block; padding: 3px 9px;
   border: 1px solid rgba(250,246,233,.18); border-radius: 4px;
-  font-family: var(--font-mono); font-size: 10px; color: var(--color-ivory-mute);
+  font-family: var(--font-mono); font-size: 11px; color: var(--color-ivory-mute);
 }
 
 /* ===== Item action buttons (pin/delete on hover) ===== */
