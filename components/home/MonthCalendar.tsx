@@ -122,14 +122,17 @@ export function MonthCalendar() {
         </button>
       </div>
 
-      {/* Weekday row */}
-      <div className="grid grid-cols-7 gap-0.5">
+      {/* Weekday row — sits flush against the grid below so the
+          column lines visually continue through the header.  Uses
+          the same gap-px-on-tinted-parent pattern as the days
+          grid for consistency. */}
+      <div className="rounded-t-lg overflow-hidden bg-gold/15 grid grid-cols-7 gap-px">
         {RU_WEEKDAYS.map((wd, i) => (
           <div
             key={wd}
             className={
-              "font-mono text-[9px] uppercase tracking-widest text-center py-0.5 " +
-              (i >= 5 ? "text-gold/70" : "text-ivory-mute")
+              "bg-emerald-deep/95 font-mono text-[10px] uppercase tracking-widest text-center py-2 " +
+              (i >= 5 ? "text-gold" : "text-ivory-mute")
             }
           >
             {wd}
@@ -137,58 +140,75 @@ export function MonthCalendar() {
         ))}
       </div>
 
-      {/* Day grid.  Empty leading cells keep the weekday columns
-          aligned; trailing cells are absent rather than empty so
-          the calendar's bottom edge doesn't bloat.  Cells are
-          smaller (h-9 instead of aspect-square) so the calendar
-          packs into a narrower column without growing tall. */}
-      <div className="grid grid-cols-7 gap-0.5">
-        {grid.map((d, i) => {
-          if (d === null) {
-            return <div key={`empty-${i}`} className="h-9" />;
-          }
-          const t = isToday(d);
-          const s = isSelected(d);
-          const weekendCol = i % 7 >= 5;
-          return (
-            <button
-              key={`d-${d}`}
-              type="button"
-              onClick={() => setSelected({ y: view.year, m: view.month, d })}
-              className={
-                "h-9 rounded-md flex items-center justify-center font-display text-[13px] transition relative " +
-                (t
-                  ? "bg-gold text-emerald-deep font-medium shadow-md"
-                  : s
-                  ? "border border-gold/60 text-gold"
-                  : weekendCol
-                  ? "text-gold/70 hover:bg-white/[0.04] hover:text-gold"
-                  : "text-ivory hover:bg-white/[0.04]")
-              }
-              aria-label={`${d} ${RU_MONTHS[view.month]} ${view.year}${t ? ", сегодня" : ""}`}
-            >
-              {d}
-            </button>
-          );
-        })}
+      {/* Day grid with visible hairlines.  We render a 7-col,
+          N-row sub-grid wrapped in a gold-tinted background; each
+          cell sits at gap-px so the parent's bg shows through as
+          thin gold rules between cells.  Same pattern the /
+          categories page uses for the room-grid.  Trailing empties
+          fill out the bottom row so the last week never looks
+          truncated. */}
+      <div className="rounded-b-lg overflow-hidden bg-gold/15 grid grid-cols-7 gap-px">
+        {(() => {
+          // Pad to a full 7-wide bottom row so the grid bottom edge
+          // is uniform.  Without this, months that end on a Wednesday
+          // (etc.) leave a ragged half-row that breaks the rectangle.
+          const padded = [...grid];
+          while (padded.length % 7 !== 0) padded.push(null);
+          return padded.map((d, i) => {
+            if (d === null) {
+              return <div key={`empty-${i}`} className="bg-emerald-deep/95 h-11" />;
+            }
+            const t = isToday(d);
+            const s = isSelected(d);
+            const weekendCol = i % 7 >= 5;
+            return (
+              <button
+                key={`d-${d}`}
+                type="button"
+                onClick={() => setSelected({ y: view.year, m: view.month, d })}
+                className={
+                  "h-11 flex items-center justify-center font-display text-[15px] transition relative " +
+                  (t
+                    ? "bg-gold text-emerald-deep font-semibold shadow-inner"
+                    : s
+                    ? "bg-emerald-deep/95 ring-1 ring-inset ring-gold/60 text-gold"
+                    : weekendCol
+                    ? "bg-emerald-deep/95 text-gold/70 hover:bg-white/[0.05] hover:text-gold"
+                    : "bg-emerald-deep/95 text-ivory hover:bg-white/[0.05]")
+                }
+                aria-label={`${d} ${RU_MONTHS[view.month]} ${view.year}${t ? ", сегодня" : ""}`}
+              >
+                {d}
+              </button>
+            );
+          });
+        })()}
       </div>
 
-      {/* Footer — "Сегодня" reset (only when not already there) */}
-      <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/10">
-        <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute truncate">
-          {today.toLocaleDateString("ru-RU", {
-            weekday: "long",
-            day: "numeric",
-            month: "long",
-          })}
+      {/* Current date — prominent strip under the grid.  This is
+          the calendar's "anchor reading" so the user always knows
+          what day it actually is, regardless of which month they
+          may have wandered into via prev/next. */}
+      <div className="flex items-center justify-between gap-2 pt-3 border-t border-white/10">
+        <div className="leading-tight">
+          <div className="font-display text-[18px] font-medium text-gold capitalize leading-tight">
+            {today.toLocaleDateString("ru-RU", { weekday: "long" })}
+          </div>
+          <div className="font-mono text-[11px] uppercase tracking-widest text-ivory-mute mt-1">
+            {today.toLocaleDateString("ru-RU", {
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            })}
+          </div>
         </div>
         {(view.year !== today.getFullYear() || view.month !== today.getMonth()) && (
           <button
             type="button"
             onClick={goToday}
-            className="font-mono text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-full border border-gold/40 text-gold hover:bg-gold hover:text-emerald-deep transition flex items-center gap-1 flex-shrink-0"
+            className="font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full border border-gold/40 text-gold hover:bg-gold hover:text-emerald-deep transition flex items-center gap-1.5 flex-shrink-0"
           >
-            <Icon name="refresh" size={10} /> Сегодня
+            <Icon name="refresh" size={11} /> Сегодня
           </button>
         )}
       </div>

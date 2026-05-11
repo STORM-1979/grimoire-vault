@@ -11,28 +11,37 @@ interface LogoProps {
 }
 
 /**
- * Wordmark-only logo: "Grimoire Vault" as a single link to home.
- * The previous "g" circle + "Atelier · Personal Edition" subtitle
- * carried no information once the user is already inside the app;
- * stripping them frees space in the header and makes the brand
- * read as a clean nav landmark instead of a stacked badge.
+ * Two-line wordmark logo: "Grimoire" stacked over "Vault".  Italic
+ * serif on top, upright accent below — reads like a magazine
+ * masthead and frees horizontal space in the header.  The whole
+ * block is a single link to /, no separate icon.
  */
 export function Logo({ size = "md" }: LogoProps) {
-  // Larger on the login screen where the wordmark stands alone as
-  // the page brand, smaller in the in-app header where it shares
-  // space with the nav row.
-  const cls = size === "lg"
+  // Per-call-site sizing.  /login and /update-password pass
+  // size="lg" for the page-brand position; the in-app header uses
+  // the default md so the masthead doesn't dwarf the nav row.
+  const top = size === "lg"
     ? "text-[36px]"
     : size === "sm"
     ? "text-[18px]"
     : "text-[22px]";
+  const bottom = size === "lg"
+    ? "text-[28px]"
+    : size === "sm"
+    ? "text-[15px]"
+    : "text-[18px]";
   return (
     <Link
       href="/"
-      className={`font-display italic font-medium ${cls} text-ivory tracking-tightest hover:text-emerald-200 transition leading-none`}
+      className="group inline-block leading-[0.95] hover:opacity-90 transition"
       title="На главную"
     >
-      Grimoire <span className="not-italic font-normal text-emerald-200">Vault</span>
+      <div className={`font-display italic font-medium ${top} text-ivory tracking-tightest`}>
+        Grimoire
+      </div>
+      <div className={`font-display font-normal ${bottom} text-emerald-200 tracking-tightest mt-0.5`}>
+        Vault
+      </div>
     </Link>
   );
 }
