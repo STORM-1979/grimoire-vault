@@ -100,6 +100,11 @@ export function useEntries({ categoryId, initialData = [] }: UseEntriesOptions =
         (payload) => {
           if (payload.eventType === "INSERT") {
             const row = rowToEntry(payload.new as Record<string, unknown>);
+            // Trashed-on-insert is rare (the create endpoint never
+            // does it) but possible via direct DB writes / future
+            // bulk-import flows.  Guard anyway so the live list
+            // doesn't show tombstoned rows.
+            if (row.deletedAt != null) return;
             if (categoryId && row.categoryId !== categoryId) return;
             // Vault scope: don't surface rows from a different vault than
             // the one currently active in the UI.
@@ -117,6 +122,12 @@ export function useEntries({ categoryId, initialData = [] }: UseEntriesOptions =
               ? row.vaultId == null
               : row.vaultId === activeVaultId;
             setItems((prev) => {
+              // Soft-delete fires UPDATE (deleted_at = now()) rather
+              // than Postgres DELETE.  Without this check the row we
+              // just optimistically removed would get re-added by the
+              // .push() below — the bug that made the "Удалено" toast
+              // pop while the tile stayed on screen.
+              if (row.deletedAt != null) return prev.filter((it) => it.id !== row.id);
               if (categoryId && row.categoryId !== categoryId) return prev.filter((it) => it.id !== row.id);
               if (!matchesVault) return prev.filter((it) => it.id !== row.id);
               const next = prev.map((it) => (it.id === row.id ? row : it));
