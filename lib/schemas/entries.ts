@@ -5,11 +5,11 @@
  */
 import { z } from "zod";
 
-// All 14 category IDs
+// All 15 category IDs
 export const categoryIdSchema = z.enum([
   "documents", "web", "youtube", "local", "designs", "images",
   "skills", "prompts", "kanban", "ideas", "portfolio", "misc", "credentials",
-  "tools",
+  "tools", "bots",
 ]);
 
 /**

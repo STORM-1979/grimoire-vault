@@ -27,7 +27,7 @@ export default function HomePage() {
               <span className="block text-[120px]">worth keeping.</span>
             </h1>
             <p className="font-display italic font-light text-[22px] text-ivory-dim mt-8 max-w-2xl leading-[1.4]">
-              Четырнадцать категорий. Один пароль. Один Telegram-нунций.
+              Пятнадцать категорий. Один пароль. Один Telegram-нунций.
               Личная база знаний — изящная, тихая, всегда под рукой.
             </p>
             <div className="flex items-center gap-4 mt-9">
@@ -71,9 +71,9 @@ export default function HomePage() {
       <section className="max-w-[1480px] mx-auto px-10 py-16">
         <div className="grid grid-cols-12 gap-10 mb-12">
           <div className="col-span-6">
-            <div className="badge mb-4">Указатель — четырнадцать</div>
+            <div className="badge mb-4">Указатель — пятнадцать</div>
             <h2 className="font-display text-[68px] font-light leading-[0.92] tracking-tightest">
-              Fourteen <span className="italic text-gold">rooms</span> of one library.
+              Fifteen <span className="italic text-gold">rooms</span> of one library.
             </h2>
           </div>
           <div className="col-span-5 col-start-8 self-end">

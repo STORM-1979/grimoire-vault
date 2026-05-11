@@ -21,6 +21,10 @@ const PATHS: Record<IconName, React.ReactNode> = {
   misc:      <g><circle cx="6" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="18" cy="12" r="1.5" fill="currentColor"/></g>,
   // Crossed wrench + screwdriver — universal "tools" glyph.
   tools:     <g><path d="M14.5 6a3.5 3.5 0 0 0 4.4 4.4l2.6 2.6-3 3-2.6-2.6A3.5 3.5 0 0 1 11.5 9z" fill="none" strokeWidth="1.4" strokeLinejoin="round"/><path d="M4 18l8-8M5 5l3 3-1 1-3-3z" fill="none" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></g>,
+  // Robot head with antenna — line-style "bot" glyph.  Rounded
+  // rectangle for the body, two filled dots for eyes, antenna
+  // ending in a circle so it reads at small sizes.
+  bots:      <g><path d="M12 3v3" fill="none" strokeWidth="1.4" strokeLinecap="round"/><circle cx="12" cy="2.4" r=".9" fill="currentColor"/><rect x="4.5" y="6.5" width="15" height="12" rx="2.5" fill="none" strokeWidth="1.4"/><circle cx="9" cy="12" r="1.2" fill="currentColor"/><circle cx="15" cy="12" r="1.2" fill="currentColor"/><path d="M9.5 15.5h5" strokeWidth="1.4" strokeLinecap="round"/></g>,
   search:    <g><circle cx="11" cy="11" r="7" fill="none" strokeWidth="1.4"/><path d="M16 16l5 5" strokeWidth="1.4"/></g>,
   inbox:     <g><path d="M3 12h6l1 2h4l1-2h6" fill="none" strokeWidth="1.4"/><path d="M3 12V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5M3 12v6a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6" fill="none" strokeWidth="1.4"/></g>,
   settings:  <g><circle cx="12" cy="12" r="3" fill="none" strokeWidth="1.4"/><path d="M19 12c0 .5 0 1-.1 1.5l2 1.5-2 3.5-2.4-1c-.7.6-1.5 1-2.4 1.3l-.4 2.5h-4l-.4-2.5c-.9-.3-1.7-.7-2.4-1.3l-2.4 1-2-3.5 2-1.5C5.1 13 5 12.5 5 12s0-1 .1-1.5l-2-1.5 2-3.5 2.4 1c.7-.6 1.5-1 2.4-1.3l.4-2.5h4l.4 2.5c.9.3 1.7.7 2.4 1.3l2.4-1 2 3.5-2 1.5c.1.5.1 1 .1 1.5z" fill="none" strokeWidth="1.2"/></g>,

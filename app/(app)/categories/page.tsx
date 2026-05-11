@@ -8,7 +8,7 @@ export default function CategoriesPage() {
       <section className="max-w-[1480px] mx-auto px-10 pt-14 pb-12">
         <div className="badge mb-4">Все категории</div>
         <h1 className="font-display text-[80px] font-light leading-[0.92] tracking-tightest">
-          Четырнадцать <span className="italic text-gold">комнат</span> одной библиотеки.
+          Пятнадцать <span className="italic text-gold">комнат</span> одной библиотеки.
         </h1>
         <p className="text-[16px] text-ivory-dim mt-5 max-w-2xl">
           Каждая комната — отдельный раздел со своим списком и ритмом. Любая

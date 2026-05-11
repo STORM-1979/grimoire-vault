@@ -22,6 +22,7 @@ export const CATEGORIES: Category[] = [
   { id: "misc",        no: "12", en: "Misc",          ru: "Разное",            icon: "misc",      ordering: 12 },
   { id: "credentials", no: "13", en: "Credentials",   ru: "Пароли и аккаунты", icon: "lock",      ordering: 13, secured: true },
   { id: "tools",       no: "14", en: "Tools",         ru: "Инструменты",       icon: "tools",     ordering: 14 },
+  { id: "bots",        no: "15", en: "Bots",          ru: "Боты",              icon: "bots",      ordering: 15 },
 ];
 
 const _byId = new Map<CategoryId, Category>(CATEGORIES.map((c) => [c.id, c]));
@@ -95,6 +96,7 @@ const DEFAULT_COLLECTIONS: Partial<Record<CategoryId, string[]>> = {
   portfolio: ["Web-приложения", "Mobile", "Open Source", "Клиентские", "Кейсы"],
   misc: ["Путешествия", "Еда", "Книги", "Хобби", "Здоровье", "Финансы"],
   tools: ["AI", "Dev", "Дизайн", "Продуктивность", "DevOps", "Аналитика"],
+  bots: ["Telegram", "Discord", "Slack", "AI-ассистенты", "Trading", "Чат-боты"],
 };
 
 export function defaultCollectionsFor(id: CategoryId): string[] {

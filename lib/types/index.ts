@@ -16,12 +16,13 @@ export type CategoryId =
   | "portfolio"
   | "misc"
   | "credentials"
-  | "tools";
+  | "tools"
+  | "bots";
 
 export type IconName =
   | "documents" | "web" | "youtube" | "local" | "designs" | "images"
   | "skills" | "prompts" | "kanban" | "ideas" | "portfolio" | "misc"
-  | "tools"
+  | "tools" | "bots"
   | "lock" | "search" | "inbox" | "settings" | "add" | "arrow"
   | "pin" | "pinFilled" | "star" | "play" | "x" | "check"
   | "eye" | "eyeOff" | "copy" | "shield" | "refresh"

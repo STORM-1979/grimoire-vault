@@ -98,7 +98,8 @@ export function AddItemModal({
     || categoryId === "prompts"
     || categoryId === "ideas"
     || categoryId === "misc"
-    || categoryId === "tools";
+    || categoryId === "tools"
+    || categoryId === "bots";
 
   const [form, setForm] = useState({ ...EMPTY_FORM });
   // Per-category presets (Skills / Prompts / Ideas / Active Projects
@@ -528,6 +529,7 @@ export function AddItemModal({
     : isDoc ? "Добавить документ"
     : isPrompt ? "Добавить промпт"
     : categoryId === "tools" ? "Добавить инструмент"
+    : categoryId === "bots" ? "Добавить бота"
     : "Добавить запись";
 
   const titleDisabled = !form.title.trim() || submitting;

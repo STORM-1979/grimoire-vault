@@ -3,7 +3,7 @@ import { z } from "zod";
 const categoryIdSchema = z.enum([
   "documents", "web", "youtube", "local", "designs", "images",
   "skills", "prompts", "kanban", "ideas", "portfolio", "misc", "credentials",
-  "tools",
+  "tools", "bots",
 ]);
 
 const slugSchema = z.string()

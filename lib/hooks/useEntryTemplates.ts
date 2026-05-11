@@ -87,6 +87,16 @@ const SEED: Record<CategoryId, EntryTemplate[]> = {
       desc: "## Установка\n```\n…\n```\n\n## Базовый workflow\n…\n\n## Почему именно она\n…",
       tags: ["cli"] },
   ],
+  bots: [
+    { id: "bots-telegram",
+      name: "Telegram-бот",
+      desc: "## Что делает\n…\n\n## Команды\n- /start — …\n- /help — …\n\n## Зачем мне\n…",
+      tags: ["telegram"] },
+    { id: "bots-ai-assistant",
+      name: "AI-ассистент",
+      desc: "## Модель\n…\n\n## Сильные стороны\n- …\n\n## Где использую\n- …\n\n## Цена\n…",
+      tags: ["ai"] },
+  ],
 };
 
 function readAll(): Record<string, EntryTemplate[]> {
