@@ -3,27 +3,26 @@
 import { useEffect, useState } from "react";
 
 /**
- * Aviator (Type-B flieger) clock, modelled exactly on the reference
- * watch shipped with the redesign brief:
+ * Aviator (Type-B flieger) clock — layout and proportions copied
+ * directly from the reference photo:
  *
- *   • Warm cream dial, no branding text — the photo's face is
- *     blank apart from the numerals.
- *   • Outer minute scale 5 / 10 / 15 / … / 55 in bold sans (the
- *     photo uses a heavy black sans-serif).
- *   • Inner hour scale 1 / 2 / … / 12 in smaller serif numerals.
- *   • Triangle index at 12 with two flanking pip dots.
- *   • Three hands: hour and minute are sword-shaped with a cream
- *     tip (matches the photo's painted lume); second hand is a
- *     slim stick.
- *   • Crown protrudes from the case at 3 o'clock.
- *   • Strap lugs intentionally absent — case floats clean on the
- *     emerald background per request.
+ *   • Round case, no crown, no strap-lugs — the watch floats on
+ *     the emerald background as a clean object.
+ *   • Two-ring dial: outer minute scale (5/10/15/…/55) in heavy
+ *     numerals, inner hour scale (1–12) in smaller numerals,
+ *     separated by a thin hairline circle exactly as in the photo.
+ *   • Triangle index at 12 with two flanking pip dots; apex points
+ *     OUTWARD (toward the rim, away from centre).
+ *   • Three sword-shaped hands with a cream lume tip.
  *
- * Hands smooth-interpolate between ticks (hour creeps with the
- * minutes, minute creeps with the seconds).  Second hand does
- * discrete ticks once per second via setInterval(1000).  First
- * server render uses a deterministic 12:00:00 so SSR markup
- * matches the first client paint.
+ * Dial reverts to the site's emerald palette per request — the
+ * face is a slightly-lighter-than-background green so the watch
+ * reads as an object instead of blending into the page.  Numerals
+ * and hands in warm cream for contrast.
+ *
+ * Hands smooth-interpolate between ticks; second hand ticks
+ * discretely once per second.  First server render uses a stable
+ * 12:00:00 so SSR markup matches client.
  */
 export function AnalogClock() {
   const [now, setNow] = useState<Date | null>(null);
@@ -42,8 +41,6 @@ export function AnalogClock() {
   const minuteAngle = (minutes + seconds / 60) * 6;
   const secondAngle = seconds * 6;
 
-  // Centre at (150,150).  SVG y grows downward, so we offset the
-  // angle by -90° to put 0° at 12 o'clock.
   const project = (angleDeg: number, length: number, cx = 150, cy = 150) => {
     const rad = (angleDeg - 90) * (Math.PI / 180);
     return {
@@ -52,26 +49,23 @@ export function AnalogClock() {
     };
   };
 
-  const hourEnd = project(hourAngle, 62);
-  const minuteEnd = project(minuteAngle, 92);
   const secondEnd = project(secondAngle, 102);
   const secondTail = project(secondAngle + 180, 22);
 
-  // Dial palette pulled from the reference photo:
-  // - cream/tan face (#E9DDB1) — warm, slightly aged
-  // - near-black markings (#1A1410) — readable on cream
-  // - off-white painted hand tip (#F5EFD8)
-  // - brushed-steel case (rgba ivory-mute) — matches the photo
-  //   well enough on the emerald background.
-  const DIAL = "#E9DDB1";
-  const INK = "#1A1410";
-  const LUME = "#F5EFD8";
+  // Palette — back to the site's emerald scheme.
+  // - Dial: emerald just a step lighter than the page background
+  //   so the case reads as a separate object.
+  // - Ink: warm cream that contrasts on the green face.
+  // - Accent: gold for the triangle index and the second hand.
+  const DIAL = "#0F3528";
+  const INK = "#E9DDB1";
+  const ACCENT = "#D4B76A";
 
   return (
     <div className="flex items-center justify-center">
       <svg
-        viewBox="0 0 320 300"
-        className="w-full max-w-[460px] h-auto"
+        viewBox="0 0 300 300"
+        className="w-full max-w-[540px] h-auto"
         role="img"
         aria-label={
           now
@@ -79,21 +73,10 @@ export function AnalogClock() {
             : "Аналоговые часы"
         }
       >
-        {/* Crown — small stem sticking out at 3 o'clock.  Drawn
-            before the case so the case rim overlaps cleanly. */}
-        <rect
-          x="291" y="143"
-          width="14" height="14"
-          rx="2"
-          fill="rgba(250,246,233,0.20)"
-          stroke="rgba(212,183,106,0.45)"
-          strokeWidth="1"
-        />
-
         {/* Case — outer brushed-steel ring */}
         <circle
           cx="150" cy="150" r="142"
-          fill="rgba(250,246,233,0.12)"
+          fill="rgba(250,246,233,0.10)"
           stroke="rgba(212,183,106,0.50)"
           strokeWidth="2"
         />
@@ -105,15 +88,15 @@ export function AnalogClock() {
           strokeWidth="1"
         />
 
-        {/* Dial */}
+        {/* Dial — site emerald */}
         <circle cx="150" cy="150" r="125" fill={DIAL} />
 
         {/* Minute ticks — 60 short marks; every 5th is longer + heavier */}
         {Array.from({ length: 60 }, (_, i) => {
           const angle = i * 6;
           const isMajor = i % 5 === 0;
-          const outer = project(angle, 118);
-          const inner = project(angle, isMajor ? 104 : 111);
+          const outer = project(angle, 119);
+          const inner = project(angle, isMajor ? 104 : 112);
           return (
             <line
               key={`tick-${i}`}
@@ -126,14 +109,14 @@ export function AnalogClock() {
           );
         })}
 
-        {/* Outer minute numerals 5, 10, … 55.  The 60 position is
-            taken by the triangle, so we skip it.  Bold mono — the
-            photo's outer ring is a heavy sans, this is the closest
-            match in our font stack. */}
+        {/* Outer minute numerals 5 / 10 / … / 55.  60 lives at the
+            top under the triangle so we skip it.  Heavy mono — the
+            closest match in our font stack to the reference photo's
+            bold sans-serif. */}
         {Array.from({ length: 11 }, (_, i) => {
           const minute = (i + 1) * 5; // 5 .. 55
           const angle = (i + 1) * 30;
-          const pos = project(angle, 91);
+          const pos = project(angle, 90);
           return (
             <text
               key={`min-${minute}`}
@@ -150,25 +133,24 @@ export function AnalogClock() {
           );
         })}
 
-        {/* Triangle index at 12 + two flanking pip dots — matches
-            the reference photo's orientation cue exactly. */}
-        <path
-          d="M 144 46 L 156 46 L 150 62 Z"
-          fill={LUME}
+        {/* Thin hairline circle separating the outer minute ring
+            from the inner hour ring.  Subtle — same colour as the
+            ink at 40% opacity so it reads as a structural cue
+            without competing with the numerals. */}
+        <circle
+          cx="150" cy="150" r="76"
+          fill="none"
           stroke={INK}
-          strokeWidth="1"
-          strokeLinejoin="miter"
+          strokeWidth="0.8"
+          opacity="0.45"
         />
-        <circle cx="132" cy="56" r="1.8" fill={INK} />
-        <circle cx="168" cy="56" r="1.8" fill={INK} />
 
-        {/* Inner hour ring 1–12 — smaller serif numerals.  The
-            photo's inner ring uses a thin serif; Fraunces reads
-            close enough at this size. */}
+        {/* Inner hour ring — 1–12 in smaller serif numerals,
+            same ink colour as the outer ring but lighter weight. */}
         {Array.from({ length: 12 }, (_, i) => {
           const hour = i + 1;
           const angle = hour * 30;
-          const pos = project(angle, 70);
+          const pos = project(angle, 62);
           return (
             <text
               key={`hr-${hour}`}
@@ -179,81 +161,96 @@ export function AnalogClock() {
               textAnchor="middle"
               dominantBaseline="middle"
               fill={INK}
+              opacity="0.95"
             >
               {hour}
             </text>
           );
         })}
 
-        {/* Hour hand — sword shape with a cream lume tip.  Drawn
-            as a polygon so we can give the tip a separate fill.
-            Coordinates are computed via project() at three control
-            points: base, shoulder, tip. */}
+        {/* Triangle index at 12 — apex pointing OUTWARD (toward
+            the rim) with two flanking pip dots, per the reference
+            photo.  Wide base at y=62 (inner side), apex at y=46
+            (outer side). */}
+        <path
+          d="M 144 62 L 156 62 L 150 46 Z"
+          fill={ACCENT}
+          stroke={INK}
+          strokeWidth="0.6"
+          strokeLinejoin="miter"
+        />
+        <circle cx="132" cy="56" r="1.8" fill={INK} />
+        <circle cx="168" cy="56" r="1.8" fill={INK} />
+
+        {/* Hour hand — sword shape with a cream body and gold lume
+            tip.  Inverted contrast from the cream-dial photo (we
+            need light hands on a dark dial), silhouette unchanged. */}
         <SwordHand
           angle={hourAngle}
           length={62}
-          width={8}
+          width={9}
           shoulder={0.78}
-          ink={INK}
-          lume={LUME}
+          body={INK}
+          tip={ACCENT}
+          outline={DIAL}
         />
 
-        {/* Minute hand — same construction, longer + slimmer */}
+        {/* Minute hand — longer + slimmer, same construction */}
         <SwordHand
           angle={minuteAngle}
-          length={96}
-          width={6}
-          shoulder={0.82}
-          ink={INK}
-          lume={LUME}
+          length={98}
+          width={6.5}
+          shoulder={0.84}
+          body={INK}
+          tip={ACCENT}
+          outline={DIAL}
         />
 
-        {/* Second hand — thin stick with a small counterweight tail.
-            Tip painted black (no lume) per the photo. */}
+        {/* Second hand — thin gold needle with a small dark
+            counterweight tail, per the photo. */}
         <line
           x1={secondTail.x} y1={secondTail.y}
           x2={secondEnd.x} y2={secondEnd.y}
-          stroke={INK}
-          strokeWidth="1.4"
+          stroke={ACCENT}
+          strokeWidth="1.5"
           strokeLinecap="round"
         />
-        <circle cx={secondTail.x} cy={secondTail.y} r="3.2" fill={INK} />
+        <circle cx={secondTail.x} cy={secondTail.y} r="3.4" fill={ACCENT} stroke={DIAL} strokeWidth="0.6" />
 
         {/* Centre cap on top of all hands */}
-        <circle cx="150" cy="150" r="4" fill={INK} />
+        <circle cx="150" cy="150" r="4.5" fill={ACCENT} stroke={DIAL} strokeWidth="0.8" />
       </svg>
     </div>
   );
 }
 
 /**
- * Sword-shape watch hand — a thin diamond that broadens around the
- * midpoint and tapers back at the tip.  Drawn as a 6-point polygon
- * so we can plant a cream lume fill near the tip (separate from
- * the dark body).
+ * Sword-shape watch hand.  Six-point polygon: short tail behind
+ * the centre, two shoulder corners at `shoulder` fraction along
+ * the axis, and a single tip.  A second narrower polygon plants
+ * a contrast tip near the end for the lume effect.
  *
- * Geometry:
- *   • Base sits on the dial centre.
- *   • Body is `width` units wide at the widest point ("shoulder").
- *   • Shoulder sits at `shoulder` fraction of `length` along the
- *     hand axis.
- *   • Lume insert occupies the segment from `shoulder` → tip,
- *     drawn slightly narrower so a thin dark outline frames it.
+ * `body` colour fills the broad diamond, `tip` colour fills the
+ * lume insert near the end, and `outline` strokes around the
+ * shapes — usually the dial colour so the hand reads cleanly
+ * against the face.
  */
 function SwordHand({
   angle,
   length,
   width,
   shoulder,
-  ink,
-  lume,
+  body,
+  tip,
+  outline,
 }: {
   angle: number;
   length: number;
   width: number;
   shoulder: number;
-  ink: string;
-  lume: string;
+  body: string;
+  tip: string;
+  outline: string;
 }) {
   const rad = (angle - 90) * (Math.PI / 180);
   const cos = Math.cos(rad);
@@ -261,47 +258,42 @@ function SwordHand({
   const cx = 150;
   const cy = 150;
 
-  // Forward axis = direction the hand points.
-  // Side axis = perpendicular (rotated +90°).
   const fwd = (d: number) => ({ x: cos * d, y: sin * d });
   const side = (d: number) => ({ x: -sin * d, y: cos * d });
 
-  const tip = fwd(length);
   const shoulderPt = fwd(length * shoulder);
-  const baseBack = fwd(-width * 1.2); // small tail behind the centre
+  const tipPt = fwd(length);
+  const tailPt = fwd(-width * 1.3);
 
-  // Body polygon: base-tail, shoulder-left, tip, shoulder-right.
   const half = width / 2;
   const baseL = { x: cx + side(-half).x, y: cy + side(-half).y };
   const baseR = { x: cx + side(half).x, y: cy + side(half).y };
   const shoulderL = { x: cx + shoulderPt.x + side(-half).x, y: cy + shoulderPt.y + side(-half).y };
   const shoulderR = { x: cx + shoulderPt.x + side(half).x, y: cy + shoulderPt.y + side(half).y };
-  const tipPt = { x: cx + tip.x, y: cy + tip.y };
-  const tailPt = { x: cx + baseBack.x, y: cy + baseBack.y };
+  const tipEnd = { x: cx + tipPt.x, y: cy + tipPt.y };
+  const tailEnd = { x: cx + tailPt.x, y: cy + tailPt.y };
 
-  const bodyPath = `M ${tailPt.x} ${tailPt.y}
+  const bodyPath = `M ${tailEnd.x} ${tailEnd.y}
     L ${baseL.x} ${baseL.y}
     L ${shoulderL.x} ${shoulderL.y}
-    L ${tipPt.x} ${tipPt.y}
+    L ${tipEnd.x} ${tipEnd.y}
     L ${shoulderR.x} ${shoulderR.y}
     L ${baseR.x} ${baseR.y} Z`;
 
-  // Lume insert: slimmer rectangle from shoulder to tip.
-  const lumeHalf = (width - 2) / 2;
+  // Lume insert — narrower diamond from shoulder to tip.
+  const lumeHalf = Math.max(1.4, (width - 2.4) / 2);
   const lumeShoulderL = { x: cx + shoulderPt.x + side(-lumeHalf).x, y: cy + shoulderPt.y + side(-lumeHalf).y };
   const lumeShoulderR = { x: cx + shoulderPt.x + side(lumeHalf).x, y: cy + shoulderPt.y + side(lumeHalf).y };
-  // Lume tip pulled in slightly so the outer dark outline frames it.
-  const lumeTip = fwd(length - 2);
-  const lumeTipPt = { x: cx + lumeTip.x, y: cy + lumeTip.y };
-
+  const lumeTipPt = fwd(length - 2);
+  const lumeTip = { x: cx + lumeTipPt.x, y: cy + lumeTipPt.y };
   const lumePath = `M ${lumeShoulderL.x} ${lumeShoulderL.y}
-    L ${lumeTipPt.x} ${lumeTipPt.y}
+    L ${lumeTip.x} ${lumeTip.y}
     L ${lumeShoulderR.x} ${lumeShoulderR.y} Z`;
 
   return (
     <>
-      <path d={bodyPath} fill={ink} stroke={ink} strokeWidth="0.5" strokeLinejoin="miter" />
-      <path d={lumePath} fill={lume} stroke={ink} strokeWidth="0.5" strokeLinejoin="miter" />
+      <path d={bodyPath} fill={body} stroke={outline} strokeWidth="0.7" strokeLinejoin="miter" />
+      <path d={lumePath} fill={tip} stroke={outline} strokeWidth="0.5" strokeLinejoin="miter" />
     </>
   );
 }
