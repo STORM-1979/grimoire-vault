@@ -36,7 +36,12 @@ const tagList = z.array(z.string().min(1).max(40)).max(20).default([]);
 /** Body for POST /api/entries — create new entry */
 export const createEntrySchema = z.object({
   categoryId: categoryIdSchema,
-  title: z.string().trim().min(1, "Title is required").max(280),
+  // Real-world og:title / <title> values from GitHub repos, news
+  // articles, etc. routinely exceed 280 chars when the description
+  // is appended ("GitHub — owner/repo: full README first line…").
+  // 500 is the cap; anything longer is almost always a bug in the
+  // source page and we'd rather error than silently truncate.
+  title: z.string().trim().min(1, "Title is required").max(500),
   description: z.string().max(4000).optional().nullable(),
   body: z.string().max(20000).optional().nullable(),
   url: urlOrEmpty,
@@ -70,7 +75,8 @@ export const createEntrySchema = z.object({
  */
 export const updateEntrySchema = z.object({
   categoryId: categoryIdSchema.optional(),
-  title: z.string().trim().min(1, "Title is required").max(280).optional(),
+  // 500-char cap mirrors createEntrySchema — see comment there.
+  title: z.string().trim().min(1, "Title is required").max(500).optional(),
   description: z.string().max(4000).optional().nullable(),
   body: z.string().max(20000).optional().nullable(),
   url: urlOrEmpty,

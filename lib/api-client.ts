@@ -24,7 +24,20 @@ async function call<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const isJson = res.headers.get("content-type")?.includes("application/json");
   const body = isJson ? await res.json() : await res.text();
   if (!res.ok) {
-    const msg = (body && typeof body === "object" && "error" in body ? (body as { error: string }).error : `HTTP ${res.status}`);
+    // Default error message is whatever the server put in `error`.
+    // For 400-with-Zod-issues we append a one-line summary of the
+    // first failing field so the user sees "Invalid request body ·
+    // title: String must contain at most 500 character(s)" instead
+    // of just "Invalid request body" with no clue what to fix.
+    let msg = (body && typeof body === "object" && "error" in body ? (body as { error: string }).error : `HTTP ${res.status}`);
+    if (body && typeof body === "object" && Array.isArray((body as { issues?: unknown }).issues)) {
+      const issues = (body as { issues: Array<{ path: (string | number)[]; message: string }> }).issues;
+      const first = issues[0];
+      if (first) {
+        const path = first.path.length ? first.path.join(".") : "body";
+        msg = `${msg} · ${path}: ${first.message}`;
+      }
+    }
     throw new ApiError(msg, res.status, body);
   }
   return body as T;
