@@ -27,10 +27,10 @@ export function Logo({ size = "md", showText = true }: LogoProps) {
       </svg>
       {showText && (
         <div className="leading-none">
-          <div className="font-display italic font-medium text-[20px] text-ivory tracking-tightest">
+          <div className="font-display italic font-medium text-[22px] text-ivory tracking-tightest">
             Grimoire <span className="not-italic font-normal text-emerald-200">Vault</span>
           </div>
-          <div className="font-mono text-[10px] tracking-widest uppercase text-ivory-mute mt-1">
+          <div className="font-mono text-[11px] tracking-widest uppercase text-ivory-mute mt-1.5">
             Atelier · Personal Edition
           </div>
         </div>

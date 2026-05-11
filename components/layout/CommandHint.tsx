@@ -24,13 +24,13 @@ export function CommandHint() {
         window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, ctrlKey: true, bubbles: true }));
       }}
       title="Командная палитра"
-      className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 hover:border-gold hover:text-gold transition text-ivory-mute font-mono text-[10px] uppercase tracking-widest"
+      className="hidden md:flex items-center gap-2 px-3.5 py-2 rounded-full border border-white/10 hover:border-gold hover:text-gold transition text-ivory-mute font-mono text-[11px] uppercase tracking-widest"
     >
-      <Icon name="search" size={12} />
+      <Icon name="search" size={13} />
       <span>Поиск</span>
       <span className="ml-1 inline-flex items-center gap-0.5">
-        <kbd className="border border-white/15 rounded px-1 py-0.5 text-[9px]">{mac ? "⌘" : "Ctrl"}</kbd>
-        <kbd className="border border-white/15 rounded px-1 py-0.5 text-[9px]">K</kbd>
+        <kbd className="border border-white/15 rounded px-1.5 py-0.5 text-[10px]">{mac ? "⌘" : "Ctrl"}</kbd>
+        <kbd className="border border-white/15 rounded px-1.5 py-0.5 text-[10px]">K</kbd>
       </span>
     </button>
   );

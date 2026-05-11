@@ -16,7 +16,7 @@ export function Header({ user }: HeaderProps) {
       <div className="max-w-[1480px] mx-auto px-10 py-4 flex items-center justify-between gap-8">
         <Logo />
 
-        <nav className="flex items-center gap-9">
+        <nav className="flex items-center gap-6">
           <NavLink href="/" exact>Главная</NavLink>
           <NavLink href="/today">Сегодня</NavLink>
           <NavLink href="/categories">Категории</NavLink>
@@ -36,7 +36,7 @@ export function Header({ user }: HeaderProps) {
           <VaultPicker />
           <CommandHint />
           {user?.email && (
-            <span className="font-mono text-[11px] text-ivory-mute hidden md:inline">
+            <span className="font-mono text-[12px] text-ivory-mute hidden md:inline">
               {user.email}
             </span>
           )}
