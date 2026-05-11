@@ -49,8 +49,11 @@ export function AnalogClock() {
     };
   };
 
-  const secondEnd = project(secondAngle, 102);
-  const secondTail = project(secondAngle + 180, 22);
+  // Second hand reaches almost to the inner edge of the minute
+  // scale so it visibly sweeps past each major tick — matches the
+  // photo's needle proportions.
+  const secondEndExtended = project(secondAngle, 115);
+  const secondTail = project(secondAngle + 180, 24);
 
   // Palette — back to the site's emerald scheme.
   // - Dial: emerald just a step lighter than the page background
@@ -91,39 +94,39 @@ export function AnalogClock() {
         {/* Dial — site emerald */}
         <circle cx="150" cy="150" r="125" fill={DIAL} />
 
-        {/* Minute ticks — 60 short marks; every 5th is longer + heavier */}
+        {/* Minute ticks — proportions remeasured against the photo:
+            major ticks (every 5th) are longer + meaningfully heavier
+            than the minors, which sit just inside the outer edge. */}
         {Array.from({ length: 60 }, (_, i) => {
           const angle = i * 6;
           const isMajor = i % 5 === 0;
-          const outer = project(angle, 119);
-          const inner = project(angle, isMajor ? 104 : 112);
+          const outer = project(angle, 120);
+          const inner = project(angle, isMajor ? 102 : 114);
           return (
             <line
               key={`tick-${i}`}
               x1={inner.x} y1={inner.y}
               x2={outer.x} y2={outer.y}
               stroke={INK}
-              strokeWidth={isMajor ? 2.4 : 1}
+              strokeWidth={isMajor ? 3 : 1}
               strokeLinecap="butt"
             />
           );
         })}
 
-        {/* Outer minute numerals 5 / 10 / … / 55.  60 lives at the
-            top under the triangle so we skip it.  Heavy mono — the
-            closest match in our font stack to the reference photo's
-            bold sans-serif. */}
+        {/* Outer minute numerals 5 / 10 / … / 55.  Bold mono, heavier
+            than before — the photo's outer ring reads BIG. */}
         {Array.from({ length: 11 }, (_, i) => {
           const minute = (i + 1) * 5; // 5 .. 55
           const angle = (i + 1) * 30;
-          const pos = project(angle, 90);
+          const pos = project(angle, 89);
           return (
             <text
               key={`min-${minute}`}
               x={pos.x} y={pos.y}
               fontFamily="var(--font-mono), monospace"
               fontWeight="700"
-              fontSize="15"
+              fontSize="17"
               textAnchor="middle"
               dominantBaseline="middle"
               fill={INK}
@@ -133,31 +136,34 @@ export function AnalogClock() {
           );
         })}
 
-        {/* Thin hairline circle separating the outer minute ring
-            from the inner hour ring.  Subtle — same colour as the
-            ink at 40% opacity so it reads as a structural cue
-            without competing with the numerals. */}
+        {/* Hairline separator between outer minute scale and inner
+            hour ring.  Moved closer to centre (r=68 instead of 76)
+            so the two scales sit at the right relative radii — the
+            photo's separator divides the dial roughly in half by
+            visual weight. */}
         <circle
-          cx="150" cy="150" r="76"
+          cx="150" cy="150" r="68"
           fill="none"
           stroke={INK}
           strokeWidth="0.8"
           opacity="0.45"
         />
 
-        {/* Inner hour ring — 1–12 in smaller serif numerals,
-            same ink colour as the outer ring but lighter weight. */}
+        {/* Inner hour ring — 1–12 in small serif numerals, pulled
+            closer to centre so the outer minute ring can breathe.
+            Photo's inner ring is noticeably tighter to the centre
+            than my previous pass had it. */}
         {Array.from({ length: 12 }, (_, i) => {
           const hour = i + 1;
           const angle = hour * 30;
-          const pos = project(angle, 62);
+          const pos = project(angle, 52);
           return (
             <text
               key={`hr-${hour}`}
               x={pos.x} y={pos.y}
               fontFamily="var(--font-fraunces), serif"
               fontWeight="500"
-              fontSize="13"
+              fontSize="11"
               textAnchor="middle"
               dominantBaseline="middle"
               fill={INK}
@@ -168,57 +174,59 @@ export function AnalogClock() {
           );
         })}
 
-        {/* Triangle index at 12 — apex pointing OUTWARD (toward
-            the rim) with two flanking pip dots, per the reference
-            photo.  Wide base at y=62 (inner side), apex at y=46
-            (outer side). */}
+        {/* Triangle index at 12 — apex pointing OUTWARD with two
+            flanking pip dots.  Bigger than before: 14 wide × 20
+            tall, dots r=2.5. */}
         <path
-          d="M 144 62 L 156 62 L 150 46 Z"
+          d="M 143 64 L 157 64 L 150 44 Z"
           fill={ACCENT}
           stroke={INK}
-          strokeWidth="0.6"
+          strokeWidth="0.7"
           strokeLinejoin="miter"
         />
-        <circle cx="132" cy="56" r="1.8" fill={INK} />
-        <circle cx="168" cy="56" r="1.8" fill={INK} />
+        <circle cx="130" cy="58" r="2.5" fill={INK} />
+        <circle cx="170" cy="58" r="2.5" fill={INK} />
 
-        {/* Hour hand — sword shape with a cream body and gold lume
-            tip.  Inverted contrast from the cream-dial photo (we
-            need light hands on a dark dial), silhouette unchanged. */}
+        {/* Hour hand — wider body with the diamond-shoulder sitting
+            closer to the base (40% along instead of 78%), matching
+            the photo's wedge silhouette where the widest point is
+            near the centre pivot, then tapers to a sharp point. */}
         <SwordHand
           angle={hourAngle}
           length={62}
-          width={9}
-          shoulder={0.78}
+          width={11}
+          shoulder={0.4}
           body={INK}
           tip={ACCENT}
           outline={DIAL}
         />
 
-        {/* Minute hand — longer + slimmer, same construction */}
+        {/* Minute hand — longer, slightly slimmer; same shoulder-
+            near-base geometry. */}
         <SwordHand
           angle={minuteAngle}
-          length={98}
-          width={6.5}
-          shoulder={0.84}
+          length={105}
+          width={8}
+          shoulder={0.42}
           body={INK}
           tip={ACCENT}
           outline={DIAL}
         />
 
-        {/* Second hand — thin gold needle with a small dark
-            counterweight tail, per the photo. */}
+        {/* Second hand — thin gold needle, longer (almost touches
+            the inner edge of the minute scale), with a small dark
+            counterweight tail. */}
         <line
           x1={secondTail.x} y1={secondTail.y}
-          x2={secondEnd.x} y2={secondEnd.y}
+          x2={secondEndExtended.x} y2={secondEndExtended.y}
           stroke={ACCENT}
           strokeWidth="1.5"
           strokeLinecap="round"
         />
-        <circle cx={secondTail.x} cy={secondTail.y} r="3.4" fill={ACCENT} stroke={DIAL} strokeWidth="0.6" />
+        <circle cx={secondTail.x} cy={secondTail.y} r="4" fill={ACCENT} stroke={DIAL} strokeWidth="0.6" />
 
         {/* Centre cap on top of all hands */}
-        <circle cx="150" cy="150" r="4.5" fill={ACCENT} stroke={DIAL} strokeWidth="0.8" />
+        <circle cx="150" cy="150" r="5.5" fill={ACCENT} stroke={DIAL} strokeWidth="1" />
       </svg>
     </div>
   );
