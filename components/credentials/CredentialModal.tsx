@@ -5,7 +5,7 @@ import { Icon } from "@/components/icons/Icon";
 import { Field } from "@/components/forms/Field";
 import { StrengthDot } from "./StrengthDot";
 import { classifyStrength, generatePassword } from "@/lib/crypto";
-import { ORPHAN_OWNER } from "@/lib/credentials-owners";
+import { ORPHAN_OWNER, splitOwner } from "@/lib/credentials-owners";
 import type { CredentialDecrypted } from "@/lib/types";
 
 interface Props {
@@ -151,26 +151,39 @@ export function CredentialModal({ initial, ownerOptions, onClose, onSubmit }: Pr
                 Same visual language as the filter strip above the
                 table on the credentials view. */}
             <div className="flex flex-wrap gap-2 items-center">
-              {ownerOptions.map((name) => {
-                const active = form.owner === name;
-                const isOrphan = name === ORPHAN_OWNER;
-                return (
-                  <button
-                    key={name}
-                    type="button"
-                    onClick={() => setForm((f) => ({ ...f, owner: name }))}
-                    className={
-                      "font-mono text-[11px] uppercase tracking-widest px-3.5 py-2 rounded-full transition " +
-                      (isOrphan ? "italic " : "") +
-                      (active
-                        ? "bg-gold text-emerald-deep"
-                        : "border border-white/15 text-ivory-mute hover:text-gold hover:border-gold/40")
-                    }
-                  >
-                    {name}
-                  </button>
-                );
-              })}
+              {/* Sort hierarchically so parents lead their own
+                  children, ORPHAN_OWNER pinned to the end. */}
+              {[...ownerOptions]
+                .filter((n) => n !== ORPHAN_OWNER)
+                .sort((a, b) => a.localeCompare(b, "ru", { sensitivity: "base" }))
+                .concat([ORPHAN_OWNER])
+                .map((name) => {
+                  const active = form.owner === name;
+                  const isOrphan = name === ORPHAN_OWNER;
+                  const { parent, child } = splitOwner(name);
+                  return (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, owner: name }))}
+                      className={
+                        "font-mono text-[11px] uppercase tracking-widest px-3.5 py-2 rounded-full transition " +
+                        (isOrphan ? "italic " : "") +
+                        (active
+                          ? "bg-gold text-emerald-deep"
+                          : "border border-white/15 text-ivory-mute hover:text-gold hover:border-gold/40")
+                      }
+                    >
+                      {child ? (
+                        <>
+                          <span className={active ? "opacity-60" : "opacity-50"}>{parent} /</span> {child}
+                        </>
+                      ) : (
+                        name
+                      )}
+                    </button>
+                  );
+                })}
               {/* + Новая коллекция — type a name + Enter / blur
                   commits it as the active owner.  The name only
                   becomes a permanent option after the credential

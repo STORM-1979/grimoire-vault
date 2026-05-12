@@ -9,7 +9,10 @@ import { UnlockGate } from "./UnlockGate";
 import { CredentialsTable } from "./CredentialsTable";
 import { CredentialModal } from "./CredentialModal";
 import { PrintableCredentials } from "./PrintableCredentials";
-import { distinctOwners, ORPHAN_OWNER } from "@/lib/credentials-owners";
+import {
+  topLevelOwners, childrenOf, splitOwner, joinOwner, ownerMatches,
+  ORPHAN_OWNER, OWNER_SEP,
+} from "@/lib/credentials-owners";
 import type { CredentialDecrypted } from "@/lib/types";
 
 export function CredentialsView() {
@@ -37,6 +40,10 @@ export function CredentialsView() {
   // Inline "+ Новая коллекция" input state — null = idle, "" =
   // input visible and empty.
   const [draftCollection, setDraftCollection] = useState<string | null>(null);
+  // Same for the sub-collection input (appears in the sub-row
+  // under an active parent).  Independent state so the top-row
+  // and sub-row inputs don't fight each other.
+  const [draftSub, setDraftSub] = useState<string | null>(null);
 
   if (!mk.ready) {
     return (
@@ -58,33 +65,71 @@ export function CredentialsView() {
     );
   }
 
-  // Owner chip list = distinct owners from rows + pending (empty)
-  // collections the user created in advance.  Dedupe, sort, pin
-  // ORPHAN_OWNER to the end so user-named buckets lead the row.
-  const ownerList = (() => {
-    const raw = distinctOwners(creds.items);
-    const realNames = new Set(raw);
-    const pendingExtras = pendingCollections.filter((n) => !realNames.has(n));
-    const merged = [...raw, ...pendingExtras].filter((n) => n !== ORPHAN_OWNER);
-    merged.sort((a, b) => a.localeCompare(b, "ru", { sensitivity: "base" }));
-    return [...merged, ORPHAN_OWNER];
+  // Top-level chips: distinct parent names from rows + pending
+  // (empty) top-level collections.  ORPHAN_OWNER pinned to the end.
+  const topList = (() => {
+    const real = topLevelOwners(creds.items);
+    const realSet = new Set(real);
+    // pendingCollections may contain "Parent / Child" entries; only
+    // their parent segment goes into the top row, child rows are
+    // handled by the sub-row below.
+    const pendingTops = pendingCollections
+      .map((p) => splitOwner(p).parent)
+      .filter((p) => !realSet.has(p));
+    const merged = [...real, ...pendingTops].filter((n) => n !== ORPHAN_OWNER);
+    const dedup = Array.from(new Set(merged));
+    dedup.sort((a, b) => a.localeCompare(b, "ru", { sensitivity: "base" }));
+    return [...dedup, ORPHAN_OWNER];
   })();
 
-  // Apply the owner filter before the pinned/others split so the
-  // chip counts above and the rendered tables below stay in sync.
-  const ownerFiltered = creds.items.filter(
-    (c) => (c.owner?.trim() || ORPHAN_OWNER) === ownerFilter,
-  );
+  // Currently-active parent (derived from ownerFilter).
+  const activeParent = splitOwner(ownerFilter).parent;
+
+  // Sub-row children for the active parent.  Includes both real
+  // ones (from row data) and pending ones (saved-empty
+  // sub-collections in localStorage).
+  const subList = (() => {
+    const real = childrenOf(creds.items, activeParent);
+    const realSet = new Set(real);
+    const pendingSubs = pendingCollections
+      .map((p) => splitOwner(p))
+      .filter((s) => s.child && s.parent === activeParent && !realSet.has(s.child!))
+      .map((s) => s.child!);
+    const merged = [...real, ...pendingSubs];
+    return Array.from(new Set(merged)).sort((a, b) =>
+      a.localeCompare(b, "ru", { sensitivity: "base" }),
+    );
+  })();
+
+  // Apply the hierarchical filter — parent-only matches parent +
+  // every descendant; child path matches exactly.
+  const ownerFiltered = creds.items.filter((c) => ownerMatches(c.owner, ownerFilter));
   const pinned = ownerFiltered.filter((c) => c.pinned);
   const others = ownerFiltered.filter((c) => !c.pinned);
 
-  // Counts per owner bucket — used for the chip labels.
-  const counts = Object.fromEntries(
-    ownerList.map((name) => [
+  // Counts per chip — top-level chips count themselves + descendants,
+  // child chips count exact matches.
+  const topCounts = Object.fromEntries(
+    topList.map((name) => [
       name,
-      creds.items.filter((c) => (c.owner?.trim() || ORPHAN_OWNER) === name).length,
+      creds.items.filter((c) => ownerMatches(c.owner, name)).length,
     ]),
   ) as Record<string, number>;
+  const subCounts = Object.fromEntries(
+    subList.map((child) => {
+      const full = joinOwner(activeParent, child);
+      return [child, creds.items.filter((c) => (c.owner?.trim() || ORPHAN_OWNER) === full).length];
+    }),
+  ) as Record<string, number>;
+  // Used by the modal — needs the FULL list of chips it can offer.
+  const ownerList = (() => {
+    const set = new Set<string>(topList);
+    for (const top of topList) {
+      for (const child of childrenOf(creds.items, top)) set.add(joinOwner(top, child));
+    }
+    for (const p of pendingCollections) set.add(p);
+    return Array.from(set);
+  })();
 
   return (
     <div>
@@ -192,35 +237,27 @@ export function CredentialsView() {
         </div>
       )}
 
-      {/* Collection filter strip — derived from the current row
-          set + any empty collections the user created in advance
-          via the "+ Новая коллекция" button.  Every credential
-          lives in a collection (the migration backfilled orphans
-          into "Без коллекции"), so the strip is the primary
-          navigation device for the table below.  The "Все" chip
-          is intentionally absent — every entry belongs to exactly
-          one bucket. */}
+      {/* Collection filter strip — two-level.  Top row shows all
+          parent collections + "+ Новая коллекция".  When a parent
+          is active, a sub-row appears underneath with its children
+          + "+ Новая подколлекция".  Same pattern as the entries
+          CollectionsTabs. */}
       <section className="max-w-[1480px] mx-auto px-10 mt-4">
+        {/* Top row */}
         <div className="flex flex-wrap gap-2 items-center">
           <span className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute pr-1">
             коллекция →
           </span>
-          {ownerList.map((name) => (
+          {topList.map((name) => (
             <OwnerChip
               key={name}
               label={name}
-              count={counts[name] ?? 0}
-              active={ownerFilter === name}
+              count={topCounts[name] ?? 0}
+              active={activeParent === name}
               italic={name === ORPHAN_OWNER}
               onClick={() => setOwnerFilter(name)}
             />
           ))}
-          {/* + Новая коллекция — inline-create.  Click → input
-              appears in place of the button.  Enter commits and
-              auto-switches the filter to the new bucket so the
-              user lands on an empty table ready to receive its
-              first credential.  Same UX rhythm as the entries
-              CollectionsTabs uses. */}
           {draftCollection === null ? (
             <button
               type="button"
@@ -231,50 +268,118 @@ export function CredentialsView() {
               <Icon name="add" size={11} /> Новая коллекция
             </button>
           ) : (
-            <span className="inline-flex items-center gap-1">
+            <input
+              autoFocus
+              type="text"
+              value={draftCollection}
+              placeholder="название"
+              onChange={(e) => setDraftCollection(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  const name = draftCollection.trim();
+                  if (!name) { setDraftCollection(null); return; }
+                  if (!topList.includes(name)) {
+                    setPendingCollections((p) => p.includes(name) ? p : [...p, name]);
+                  }
+                  setOwnerFilter(name);
+                  setDraftCollection(null);
+                } else if (e.key === "Escape") setDraftCollection(null);
+              }}
+              onBlur={() => {
+                const name = draftCollection.trim();
+                if (name && !topList.includes(name)) {
+                  setPendingCollections((p) => p.includes(name) ? p : [...p, name]);
+                  setOwnerFilter(name);
+                }
+                setDraftCollection(null);
+              }}
+              className="font-mono text-[11px] uppercase tracking-widest px-3.5 py-2 rounded-full bg-emerald-deep border border-emerald-300 text-ivory min-w-[160px] focus:outline-none"
+            />
+          )}
+        </div>
+
+        {/* Sub-row — only visible when a non-orphan parent is
+            selected.  Always shows the "+ Новая подколлекция"
+            button so the user can spin one up even before any
+            child exists.  ORPHAN_OWNER is intentionally leaf-only —
+            sub-collections under it would be confusing semantics. */}
+        {activeParent !== ORPHAN_OWNER && (
+          <div className="mt-2.5 pl-4 border-l-2 border-gold/20 flex flex-wrap gap-2 items-center">
+            <span className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute pr-1">
+              подколлекции →
+            </span>
+            {/* Sentinel "сам" chip = filter to parent-only (records
+                directly under the parent, not in any sub).  Shown
+                only when sub-collections exist OR the user is on a
+                sub-collection — keeps the chip from cluttering the
+                strip when there's nothing to disambiguate. */}
+            {(subList.length > 0 || ownerFilter !== activeParent) && (
+              <OwnerChip
+                label="без подколлекции"
+                count={creds.items.filter((c) => (c.owner?.trim() || ORPHAN_OWNER) === activeParent).length}
+                active={ownerFilter === activeParent}
+                italic
+                onClick={() => setOwnerFilter(activeParent)}
+              />
+            )}
+            {subList.map((child) => {
+              const full = joinOwner(activeParent, child);
+              return (
+                <OwnerChip
+                  key={child}
+                  label={child}
+                  count={subCounts[child] ?? 0}
+                  active={ownerFilter === full}
+                  onClick={() => setOwnerFilter(full)}
+                />
+              );
+            })}
+            {draftSub === null ? (
+              <button
+                type="button"
+                onClick={() => setDraftSub("")}
+                className="font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full border border-emerald-300/25 text-emerald-200/80 hover:border-emerald-300 hover:bg-emerald-300/[0.06] transition flex items-center gap-1.5"
+                title={`Создать новую подколлекцию внутри «${activeParent}»`}
+              >
+                <Icon name="add" size={10} /> Новая подколлекция
+              </button>
+            ) : (
               <input
                 autoFocus
                 type="text"
-                value={draftCollection}
+                value={draftSub}
                 placeholder="название"
-                onChange={(e) => setDraftCollection(e.target.value)}
+                onChange={(e) => setDraftSub(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
-                    const name = draftCollection.trim();
-                    if (!name) {
-                      setDraftCollection(null);
-                      return;
+                    const name = draftSub.trim();
+                    if (!name) { setDraftSub(null); return; }
+                    const full = joinOwner(activeParent, name);
+                    if (!ownerList.includes(full)) {
+                      setPendingCollections((p) => p.includes(full) ? p : [...p, full]);
                     }
-                    // No-op if it already exists; otherwise stash
-                    // in pendingCollections so the chip shows even
-                    // with zero credentials in it.
-                    if (!ownerList.includes(name)) {
-                      setPendingCollections((p) =>
-                        p.includes(name) ? p : [...p, name],
-                      );
-                    }
-                    setOwnerFilter(name);
-                    setDraftCollection(null);
-                  } else if (e.key === "Escape") {
-                    setDraftCollection(null);
-                  }
+                    setOwnerFilter(full);
+                    setDraftSub(null);
+                  } else if (e.key === "Escape") setDraftSub(null);
                 }}
                 onBlur={() => {
-                  const name = draftCollection.trim();
-                  if (name && !ownerList.includes(name)) {
-                    setPendingCollections((p) =>
-                      p.includes(name) ? p : [...p, name],
-                    );
-                    setOwnerFilter(name);
+                  const name = draftSub.trim();
+                  if (name) {
+                    const full = joinOwner(activeParent, name);
+                    if (!ownerList.includes(full)) {
+                      setPendingCollections((p) => p.includes(full) ? p : [...p, full]);
+                    }
+                    setOwnerFilter(full);
                   }
-                  setDraftCollection(null);
+                  setDraftSub(null);
                 }}
-                className="font-mono text-[11px] uppercase tracking-widest px-3.5 py-2 rounded-full bg-emerald-deep border border-emerald-300 text-ivory min-w-[160px] focus:outline-none"
+                className="font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full bg-emerald-deep border border-emerald-300 text-ivory min-w-[140px] focus:outline-none"
               />
-            </span>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </section>
 
       {pinned.length > 0 && (
