@@ -22,6 +22,10 @@ export function LoginForm() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // Reveal-toggle for the password field — same eye/eyeOff pattern
+  // the credentials UnlockGate uses, kept consistent so the user
+  // doesn't have to learn two different show-password gestures.
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // null  → idle
   // true  → recovery email just dispatched, show confirmation
@@ -90,15 +94,29 @@ export function LoginForm() {
 
       <label className="block">
         <div className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute mb-1.5">Пароль</div>
-        <input
-          type="password"
-          required
-          autoComplete="current-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="••••••••"
-          className="w-full bg-white/[0.04] border border-gold/20 rounded-lg px-4 py-3 font-mono text-ivory placeholder:text-ivory-mute/50 outline-none focus:border-gold transition"
-        />
+        <div className="relative">
+          <input
+            type={showPassword ? "text" : "password"}
+            required
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            // pr-12 reserves space on the right so the input text
+            // never collides with the reveal button.
+            className="w-full bg-white/[0.04] border border-gold/20 rounded-lg px-4 py-3 pr-12 font-mono text-ivory placeholder:text-ivory-mute/50 outline-none focus:border-gold transition"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            tabIndex={-1}
+            className="absolute right-2 top-1/2 -translate-y-1/2 item-actions-btn"
+            title={showPassword ? "Скрыть пароль" : "Показать пароль"}
+            aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
+          >
+            <Icon name={showPassword ? "eyeOff" : "eye"} size={13} />
+          </button>
+        </div>
       </label>
 
       {error && (

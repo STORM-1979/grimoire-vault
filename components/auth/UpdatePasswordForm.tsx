@@ -19,6 +19,11 @@ export function UpdatePasswordForm() {
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  // One reveal-toggle for BOTH fields — when the user wants to
+  // see what they typed, they want to see both at once.  Avoids
+  // the awkward "showing one but not the other" state where they'd
+  // have to flip twice to verify a match.
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -56,31 +61,55 @@ export function UpdatePasswordForm() {
     <form onSubmit={handleSubmit} className="space-y-4">
       <label className="block">
         <div className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute mb-1.5">Новый пароль</div>
-        <input
-          type="password"
-          required
-          autoFocus
-          autoComplete="new-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="••••••••"
-          minLength={8}
-          className="w-full bg-white/[0.04] border border-gold/20 rounded-lg px-4 py-3 font-mono text-ivory placeholder:text-ivory-mute/50 outline-none focus:border-gold transition"
-        />
+        <div className="relative">
+          <input
+            type={showPassword ? "text" : "password"}
+            required
+            autoFocus
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            minLength={8}
+            className="w-full bg-white/[0.04] border border-gold/20 rounded-lg px-4 py-3 pr-12 font-mono text-ivory placeholder:text-ivory-mute/50 outline-none focus:border-gold transition"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            tabIndex={-1}
+            className="absolute right-2 top-1/2 -translate-y-1/2 item-actions-btn"
+            title={showPassword ? "Скрыть пароль" : "Показать пароль"}
+            aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
+          >
+            <Icon name={showPassword ? "eyeOff" : "eye"} size={13} />
+          </button>
+        </div>
       </label>
 
       <label className="block">
         <div className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute mb-1.5">Повтори пароль</div>
-        <input
-          type="password"
-          required
-          autoComplete="new-password"
-          value={confirm}
-          onChange={(e) => setConfirm(e.target.value)}
-          placeholder="••••••••"
-          minLength={8}
-          className="w-full bg-white/[0.04] border border-gold/20 rounded-lg px-4 py-3 font-mono text-ivory placeholder:text-ivory-mute/50 outline-none focus:border-gold transition"
-        />
+        <div className="relative">
+          <input
+            type={showPassword ? "text" : "password"}
+            required
+            autoComplete="new-password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            placeholder="••••••••"
+            minLength={8}
+            className="w-full bg-white/[0.04] border border-gold/20 rounded-lg px-4 py-3 pr-12 font-mono text-ivory placeholder:text-ivory-mute/50 outline-none focus:border-gold transition"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            tabIndex={-1}
+            className="absolute right-2 top-1/2 -translate-y-1/2 item-actions-btn"
+            title={showPassword ? "Скрыть пароль" : "Показать пароль"}
+            aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
+          >
+            <Icon name={showPassword ? "eyeOff" : "eye"} size={13} />
+          </button>
+        </div>
       </label>
 
       {error && (
