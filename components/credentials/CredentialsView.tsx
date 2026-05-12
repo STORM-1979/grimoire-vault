@@ -7,11 +7,15 @@ import { useCredentials } from "@/lib/hooks/useCredentials";
 import { UnlockGate } from "./UnlockGate";
 import { CredentialsTable } from "./CredentialsTable";
 import { CredentialModal } from "./CredentialModal";
+import type { CredentialDecrypted } from "@/lib/types";
 
 export function CredentialsView() {
   const mk = useMasterKey();
   const creds = useCredentials(mk.key);
   const [showAdd, setShowAdd] = useState(false);
+  // null  → modal closed
+  // record → edit mode, pre-fill with this decrypted row
+  const [editing, setEditing] = useState<CredentialDecrypted | null>(null);
 
   if (!mk.ready) {
     return (
@@ -70,6 +74,14 @@ export function CredentialsView() {
         />
       )}
 
+      {editing && (
+        <CredentialModal
+          initial={editing}
+          onClose={() => setEditing(null)}
+          onSubmit={async (input) => { await creds.update(editing.id, input); }}
+        />
+      )}
+
       {/* Security warning */}
       <section className="max-w-[1480px] mx-auto px-10 pt-2">
         <div className="flex items-start gap-4 p-5 rounded-xl border border-gold/30 bg-gold/[0.04]">
@@ -96,13 +108,23 @@ export function CredentialsView() {
           <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-4 flex items-center gap-2">
             <Icon name="pin" size={14} /> Закреплено
           </div>
-          <CredentialsTable items={pinned} onTogglePin={creds.togglePin} onDelete={creds.remove} />
+          <CredentialsTable
+            items={pinned}
+            onTogglePin={creds.togglePin}
+            onDelete={creds.remove}
+            onEdit={setEditing}
+          />
         </section>
       )}
 
       <section className="max-w-[1480px] mx-auto px-10 py-8">
         <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-4">Все записи · {others.length}</div>
-        <CredentialsTable items={others} onTogglePin={creds.togglePin} onDelete={creds.remove} />
+        <CredentialsTable
+          items={others}
+          onTogglePin={creds.togglePin}
+          onDelete={creds.remove}
+          onEdit={setEditing}
+        />
       </section>
 
       {creds.items.length === 0 && !creds.loading && (

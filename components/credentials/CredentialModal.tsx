@@ -5,8 +5,14 @@ import { Icon } from "@/components/icons/Icon";
 import { Field } from "@/components/forms/Field";
 import { StrengthDot } from "./StrengthDot";
 import { classifyStrength, generatePassword } from "@/lib/crypto";
+import type { CredentialDecrypted } from "@/lib/types";
 
 interface Props {
+  /** When set, the modal opens in edit mode: pre-fills the form
+   *  with this record's decrypted values, swaps the heading, and
+   *  routes submit through onSubmit with the same shape — the
+   *  caller decides whether to call create() or update(). */
+  initial?: CredentialDecrypted | null;
   onClose: () => void;
   onSubmit: (input: {
     service: string;
@@ -21,11 +27,25 @@ interface Props {
   }) => Promise<void>;
 }
 
-export function CredentialModal({ onClose, onSubmit }: Props) {
-  const [form, setForm] = useState({
-    service: "", url: "", username: "", password: "", notes: "",
-    tags: "", twoFactor: false, pinned: false,
-  });
+export function CredentialModal({ initial, onClose, onSubmit }: Props) {
+  const isEdit = !!initial;
+  const [form, setForm] = useState(() =>
+    initial
+      ? {
+          service: initial.service,
+          url: initial.url ?? "",
+          username: initial.username,
+          password: initial.password,
+          notes: initial.notes ?? "",
+          tags: initial.tags.join(", "),
+          twoFactor: initial.twoFactor,
+          pinned: initial.pinned,
+        }
+      : {
+          service: "", url: "", username: "", password: "", notes: "",
+          tags: "", twoFactor: false, pinned: false,
+        }
+  );
   const [showPwd, setShowPwd] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,10 +104,16 @@ export function CredentialModal({ onClose, onSubmit }: Props) {
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <header className="flex items-start justify-between p-7 pb-5 border-b border-white/10">
           <div>
-            <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-2">№ 13 · Credentials</div>
-            <h3 className="font-display text-[32px] font-medium leading-none">Сохранить аккаунт</h3>
-            <div className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute mt-2">
-              Шифруется на клиенте · сервер видит только blobs
+            <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-2">
+              № 13 · Credentials{isEdit ? " · Edit" : ""}
+            </div>
+            <h3 className="font-display text-[32px] font-medium leading-none">
+              {isEdit ? "Редактировать аккаунт" : "Сохранить аккаунт"}
+            </h3>
+            <div className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute mt-2 truncate max-w-md">
+              {isEdit
+                ? initial?.service
+                : "Шифруется на клиенте · сервер видит только blobs"}
             </div>
           </div>
           <button onClick={onClose} className="item-actions-btn" title="Закрыть (Esc)">
@@ -212,7 +238,7 @@ export function CredentialModal({ onClose, onSubmit }: Props) {
               disabled={!form.service.trim() || !form.password || busy}
               className="bg-ivory text-emerald-950 px-6 py-2.5 rounded-full font-medium tracking-tight hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-2"
             >
-              <Icon name="lock" size={16} /> {busy ? "..." : "Сохранить аккаунт"}
+              <Icon name={isEdit ? "check" : "lock"} size={16} /> {busy ? "..." : isEdit ? "Сохранить" : "Сохранить аккаунт"}
             </button>
           </div>
         </form>

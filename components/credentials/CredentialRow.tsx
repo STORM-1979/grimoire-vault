@@ -10,11 +10,14 @@ interface Props {
   item: CredentialDecrypted;
   onTogglePin: (id: string) => void | Promise<void>;
   onDelete: (id: string) => void | Promise<void>;
+  /** Open the edit modal pre-filled with this record.  Optional —
+   *  drop the prop to hide the edit button (e.g. read-only views). */
+  onEdit?: (item: CredentialDecrypted) => void;
 }
 
 const initial = (s: string) => (s.trim()[0] ?? "?").toUpperCase();
 
-export function CredentialRow({ item, onTogglePin, onDelete }: Props) {
+export function CredentialRow({ item, onTogglePin, onDelete, onEdit }: Props) {
   const [revealed, setRevealed] = useState(false);
   const masked = "•".repeat(Math.min(16, Math.max(8, item.password.length)));
 
@@ -28,10 +31,20 @@ export function CredentialRow({ item, onTogglePin, onDelete }: Props) {
     e.preventDefault();
     if (confirm(`Удалить «${item.service}»?`)) onDelete(item.id);
   };
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onEdit?.(item);
+  };
 
   return (
     <div className="cred-row group relative grid grid-cols-[44px_2fr_2.5fr_2.5fr_120px_120px] gap-4 items-center px-4 py-3.5 border-b border-white/5 hover:bg-white/[0.03] transition-colors">
       <div className="absolute top-3 right-3 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        {onEdit && (
+          <button onClick={handleEdit} className="item-actions-btn" title="Редактировать">
+            <Icon name="edit" size={13} />
+          </button>
+        )}
         <button onClick={handlePin} className={`item-actions-btn ${item.pinned ? "active" : ""}`} title={item.pinned ? "Открепить" : "Закрепить"}>
           <Icon name={item.pinned ? "pinFilled" : "pin"} size={13} />
         </button>

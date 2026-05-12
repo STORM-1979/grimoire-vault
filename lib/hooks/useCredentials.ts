@@ -101,6 +101,26 @@ export function useCredentials(key: CryptoKey | null) {
     return dec;
   }, [key]);
 
+  /**
+   * Full-record edit.  Same payload shape as create — we re-encrypt
+   * every field with fresh IVs because the password may have rotated,
+   * and AES-GCM forbids reusing an IV with the same key (a leak would
+   * unmask both ciphertexts).  The server's PATCH route accepts any
+   * subset of CreateCredentialInput via updateCredentialSchema.partial,
+   * so sending the full re-encrypted blob is safe.
+   */
+  const update = useCallback(async (id: string, input: NewCredentialPlain) => {
+    if (!key) throw new Error("Vault locked");
+    const payload = await encryptForCreate(input, key);
+    const updated = await credentialsApi.update(id, payload);
+    const dec = await decryptRecord(updated, key);
+    setItems((prev) => prev.map((it) => (it.id === id ? dec : it)).sort((a, b) => {
+      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+      return b.updatedAt.localeCompare(a.updatedAt);
+    }));
+    return dec;
+  }, [key]);
+
   const togglePin = useCallback(async (id: string) => {
     const target = items.find((it) => it.id === id);
     if (!target) return;
@@ -129,5 +149,5 @@ export function useCredentials(key: CryptoKey | null) {
     }
   }, [items]);
 
-  return { items, loading, error, refetch, create, togglePin, remove };
+  return { items, loading, error, refetch, create, update, togglePin, remove };
 }
