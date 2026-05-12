@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Icon } from "@/components/icons/Icon";
 import { useMasterKey } from "@/lib/hooks/useMasterKey";
 import { useCredentials } from "@/lib/hooks/useCredentials";
+import { useLocalStorageState } from "@/lib/hooks/useLocalStorageState";
 import { UnlockGate } from "./UnlockGate";
 import { CredentialsTable } from "./CredentialsTable";
 import { CredentialModal } from "./CredentialModal";
@@ -23,6 +24,19 @@ export function CredentialsView() {
   // mount (the "Все" view is gone, every credential belongs to a
   // collection).  Switches when the user clicks a different chip.
   const [ownerFilter, setOwnerFilter] = useState<string>(ORPHAN_OWNER);
+  // Empty collections — names the user created without filing a
+  // credential into them yet.  Persisted to localStorage so they
+  // survive reloads.  Pruned automatically when a credential lands
+  // there (the name then shows up in distinctOwners and we drop
+  // it from this list to avoid duplication).
+  const [pendingCollections, setPendingCollections] = useLocalStorageState<string[]>(
+    "gv:credentials:pending-collections",
+    [],
+    { validate: (v): v is string[] => Array.isArray(v) && v.every((s) => typeof s === "string") },
+  );
+  // Inline "+ Новая коллекция" input state — null = idle, "" =
+  // input visible and empty.
+  const [draftCollection, setDraftCollection] = useState<string | null>(null);
 
   if (!mk.ready) {
     return (
@@ -44,15 +58,16 @@ export function CredentialsView() {
     );
   }
 
-  // Distinct owner names derived from current rows + the orphan
-  // sentinel.  Sorted alphabetically Russian-first by the helper.
-  // Pin "Без коллекции" to the end so user-named collections lead.
+  // Owner chip list = distinct owners from rows + pending (empty)
+  // collections the user created in advance.  Dedupe, sort, pin
+  // ORPHAN_OWNER to the end so user-named buckets lead the row.
   const ownerList = (() => {
     const raw = distinctOwners(creds.items);
-    return [
-      ...raw.filter((n) => n !== ORPHAN_OWNER),
-      ORPHAN_OWNER,
-    ];
+    const realNames = new Set(raw);
+    const pendingExtras = pendingCollections.filter((n) => !realNames.has(n));
+    const merged = [...raw, ...pendingExtras].filter((n) => n !== ORPHAN_OWNER);
+    merged.sort((a, b) => a.localeCompare(b, "ru", { sensitivity: "base" }));
+    return [...merged, ORPHAN_OWNER];
   })();
 
   // Apply the owner filter before the pinned/others split so the
@@ -129,10 +144,14 @@ export function CredentialsView() {
           onClose={() => setShowAdd(false)}
           onSubmit={async (input) => {
             await creds.create(input);
-            // Snap the filter to whichever bucket the new
-            // credential landed in, so the user can see it
-            // immediately.
-            if (input.owner) setOwnerFilter(input.owner);
+            // Snap the filter to whichever bucket the new credential
+            // landed in, and drop that name from pendingCollections
+            // — it's now a real bucket (distinctOwners picks it up
+            // from the row set on next render).
+            if (input.owner) {
+              setOwnerFilter(input.owner);
+              setPendingCollections((p) => p.filter((n) => n !== input.owner));
+            }
           }}
         />
       )}
@@ -144,7 +163,10 @@ export function CredentialsView() {
           onClose={() => setEditing(null)}
           onSubmit={async (input) => {
             await creds.update(editing.id, input);
-            if (input.owner) setOwnerFilter(input.owner);
+            if (input.owner) {
+              setOwnerFilter(input.owner);
+              setPendingCollections((p) => p.filter((n) => n !== input.owner));
+            }
           }}
         />
       )}
@@ -171,11 +193,13 @@ export function CredentialsView() {
       )}
 
       {/* Collection filter strip — derived from the current row
-          set.  Every credential lives in a collection (the migration
-          backfilled orphans into "Без коллекции"), so the strip is
-          the primary navigation device for the table below.  The
-          "Все" chip is intentionally absent — every entry belongs
-          to exactly one bucket. */}
+          set + any empty collections the user created in advance
+          via the "+ Новая коллекция" button.  Every credential
+          lives in a collection (the migration backfilled orphans
+          into "Без коллекции"), so the strip is the primary
+          navigation device for the table below.  The "Все" chip
+          is intentionally absent — every entry belongs to exactly
+          one bucket. */}
       <section className="max-w-[1480px] mx-auto px-10 mt-4">
         <div className="flex flex-wrap gap-2 items-center">
           <span className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute pr-1">
@@ -191,6 +215,65 @@ export function CredentialsView() {
               onClick={() => setOwnerFilter(name)}
             />
           ))}
+          {/* + Новая коллекция — inline-create.  Click → input
+              appears in place of the button.  Enter commits and
+              auto-switches the filter to the new bucket so the
+              user lands on an empty table ready to receive its
+              first credential.  Same UX rhythm as the entries
+              CollectionsTabs uses. */}
+          {draftCollection === null ? (
+            <button
+              type="button"
+              onClick={() => setDraftCollection("")}
+              className="font-mono text-[11px] uppercase tracking-widest px-3.5 py-2 rounded-full border border-emerald-300/30 text-emerald-200 hover:border-emerald-300 hover:bg-emerald-300/[0.06] transition flex items-center gap-1.5"
+              title="Создать новую коллекцию"
+            >
+              <Icon name="add" size={11} /> Новая коллекция
+            </button>
+          ) : (
+            <span className="inline-flex items-center gap-1">
+              <input
+                autoFocus
+                type="text"
+                value={draftCollection}
+                placeholder="название"
+                onChange={(e) => setDraftCollection(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    const name = draftCollection.trim();
+                    if (!name) {
+                      setDraftCollection(null);
+                      return;
+                    }
+                    // No-op if it already exists; otherwise stash
+                    // in pendingCollections so the chip shows even
+                    // with zero credentials in it.
+                    if (!ownerList.includes(name)) {
+                      setPendingCollections((p) =>
+                        p.includes(name) ? p : [...p, name],
+                      );
+                    }
+                    setOwnerFilter(name);
+                    setDraftCollection(null);
+                  } else if (e.key === "Escape") {
+                    setDraftCollection(null);
+                  }
+                }}
+                onBlur={() => {
+                  const name = draftCollection.trim();
+                  if (name && !ownerList.includes(name)) {
+                    setPendingCollections((p) =>
+                      p.includes(name) ? p : [...p, name],
+                    );
+                    setOwnerFilter(name);
+                  }
+                  setDraftCollection(null);
+                }}
+                className="font-mono text-[11px] uppercase tracking-widest px-3.5 py-2 rounded-full bg-emerald-deep border border-emerald-300 text-ivory min-w-[160px] focus:outline-none"
+              />
+            </span>
+          )}
         </div>
       </section>
 
