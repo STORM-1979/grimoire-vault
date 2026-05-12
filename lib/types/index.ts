@@ -26,7 +26,7 @@ export type IconName =
   | "lock" | "search" | "inbox" | "settings" | "add" | "arrow"
   | "pin" | "pinFilled" | "star" | "play" | "x" | "check"
   | "eye" | "eyeOff" | "copy" | "shield" | "refresh"
-  | "edit" | "drag" | "wifi" | "wifiOff" | "sort";
+  | "edit" | "drag" | "wifi" | "wifiOff" | "sort" | "trash";
 
 export interface Category {
   id: CategoryId;
