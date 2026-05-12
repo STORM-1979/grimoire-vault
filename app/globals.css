@@ -98,7 +98,7 @@ body {
 .badge {
   display: inline-block;
   border: 1px solid rgba(212,183,106,.5);
-  padding: 5px 12px;
+  padding: 9px 12px;
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.18em;
