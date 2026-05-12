@@ -1,6 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {
+  DndContext, closestCenter, PointerSensor, KeyboardSensor,
+  useSensor, useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext, horizontalListSortingStrategy,
+  useSortable, arrayMove, sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Icon } from "@/components/icons/Icon";
 import { collectionsApi, ApiError } from "@/lib/api-client";
 import { defaultCollectionsFor } from "@/lib/categories";
@@ -255,6 +265,77 @@ export function CollectionsTabs({
     }
   };
 
+  // DnD sensors — PointerSensor with distance:8 means a quick
+  // click on a chip still registers as a click, only intentional
+  // drags trigger reorder.  KeyboardSensor brings Space + arrows
+  // for a11y so reorder is reachable without a mouse.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  /**
+   * Top-row reorder.  Computes the new local order optimistically,
+   * broadcasts it to the parent, then fires a PATCH per affected
+   * chip with the freshly-assigned position.  On failure we
+   * surface the error and refetch to snap back to truth.
+   */
+  const handleReorderTop = async (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const oldIdx = topLevel.findIndex((c) => c.id === active.id);
+    const newIdx = topLevel.findIndex((c) => c.id === over.id);
+    if (oldIdx < 0 || newIdx < 0) return;
+    const nextTop = arrayMove(topLevel, oldIdx, newIdx).map((c, i) => ({ ...c, position: i }));
+    // Rebuild the full collections array preserving children.
+    const nextAll = [
+      ...nextTop,
+      ...(collections ?? []).filter((c) => c.parentId),
+    ];
+    broadcast(nextAll);
+    setError(null);
+    try {
+      await Promise.all(
+        nextTop.map((c, i) =>
+          c.position === collections?.find((x) => x.id === c.id)?.position
+            ? Promise.resolve()
+            : collectionsApi.update(c.id, { position: i }),
+        ),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "reorder failed");
+      // Pull truth from the server in case some PATCHes landed and
+      // some didn't — keeps client state from drifting.
+      try { await refetch(); } catch { /* ignore */ }
+    }
+  };
+
+  /** Sub-row reorder — same flow but scoped to children of one parent. */
+  const handleReorderSub = async (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id || !activeRootId) return;
+    const children = byParent.get(activeRootId) ?? [];
+    const oldIdx = children.findIndex((c) => c.id === active.id);
+    const newIdx = children.findIndex((c) => c.id === over.id);
+    if (oldIdx < 0 || newIdx < 0) return;
+    const nextChildren = arrayMove(children, oldIdx, newIdx).map((c, i) => ({ ...c, position: i }));
+    const others = (collections ?? []).filter((c) => c.parentId !== activeRootId);
+    broadcast([...others, ...nextChildren]);
+    setError(null);
+    try {
+      await Promise.all(
+        nextChildren.map((c, i) =>
+          c.position === collections?.find((x) => x.id === c.id)?.position
+            ? Promise.resolve()
+            : collectionsApi.update(c.id, { position: i }),
+        ),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "reorder failed");
+      try { await refetch(); } catch { /* ignore */ }
+    }
+  };
+
   const handleDelete = async (c: EntryCollection) => {
     const childCount = byParent.get(c.id)?.length ?? 0;
     const tail = childCount > 0
@@ -290,26 +371,33 @@ export function CollectionsTabs({
 
   return (
     <div className="max-w-[1480px] mx-auto px-10 mb-6">
-      {/* Top-level row.  "Все записи" chip removed by request —
-          every entry must belong to a collection, so the
-          aggregate view is no longer a navigation target.  A
-          migration moved orphan entries into a "Без коллекции"
-          collection per category. */}
+      {/* Top-level row.  Chips wrapped in a DndContext +
+          SortableContext so the user can drag-reorder them.
+          PointerSensor's distance:8 activation means a quick
+          click still selects; only intentional drag motion
+          starts the reorder.  "Все записи" chip removed by
+          request — every entry belongs to a collection now. */}
       <div className="flex flex-wrap gap-2 items-center">
-        {topLevel.map((c) =>
-          renderChip(c, {
-            isActive: c.id === activeRootId,
-            isSelected: c.id === selected,
-            isRenaming: renamingId === c.id,
-            renameDraft,
-            setRenameDraft,
-            onRename: () => void handleRename(c.id),
-            startRename: () => { setRenamingId(c.id); setRenameDraft(c.name); },
-            cancelRename: () => setRenamingId(null),
-            onSelect: () => onSelect(c.id),
-            onDelete: () => void handleDelete(c),
-          }),
-        )}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => void handleReorderTop(e)}>
+          <SortableContext items={topLevel.map((c) => c.id)} strategy={horizontalListSortingStrategy}>
+            {topLevel.map((c) => (
+              <SortableChipWrapper key={c.id} id={c.id}>
+                {renderChip(c, {
+                  isActive: c.id === activeRootId,
+                  isSelected: c.id === selected,
+                  isRenaming: renamingId === c.id,
+                  renameDraft,
+                  setRenameDraft,
+                  onRename: () => void handleRename(c.id),
+                  startRename: () => { setRenamingId(c.id); setRenameDraft(c.name); },
+                  cancelRename: () => setRenamingId(null),
+                  onSelect: () => onSelect(c.id),
+                  onDelete: () => void handleDelete(c),
+                })}
+              </SortableChipWrapper>
+            ))}
+          </SortableContext>
+        </DndContext>
 
         {creating?.parentId === null ? (
           <InlineCreate
@@ -332,26 +420,34 @@ export function CollectionsTabs({
       </div>
 
       {/* Sub-row — only when a top-level chip is active and either
-          has children or the user is mid-creation under it. */}
+          has children or the user is mid-creation under it.
+          Sub-collections get their own DndContext so they reorder
+          among themselves; matches the top row's behaviour. */}
       {showSubRow && (
         <div className="mt-2.5 pl-4 border-l-2 border-gold/20 flex flex-wrap gap-2 items-center">
           <span className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute pr-1">
             подкатегории →
           </span>
-          {subRow.map((c) =>
-            renderChip(c, {
-              isActive: c.id === selected,
-              isSelected: c.id === selected,
-              isRenaming: renamingId === c.id,
-              renameDraft,
-              setRenameDraft,
-              onRename: () => void handleRename(c.id),
-              startRename: () => { setRenamingId(c.id); setRenameDraft(c.name); },
-              cancelRename: () => setRenamingId(null),
-              onSelect: () => onSelect(c.id),
-              onDelete: () => void handleDelete(c),
-            }),
-          )}
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => void handleReorderSub(e)}>
+            <SortableContext items={subRow.map((c) => c.id)} strategy={horizontalListSortingStrategy}>
+              {subRow.map((c) => (
+                <SortableChipWrapper key={c.id} id={c.id}>
+                  {renderChip(c, {
+                    isActive: c.id === selected,
+                    isSelected: c.id === selected,
+                    isRenaming: renamingId === c.id,
+                    renameDraft,
+                    setRenameDraft,
+                    onRename: () => void handleRename(c.id),
+                    startRename: () => { setRenamingId(c.id); setRenameDraft(c.name); },
+                    cancelRename: () => setRenamingId(null),
+                    onSelect: () => onSelect(c.id),
+                    onDelete: () => void handleDelete(c),
+                  })}
+                </SortableChipWrapper>
+              ))}
+            </SortableContext>
+          </DndContext>
 
           {creating?.parentId === activeRootId ? (
             <InlineCreate
@@ -505,6 +601,37 @@ function InlineCreate({
       <button type="button" onClick={onCancel} className="item-actions-btn" title="Отмена">
         <Icon name="x" size={12} />
       </button>
+    </span>
+  );
+}
+
+/**
+ * Wraps a chip in dnd-kit's sortable harness — the wrapper picks
+ * up the transform/transition values from useSortable and applies
+ * them to the inline span.  The chip's own onClick still fires
+ * because PointerSensor has activationConstraint: { distance: 8 }
+ * on the parent context — a click without horizontal motion never
+ * triggers a drag.
+ *
+ * isDragging fades the chip while it's being moved so the user
+ * gets a "placeholder" feel for the slot it left behind.  cursor
+ * stays default on idle; flips to grabbing during drag.
+ */
+function SortableChipWrapper({ id, children }: { id: string; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  return (
+    <span
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+        cursor: isDragging ? "grabbing" : undefined,
+      }}
+      {...attributes}
+      {...listeners}
+    >
+      {children}
     </span>
   );
 }
