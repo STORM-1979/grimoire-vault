@@ -91,7 +91,6 @@ async function CategoriesGrid() {
             <span className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute">
               {counts[c.id] ?? 0} записей
             </span>
-            <span className="font-mono text-[10px] uppercase tracking-widest text-gold">∞ подкат.</span>
           </div>
         </Link>
       ))}
@@ -112,9 +111,8 @@ function CategoriesGridSkeleton() {
           <div className="text-emerald-200 mb-6"><Icon name={c.icon} size={34} /></div>
           <h3 className="font-display text-[26px] font-medium leading-none">{c.en}</h3>
           <div className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute mt-2">{c.ru}</div>
-          <div className="flex justify-between items-baseline mt-6 pt-3 border-t border-white/10 animate-pulse">
+          <div className="flex items-baseline mt-6 pt-3 border-t border-white/10 animate-pulse">
             <span className="h-3 w-12 rounded bg-white/10" />
-            <span className="font-mono text-[10px] uppercase tracking-widest text-gold opacity-50">∞</span>
           </div>
         </div>
       ))}

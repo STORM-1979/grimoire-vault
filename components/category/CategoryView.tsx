@@ -382,10 +382,12 @@ export function CategoryView({ category, initialItems }: Props) {
         />
       )}
 
-      {/* "Uncategorized" highlight only kicks in when the user has
-          actually created collections in this category — until then,
-          every row would qualify and the visual cue would be useless
-          noise. */}
+      {/* "Uncategorized" highlight: amber ring + "без коллекции"
+          pill on every entry whose collection_id is null in a
+          collection-supporting category.  Lights up across all 13
+          collection-capable categories regardless of whether the
+          user has actually created any collections yet — the cue
+          is "this needs filing", not "this could be in collection X". */}
       {/* Pinned section */}
       {pinned.length > 0 && (
         <section className="max-w-[1480px] mx-auto px-10 py-10">
@@ -398,7 +400,7 @@ export function CategoryView({ category, initialItems }: Props) {
                 <IdeaCard key={it.id} item={it} category={category} big
                   selected={selectedId === it.id}
                   bulkSelected={bulkIds.has(it.id)}
-                  uncategorized={showCollections && collections.length > 0 && !it.collectionId}
+                  uncategorized={showCollections && !it.collectionId}
                   onBulkToggle={toggleBulk}
                   onTogglePin={togglePin} onDelete={removeWithUndo} onEdit={setEditing} />
               ))}
@@ -495,7 +497,7 @@ export function CategoryView({ category, initialItems }: Props) {
               <IdeaCard key={it.id} item={it} category={category}
                 selected={selectedId === it.id}
                 bulkSelected={bulkIds.has(it.id)}
-                uncategorized={showCollections && collections.length > 0 && !it.collectionId}
+                uncategorized={showCollections && !it.collectionId}
                 onBulkToggle={toggleBulk}
                 onTogglePin={togglePin} onDelete={removeWithUndo} onEdit={setEditing} />
             ))}
