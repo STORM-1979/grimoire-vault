@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Icon } from "@/components/icons/Icon";
 import { CopyButton } from "./CopyButton";
 import { StrengthDot } from "./StrengthDot";
-import { getOwnerLabel } from "@/lib/credentials-owners";
 import type { CredentialDecrypted } from "@/lib/types";
 
 interface Props {
@@ -73,11 +72,9 @@ export function CredentialRow({ item, onTogglePin, onDelete, onEdit }: Props) {
               <Icon name="shield" size={10} /> 2FA
             </span>
           )}
-          {item.owner && (
-            <span className="tag-soft inline-flex items-center gap-1">
-              {getOwnerLabel(item.owner)}
-            </span>
-          )}
+          {/* Collection name removed from the row — it's redundant
+              when the filter chip strip above already tells the
+              user which bucket they're looking at. */}
         </div>
         {item.url && (
           <a
