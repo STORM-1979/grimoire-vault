@@ -5,7 +5,7 @@ import { Icon } from "@/components/icons/Icon";
 import { Field } from "@/components/forms/Field";
 import { StrengthDot } from "./StrengthDot";
 import { classifyStrength, generatePassword } from "@/lib/crypto";
-import { CREDENTIAL_OWNERS } from "@/lib/credentials-owners";
+import { ORPHAN_OWNER } from "@/lib/credentials-owners";
 import type { CredentialDecrypted } from "@/lib/types";
 
 interface Props {
@@ -14,6 +14,10 @@ interface Props {
    *  routes submit through onSubmit with the same shape — the
    *  caller decides whether to call create() or update(). */
   initial?: CredentialDecrypted | null;
+  /** Distinct owner-collection names that already exist in the
+   *  user's vault — rendered as chip buttons.  The "Новая…" input
+   *  below lets the user type a fresh name on the fly. */
+  ownerOptions: string[];
   onClose: () => void;
   onSubmit: (input: {
     service: string;
@@ -29,8 +33,12 @@ interface Props {
   }) => Promise<void>;
 }
 
-export function CredentialModal({ initial, onClose, onSubmit }: Props) {
+export function CredentialModal({ initial, ownerOptions, onClose, onSubmit }: Props) {
   const isEdit = !!initial;
+  // Default the owner to the orphan-bucket label so the picker
+  // starts in a valid required-field state ("Без коллекции" is
+  // always present in ownerOptions via distinctOwners()).  The
+  // user can override before saving.
   const [form, setForm] = useState(() =>
     initial
       ? {
@@ -42,13 +50,16 @@ export function CredentialModal({ initial, onClose, onSubmit }: Props) {
           tags: initial.tags.join(", "),
           twoFactor: initial.twoFactor,
           pinned: initial.pinned,
-          owner: initial.owner ?? "",
+          owner: initial.owner?.trim() || ORPHAN_OWNER,
         }
       : {
           service: "", url: "", username: "", password: "", notes: "",
-          tags: "", twoFactor: false, pinned: false, owner: "",
+          tags: "", twoFactor: false, pinned: false, owner: ORPHAN_OWNER,
         }
   );
+  // Inline "+ Новая коллекция" input — empty by default, becomes
+  // the owner value on Enter.
+  const [newOwnerDraft, setNewOwnerDraft] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,10 +80,10 @@ export function CredentialModal({ initial, onClose, onSubmit }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    // Service is the only hard requirement.  Password is optional —
-    // SSO / passkey / email-link accounts have nothing to type into
-    // that field, so we let the row save without one.
-    if (!form.service.trim()) return;
+    // Service + collection are mandatory.  Password stays optional
+    // (SSO / passkey / email-link accounts have nothing to type
+    // into that field).
+    if (!form.service.trim() || !form.owner.trim()) return;
     setBusy(true);
     try {
       await onSubmit({
@@ -129,43 +140,68 @@ export function CredentialModal({ initial, onClose, onSubmit }: Props) {
         </header>
 
         <form onSubmit={handleSubmit} className="p-7">
-          <Field label="Владелец" hint="Чей это аккаунт — для фильтрации в общем сейфе">
-            {/* Chip-row picker instead of a dropdown — owners are
-                first-class collections in this category, so the
-                user should see all the buckets at once when filing
-                a new record.  Same visual language as the filter
-                strip above the table on the credentials view. */}
-            <div className="flex flex-wrap gap-2">
-              {CREDENTIAL_OWNERS.map((o) => {
-                const active = form.owner === o.id;
+          <Field
+            label="Коллекция"
+            required
+            hint="Выбери существующую или создай новую — без коллекции запись не сохранить"
+          >
+            {/* Chip-row picker — every existing collection rendered
+                as a chip, plus an inline "+ Новая коллекция" input
+                so the user can spin up a new bucket on the fly.
+                Same visual language as the filter strip above the
+                table on the credentials view. */}
+            <div className="flex flex-wrap gap-2 items-center">
+              {ownerOptions.map((name) => {
+                const active = form.owner === name;
+                const isOrphan = name === ORPHAN_OWNER;
                 return (
                   <button
-                    key={o.id}
+                    key={name}
                     type="button"
-                    onClick={() => setForm((f) => ({ ...f, owner: o.id }))}
+                    onClick={() => setForm((f) => ({ ...f, owner: name }))}
                     className={
                       "font-mono text-[11px] uppercase tracking-widest px-3.5 py-2 rounded-full transition " +
+                      (isOrphan ? "italic " : "") +
                       (active
                         ? "bg-gold text-emerald-deep"
                         : "border border-white/15 text-ivory-mute hover:text-gold hover:border-gold/40")
                     }
                   >
-                    {o.label}
+                    {name}
                   </button>
                 );
               })}
-              <button
-                type="button"
-                onClick={() => setForm((f) => ({ ...f, owner: "" }))}
-                className={
-                  "font-mono text-[11px] uppercase tracking-widest px-3.5 py-2 rounded-full italic transition " +
-                  (form.owner === ""
-                    ? "bg-gold text-emerald-deep"
-                    : "border border-white/15 text-ivory-mute hover:text-gold hover:border-gold/40")
-                }
-              >
-                Без владельца
-              </button>
+              {/* + Новая коллекция — type a name + Enter / blur
+                  commits it as the active owner.  The name only
+                  becomes a permanent option after the credential
+                  saves, but the chip strip on the view re-derives
+                  ownerOptions from the live items list anyway. */}
+              <input
+                type="text"
+                value={newOwnerDraft}
+                onChange={(e) => setNewOwnerDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    const name = newOwnerDraft.trim();
+                    if (name) {
+                      setForm((f) => ({ ...f, owner: name }));
+                      setNewOwnerDraft("");
+                    }
+                  } else if (e.key === "Escape") {
+                    setNewOwnerDraft("");
+                  }
+                }}
+                onBlur={() => {
+                  const name = newOwnerDraft.trim();
+                  if (name) {
+                    setForm((f) => ({ ...f, owner: name }));
+                    setNewOwnerDraft("");
+                  }
+                }}
+                placeholder="+ новая коллекция"
+                className="font-mono text-[11px] uppercase tracking-widest px-3.5 py-2 rounded-full bg-transparent border border-emerald-300/30 text-emerald-200 placeholder:text-emerald-200/50 hover:border-emerald-300 focus:border-emerald-300 focus:outline-none min-w-[180px] transition"
+              />
             </div>
           </Field>
 
@@ -281,7 +317,7 @@ export function CredentialModal({ initial, onClose, onSubmit }: Props) {
             </button>
             <button
               type="submit"
-              disabled={!form.service.trim() || busy}
+              disabled={!form.service.trim() || !form.owner.trim() || busy}
               className="bg-ivory text-emerald-950 px-6 py-2.5 rounded-full font-medium tracking-tight hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-2"
             >
               <Icon name={isEdit ? "check" : "lock"} size={16} /> {busy ? "..." : isEdit ? "Сохранить" : "Сохранить аккаунт"}

@@ -290,17 +290,12 @@ export function CollectionsTabs({
 
   return (
     <div className="max-w-[1480px] mx-auto px-10 mb-6">
-      {/* Top-level row */}
+      {/* Top-level row.  "Все записи" chip removed by request —
+          every entry must belong to a collection, so the
+          aggregate view is no longer a navigation target.  A
+          migration moved orphan entries into a "Без коллекции"
+          collection per category. */}
       <div className="flex flex-wrap gap-2 items-center">
-        <button
-          type="button"
-          onClick={() => onSelect(null)}
-          className={chipClass(selected === null)}
-          title="Показать все записи в категории"
-        >
-          Все записи
-        </button>
-
         {topLevel.map((c) =>
           renderChip(c, {
             isActive: c.id === activeRootId,

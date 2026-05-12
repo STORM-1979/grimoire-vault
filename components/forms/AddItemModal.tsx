@@ -532,7 +532,12 @@ export function AddItemModal({
     : categoryId === "bots" ? "Добавить бота"
     : "Добавить запись";
 
-  const titleDisabled = !form.title.trim() || submitting;
+  // Collection is mandatory when the category supports them — the
+  // "Все записи" view is gone, so an entry without a collection has
+  // no surface to land on.  We only gate when there's actually a
+  // collection list to pick from (caller passed a non-empty array).
+  const collectionMissing = !!collections && collections.length > 0 && !collectionId;
+  const titleDisabled = !form.title.trim() || submitting || collectionMissing;
 
   return (
     <div
@@ -899,7 +904,13 @@ export function AddItemModal({
           {(!isVideo || videoExpanded) && (
             <>
               {collections && collections.length > 0 && (
-                <Field label="Коллекция" hint="Группа внутри текущей категории">
+                <Field
+                  label="Коллекция"
+                  required
+                  hint={collectionId
+                    ? "Группа внутри текущей категории"
+                    : "Выбери коллекцию — без неё запись не сохранить"}
+                >
                   <CollectionSelect
                     collections={collections}
                     value={collectionId}

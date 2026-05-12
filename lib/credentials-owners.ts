@@ -1,27 +1,38 @@
 /**
- * Account-owner registry for the credentials vault.
+ * Account-owner ("collection") helpers for the credentials vault.
  *
- * Why a registry instead of free-form text input: the filter tabs
- * in CredentialsView need a known set of values to render chips
- * for, and the modal dropdown needs the same list to populate
- * options.  Centralising here means adding a third person later
- * is one append — every consumer picks it up automatically.
+ * No hardcoded list anymore — the user creates collections freely
+ * from the credentials view by typing a new name.  This module
+ * just hosts:
+ *   - the sentinel name for the auto-created bucket migrations
+ *     route orphan rows into ("Без коллекции")
+ *   - utilities to derive the distinct collection list from the
+ *     current credential rows, plus a getOwnerLabel helper for the
+ *     few spots that just need a display string
  *
- * `id` is the value stored in the DB column.  `label` is what the
- * UI shows.  The IDs are ASCII so they survive any encoding round-
- * trip (URL params, JSON, etc) without surprises.
+ * Owner column stores the raw label string (Russian or whatever
+ * the user typed) — this is plaintext metadata, no encryption, no
+ * id↔label indirection.  Simpler than the previous registry and
+ * matches how entry_collections work on the entries side.
  */
-export interface CredentialOwner {
-  id: string;
-  label: string;
+export const ORPHAN_OWNER = "Без коллекции";
+
+export function getOwnerLabel(name: string | null | undefined): string {
+  return name?.trim() || ORPHAN_OWNER;
 }
 
-export const CREDENTIAL_OWNERS: CredentialOwner[] = [
-  { id: "vova", label: "Вова" },
-  { id: "sery", label: "Серый" },
-];
-
-export function getOwnerLabel(id: string | null | undefined): string {
-  if (!id) return "Без владельца";
-  return CREDENTIAL_OWNERS.find((o) => o.id === id)?.label ?? id;
+/**
+ * Distinct owner names from a credentials list, alphabetised
+ * Russian-first.  Always includes the orphan bucket label so the
+ * UI can render its chip even if no row currently uses it.
+ */
+export function distinctOwners(rows: Array<{ owner?: string | null }>): string[] {
+  const set = new Set<string>([ORPHAN_OWNER]);
+  for (const r of rows) {
+    const v = r.owner?.trim();
+    if (v) set.add(v);
+  }
+  return Array.from(set).sort((a, b) =>
+    a.localeCompare(b, "ru", { sensitivity: "base" }),
+  );
 }

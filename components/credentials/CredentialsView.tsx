@@ -8,7 +8,7 @@ import { UnlockGate } from "./UnlockGate";
 import { CredentialsTable } from "./CredentialsTable";
 import { CredentialModal } from "./CredentialModal";
 import { PrintableCredentials } from "./PrintableCredentials";
-import { CREDENTIAL_OWNERS } from "@/lib/credentials-owners";
+import { distinctOwners, ORPHAN_OWNER } from "@/lib/credentials-owners";
 import type { CredentialDecrypted } from "@/lib/types";
 
 export function CredentialsView() {
@@ -18,10 +18,11 @@ export function CredentialsView() {
   // null  → modal closed
   // record → edit mode, pre-fill with this decrypted row
   const [editing, setEditing] = useState<CredentialDecrypted | null>(null);
-  // Owner filter — null = all, "none" = unassigned only, otherwise
-  // an owner id from CREDENTIAL_OWNERS.  Filter is purely local;
-  // the API still returns every row.
-  const [ownerFilter, setOwnerFilter] = useState<string | null>(null);
+  // Owner filter — collection name as stored on the row.  Default
+  // to ORPHAN_OWNER so the user lands on a real bucket on first
+  // mount (the "Все" view is gone, every credential belongs to a
+  // collection).  Switches when the user clicks a different chip.
+  const [ownerFilter, setOwnerFilter] = useState<string>(ORPHAN_OWNER);
 
   if (!mk.ready) {
     return (
@@ -43,24 +44,32 @@ export function CredentialsView() {
     );
   }
 
+  // Distinct owner names derived from current rows + the orphan
+  // sentinel.  Sorted alphabetically Russian-first by the helper.
+  // Pin "Без коллекции" to the end so user-named collections lead.
+  const ownerList = (() => {
+    const raw = distinctOwners(creds.items);
+    return [
+      ...raw.filter((n) => n !== ORPHAN_OWNER),
+      ORPHAN_OWNER,
+    ];
+  })();
+
   // Apply the owner filter before the pinned/others split so the
   // chip counts above and the rendered tables below stay in sync.
-  const ownerFiltered = ownerFilter === null
-    ? creds.items
-    : ownerFilter === "none"
-    ? creds.items.filter((c) => !c.owner)
-    : creds.items.filter((c) => c.owner === ownerFilter);
+  const ownerFiltered = creds.items.filter(
+    (c) => (c.owner?.trim() || ORPHAN_OWNER) === ownerFilter,
+  );
   const pinned = ownerFiltered.filter((c) => c.pinned);
   const others = ownerFiltered.filter((c) => !c.pinned);
 
   // Counts per owner bucket — used for the chip labels.
-  const counts = {
-    all: creds.items.length,
-    none: creds.items.filter((c) => !c.owner).length,
-    ...Object.fromEntries(
-      CREDENTIAL_OWNERS.map((o) => [o.id, creds.items.filter((c) => c.owner === o.id).length]),
-    ),
-  } as Record<string, number>;
+  const counts = Object.fromEntries(
+    ownerList.map((name) => [
+      name,
+      creds.items.filter((c) => (c.owner?.trim() || ORPHAN_OWNER) === name).length,
+    ]),
+  ) as Record<string, number>;
 
   return (
     <div>
@@ -116,16 +125,27 @@ export function CredentialsView() {
 
       {showAdd && (
         <CredentialModal
+          ownerOptions={ownerList}
           onClose={() => setShowAdd(false)}
-          onSubmit={async (input) => { await creds.create(input); }}
+          onSubmit={async (input) => {
+            await creds.create(input);
+            // Snap the filter to whichever bucket the new
+            // credential landed in, so the user can see it
+            // immediately.
+            if (input.owner) setOwnerFilter(input.owner);
+          }}
         />
       )}
 
       {editing && (
         <CredentialModal
           initial={editing}
+          ownerOptions={ownerList}
           onClose={() => setEditing(null)}
-          onSubmit={async (input) => { await creds.update(editing.id, input); }}
+          onSubmit={async (input) => {
+            await creds.update(editing.id, input);
+            if (input.owner) setOwnerFilter(input.owner);
+          }}
         />
       )}
 
@@ -150,38 +170,27 @@ export function CredentialsView() {
         </div>
       )}
 
-      {/* Owner filter strip — visible whenever the vault has any
-          owned credentials so the user can split between Вова /
-          Серый / Без владельца / Все.  Buckets with zero rows are
-          still shown (greyed) so the user knows the option exists
-          when they're about to file a new credential. */}
+      {/* Collection filter strip — derived from the current row
+          set.  Every credential lives in a collection (the migration
+          backfilled orphans into "Без коллекции"), so the strip is
+          the primary navigation device for the table below.  The
+          "Все" chip is intentionally absent — every entry belongs
+          to exactly one bucket. */}
       <section className="max-w-[1480px] mx-auto px-10 mt-4">
         <div className="flex flex-wrap gap-2 items-center">
           <span className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute pr-1">
-            владелец →
+            коллекция →
           </span>
-          <OwnerChip
-            label="Все"
-            count={counts.all}
-            active={ownerFilter === null}
-            onClick={() => setOwnerFilter(null)}
-          />
-          {CREDENTIAL_OWNERS.map((o) => (
+          {ownerList.map((name) => (
             <OwnerChip
-              key={o.id}
-              label={o.label}
-              count={counts[o.id] ?? 0}
-              active={ownerFilter === o.id}
-              onClick={() => setOwnerFilter(o.id)}
+              key={name}
+              label={name}
+              count={counts[name] ?? 0}
+              active={ownerFilter === name}
+              italic={name === ORPHAN_OWNER}
+              onClick={() => setOwnerFilter(name)}
             />
           ))}
-          <OwnerChip
-            label="Без владельца"
-            count={counts.none}
-            active={ownerFilter === "none"}
-            onClick={() => setOwnerFilter("none")}
-            italic
-          />
         </div>
       </section>
 

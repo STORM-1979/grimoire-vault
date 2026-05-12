@@ -82,9 +82,29 @@ export function CategoryView({ category, initialItems }: Props) {
     },
     [items, remove, refetch, undoToast],
   );
-  // Collections sub-filter — null = all, "none" = uncategorised, uuid = that collection.
+  // Collections sub-filter.  Now that the "Все записи" chip is
+  // gone (every entry belongs to a collection by migration), the
+  // selection is always a real collection id — never null, never
+  // "none".  We default to null on first mount and let the
+  // collections-loaded effect below pin it to the first available
+  // bucket as soon as we know what exists.
   const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
   const [collections, setCollections] = useState<EntryCollection[]>([]);
+  // Pin selection to the first collection on initial load.  We
+  // pick the alphabetically-first non-"Без коллекции" bucket so
+  // the user lands on a "real" bucket when they have one; falls
+  // back to "Без коллекции" if it's the only collection.
+  useEffect(() => {
+    if (!showCollections) return;
+    if (selectedCollection !== null) return;
+    if (collections.length === 0) return;
+    const sorted = [...collections]
+      .filter((c) => !c.parentId)
+      .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name));
+    const firstNamed = sorted.find((c) => c.slug !== "bez-kollekcii") ?? sorted[0];
+    if (firstNamed) setSelectedCollection(firstNamed.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collections]);
   // Sort preference — persisted per-category in localStorage so the
   // user's choice survives reloads / category switches.
   const [sortMode, setSortMode] = useState<SortMode>("newest");
@@ -149,11 +169,15 @@ export function CategoryView({ category, initialItems }: Props) {
 
   // Apply the collections filter before pinned/others split so all
   // downstream code (cards, keyboard nav, bulk ops) sees a consistent
-  // already-filtered list.
-  const collectionFiltered = !showCollections || selectedCollection === null
+  // already-filtered list.  Without "Все записи", the rules are:
+  //   • Category doesn't support collections → show every item
+  //   • Collections list still loading → show empty (transition is
+  //     ~1 paint; better than flashing every entry then collapsing)
+  //   • A collection is selected → show that bucket + descendants
+  const collectionFiltered = !showCollections
     ? items
-    : selectedCollection === "none"
-    ? items.filter((it) => !it.collectionId)
+    : selectedCollection === null
+    ? []
     : items.filter((it) => it.collectionId && selectedScope?.has(it.collectionId));
 
   // Distinct tag list (with counts) for the tag-picker row.  Computed
