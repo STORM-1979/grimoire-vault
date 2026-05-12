@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Icon } from "@/components/icons/Icon";
 import { CopyButton } from "./CopyButton";
 import { StrengthDot } from "./StrengthDot";
+import { getOwnerLabel } from "@/lib/credentials-owners";
 import type { CredentialDecrypted } from "@/lib/types";
 
 interface Props {
@@ -64,12 +65,17 @@ export function CredentialRow({ item, onTogglePin, onDelete, onEdit }: Props) {
       </div>
 
       <div className="min-w-0">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <h4 className="font-medium text-[15px] truncate">{item.service}</h4>
           {item.pinned && <Icon name="pinFilled" size={11} className="text-gold flex-shrink-0" />}
           {item.twoFactor && (
             <span className="tag-emerald inline-flex items-center gap-1">
               <Icon name="shield" size={10} /> 2FA
+            </span>
+          )}
+          {item.owner && (
+            <span className="tag-soft inline-flex items-center gap-1">
+              {getOwnerLabel(item.owner)}
             </span>
           )}
         </div>

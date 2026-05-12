@@ -5,6 +5,8 @@ import { Icon } from "@/components/icons/Icon";
 import { Field } from "@/components/forms/Field";
 import { StrengthDot } from "./StrengthDot";
 import { classifyStrength, generatePassword } from "@/lib/crypto";
+import { ThemedSelect } from "@/components/forms/ThemedSelect";
+import { CREDENTIAL_OWNERS } from "@/lib/credentials-owners";
 import type { CredentialDecrypted } from "@/lib/types";
 
 interface Props {
@@ -24,6 +26,7 @@ interface Props {
     strength: "weak" | "medium" | "strong";
     tags: string[];
     pinned: boolean;
+    owner?: string | null;
   }) => Promise<void>;
 }
 
@@ -40,10 +43,11 @@ export function CredentialModal({ initial, onClose, onSubmit }: Props) {
           tags: initial.tags.join(", "),
           twoFactor: initial.twoFactor,
           pinned: initial.pinned,
+          owner: initial.owner ?? "",
         }
       : {
           service: "", url: "", username: "", password: "", notes: "",
-          tags: "", twoFactor: false, pinned: false,
+          tags: "", twoFactor: false, pinned: false, owner: "",
         }
   );
   const [showPwd, setShowPwd] = useState(false);
@@ -82,6 +86,7 @@ export function CredentialModal({ initial, onClose, onSubmit }: Props) {
         strength: liveStrength,
         tags: form.tags.split(",").map((t) => t.trim()).filter(Boolean),
         pinned: form.pinned,
+        owner: form.owner.trim() || null,
       });
       onClose();
     } catch (err) {
@@ -125,6 +130,15 @@ export function CredentialModal({ initial, onClose, onSubmit }: Props) {
         </header>
 
         <form onSubmit={handleSubmit} className="p-7">
+          <Field label="Владелец" hint="Чей это аккаунт — для фильтрации в общем сейфе">
+            <ThemedSelect
+              options={CREDENTIAL_OWNERS.map((o) => ({ value: o.id, label: o.label }))}
+              placeholder="— Без владельца —"
+              value={form.owner}
+              onChange={(v) => setForm((f) => ({ ...f, owner: v }))}
+            />
+          </Field>
+
           <Field label="Сервис" required>
             <input
               autoFocus

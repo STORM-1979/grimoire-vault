@@ -1,5 +1,6 @@
 "use client";
 
+import { getOwnerLabel } from "@/lib/credentials-owners";
 import type { CredentialDecrypted } from "@/lib/types";
 
 /**
@@ -54,7 +55,9 @@ export function PrintableCredentials({ items }: { items: CredentialDecrypted[] }
             <div className="printable-index">{i + 1}</div>
             <div className="printable-body">
               <div className="printable-service">
-                {it.service}{it.twoFactor && <span className="printable-2fa"> · 2FA</span>}
+                {it.service}
+                {it.twoFactor && <span className="printable-2fa"> · 2FA</span>}
+                {it.owner && <span className="printable-owner"> · {getOwnerLabel(it.owner)}</span>}
               </div>
               {it.url && <div className="printable-url">{it.url}</div>}
               <dl className="printable-fields">

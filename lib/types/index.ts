@@ -156,6 +156,9 @@ export interface CredentialRecord {
   strength: "weak" | "medium" | "strong" | null;
   tags: string[];
   pinned: boolean;
+  /** Plaintext owner id ("vova" / "sery" / future).  Null = shared
+   *  / unassigned.  See lib/credentials-owners.ts. */
+  owner?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -172,6 +175,8 @@ export interface CredentialDecrypted {
   strength: "weak" | "medium" | "strong" | null;
   tags: string[];
   pinned: boolean;
+  /** Plaintext — copied through from CredentialRecord. */
+  owner?: string | null;
   createdAt: string;
   updatedAt: string;
 }

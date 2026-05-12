@@ -24,6 +24,11 @@ export const createCredentialSchema = z.object({
   strength: z.enum(["weak", "medium", "strong"]).optional().nullable(),
   tags: tagList,
   pinned: z.boolean().default(false),
+  // Plaintext owner tag — see lib/credentials-owners.ts for the
+  // canonical id set.  Loose validation here (any string up to 40
+  // chars or null) so adding a third person doesn't require a
+  // schema bump.
+  owner: z.string().trim().min(1).max(40).optional().nullable(),
 }).strict();
 
 export const updateCredentialSchema = createCredentialSchema.partial().strict();

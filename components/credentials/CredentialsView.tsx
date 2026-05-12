@@ -8,6 +8,7 @@ import { UnlockGate } from "./UnlockGate";
 import { CredentialsTable } from "./CredentialsTable";
 import { CredentialModal } from "./CredentialModal";
 import { PrintableCredentials } from "./PrintableCredentials";
+import { CREDENTIAL_OWNERS } from "@/lib/credentials-owners";
 import type { CredentialDecrypted } from "@/lib/types";
 
 export function CredentialsView() {
@@ -17,6 +18,10 @@ export function CredentialsView() {
   // null  → modal closed
   // record → edit mode, pre-fill with this decrypted row
   const [editing, setEditing] = useState<CredentialDecrypted | null>(null);
+  // Owner filter — null = all, "none" = unassigned only, otherwise
+  // an owner id from CREDENTIAL_OWNERS.  Filter is purely local;
+  // the API still returns every row.
+  const [ownerFilter, setOwnerFilter] = useState<string | null>(null);
 
   if (!mk.ready) {
     return (
@@ -38,8 +43,24 @@ export function CredentialsView() {
     );
   }
 
-  const pinned = creds.items.filter((c) => c.pinned);
-  const others = creds.items.filter((c) => !c.pinned);
+  // Apply the owner filter before the pinned/others split so the
+  // chip counts above and the rendered tables below stay in sync.
+  const ownerFiltered = ownerFilter === null
+    ? creds.items
+    : ownerFilter === "none"
+    ? creds.items.filter((c) => !c.owner)
+    : creds.items.filter((c) => c.owner === ownerFilter);
+  const pinned = ownerFiltered.filter((c) => c.pinned);
+  const others = ownerFiltered.filter((c) => !c.pinned);
+
+  // Counts per owner bucket — used for the chip labels.
+  const counts = {
+    all: creds.items.length,
+    none: creds.items.filter((c) => !c.owner).length,
+    ...Object.fromEntries(
+      CREDENTIAL_OWNERS.map((o) => [o.id, creds.items.filter((c) => c.owner === o.id).length]),
+    ),
+  } as Record<string, number>;
 
   return (
     <div>
@@ -129,6 +150,41 @@ export function CredentialsView() {
         </div>
       )}
 
+      {/* Owner filter strip — visible whenever the vault has any
+          owned credentials so the user can split between Вова /
+          Серый / Без владельца / Все.  Buckets with zero rows are
+          still shown (greyed) so the user knows the option exists
+          when they're about to file a new credential. */}
+      <section className="max-w-[1480px] mx-auto px-10 mt-4">
+        <div className="flex flex-wrap gap-2 items-center">
+          <span className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute pr-1">
+            владелец →
+          </span>
+          <OwnerChip
+            label="Все"
+            count={counts.all}
+            active={ownerFilter === null}
+            onClick={() => setOwnerFilter(null)}
+          />
+          {CREDENTIAL_OWNERS.map((o) => (
+            <OwnerChip
+              key={o.id}
+              label={o.label}
+              count={counts[o.id] ?? 0}
+              active={ownerFilter === o.id}
+              onClick={() => setOwnerFilter(o.id)}
+            />
+          ))}
+          <OwnerChip
+            label="Без владельца"
+            count={counts.none}
+            active={ownerFilter === "none"}
+            onClick={() => setOwnerFilter("none")}
+            italic
+          />
+        </div>
+      </section>
+
       {pinned.length > 0 && (
         <section className="max-w-[1480px] mx-auto px-10 py-8">
           <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-4 flex items-center gap-2">
@@ -162,5 +218,41 @@ export function CredentialsView() {
         </section>
       )}
     </div>
+  );
+}
+
+/**
+ * Owner filter chip — gold-filled when active, hairline border
+ * otherwise.  Count badge in the chip's trailing slot so the user
+ * can see "Вова · 3" without opening the bucket first.  Italic
+ * style optional — used for the "Без владельца" sentinel to
+ * separate it visually from the named-owner chips.
+ */
+function OwnerChip({
+  label, count, active, onClick, italic = false,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+  italic?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        "font-mono text-[11px] uppercase tracking-widest px-3.5 py-2 rounded-full transition flex items-center gap-1.5 " +
+        (italic ? "italic " : "") +
+        (active
+          ? "bg-gold text-emerald-deep"
+          : "border border-white/15 text-ivory-mute hover:text-gold hover:border-gold/40")
+      }
+    >
+      <span>{label}</span>
+      <span className={active ? "text-emerald-deep/60" : "text-ivory-mute/60"}>
+        {count}
+      </span>
+    </button>
   );
 }

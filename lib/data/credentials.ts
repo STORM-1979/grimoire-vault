@@ -20,6 +20,7 @@ function rowToCredential(r: Record<string, unknown>): CredentialRecord {
     strength: ((r.strength as "weak" | "medium" | "strong") ?? null),
     tags: (r.tags as string[]) ?? [],
     pinned: !!r.pinned,
+    owner: (r.owner as string | null) ?? null,
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
   };
@@ -39,6 +40,7 @@ function inputToRow(input: Partial<CreateCredentialInput>): Record<string, unkno
   if (input.strength !== undefined) row.strength = input.strength;
   if (input.tags !== undefined) row.tags = input.tags;
   if (input.pinned !== undefined) row.pinned = input.pinned;
+  if (input.owner !== undefined) row.owner = input.owner;
   return row;
 }
 

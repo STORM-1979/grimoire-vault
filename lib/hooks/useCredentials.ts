@@ -15,6 +15,9 @@ interface NewCredentialPlain {
   strength: "weak" | "medium" | "strong" | null;
   tags: string[];
   pinned: boolean;
+  /** Plaintext owner id from CREDENTIAL_OWNERS, or null for shared
+   *  / unassigned.  See lib/credentials-owners.ts. */
+  owner?: string | null;
 }
 
 async function decryptRecord(rec: CredentialRecord, key: CryptoKey): Promise<CredentialDecrypted> {
@@ -44,6 +47,7 @@ async function decryptRecord(rec: CredentialRecord, key: CryptoKey): Promise<Cre
     strength: rec.strength,
     tags: rec.tags,
     pinned: rec.pinned,
+    owner: rec.owner ?? null,
     createdAt: rec.createdAt,
     updatedAt: rec.updatedAt,
   };
@@ -71,6 +75,7 @@ async function encryptForCreate(input: NewCredentialPlain, key: CryptoKey) {
     strength: input.password ? (input.strength ?? undefined) : undefined,
     tags: input.tags,
     pinned: input.pinned,
+    owner: input.owner ?? null,
   };
 }
 
