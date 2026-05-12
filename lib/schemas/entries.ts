@@ -102,6 +102,8 @@ export const updateEntrySchema = z.object({
   vaultId: z.string().uuid().optional().nullable(),
   /** Move into / out of a user-defined collection. */
   collectionId: z.string().uuid().optional().nullable(),
+  /** Manual sort position set by drag-and-drop reorder. */
+  position: z.number().int().optional().nullable(),
 }).strict();
 
 /** Query string for GET /api/entries */

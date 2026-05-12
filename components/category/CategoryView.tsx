@@ -2,6 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import {
+  DndContext, closestCenter, PointerSensor, KeyboardSensor,
+  useSensor, useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext, rectSortingStrategy,
+  useSortable, arrayMove, sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useEntries } from "@/lib/hooks/useEntries";
 import { useEntryKeyboardNav } from "@/lib/hooks/useEntryKeyboardNav";
 import { isMediaCategory, isVideoCategory, isTileCategory, categorySupportsCollections } from "@/lib/categories";
@@ -18,7 +28,7 @@ import { SortControl, type SortMode } from "./SortControl";
 import type { Category, CategoryId, Entry, EntryCollection } from "@/lib/types";
 
 const SORT_LS_PREFIX = "grimoire:sort:";
-const VALID_SORTS: SortMode[] = ["newest", "oldest", "title", "titleZ", "tags"];
+const VALID_SORTS: SortMode[] = ["newest", "oldest", "title", "titleZ", "tags", "manual"];
 
 /** Russian plural helper — pick the right form for `n` from
  *  (one, few, many) variants. 1, 21, 31… → one; 2-4, 22-24… → few;
@@ -239,6 +249,19 @@ export function CategoryView({ category, initialItems }: Props) {
         const cmp = ta.localeCompare(tb, "ru", { sensitivity: "base" });
         return cmp !== 0 ? cmp : ts(b) - ts(a);
       });
+    } else if (sortMode === "manual") {
+      // User-defined order via drag-and-drop.  position ASC NULLS
+      // LAST: rows with an explicit position come first in that
+      // order, anything still unpositioned sinks to the bottom in
+      // created_at DESC.
+      arr.sort((a, b) => {
+        const pa = a.position;
+        const pb = b.position;
+        if (pa != null && pb != null) return pa - pb;
+        if (pa != null) return -1;
+        if (pb != null) return 1;
+        return ts(b) - ts(a);
+      });
     }
     return arr;
   }, [filtered, sortMode]);
@@ -329,6 +352,55 @@ export function CategoryView({ category, initialItems }: Props) {
       // might want to keep operating on them.
     } catch (e) { setBulkError(e instanceof Error ? e.message : "Bulk-collection-move failed"); }
   }, [bulkIds]);
+
+  // DnD sensors — same activation rules as CollectionsTabs:
+  // an 8px movement threshold keeps regular clicks from being
+  // hijacked into drags, KeyboardSensor brings Space + arrows
+  // for a11y.  Sensors live regardless of sortMode so the React
+  // hook order stays stable; the SortableContext below only
+  // wraps the grid when sortMode === "manual".
+  const tileSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  /**
+   * Reorder handler for the manual-sort tile grid.  Mirrors the
+   * collections reorder flow:
+   *   1. arrayMove() to compute the new local order over the
+   *      currently-visible "others" list (pinned entries stay
+   *      pinned, they're a separate section above).
+   *   2. Reassign sequential positions 0..N-1 to every visible
+   *      tile so gaps from previous drag passes don't pile up.
+   *   3. Optimistically update items via useEntries.update so
+   *      the new order shows immediately.
+   *   4. PATCH each row whose position actually changed.  On
+   *      failure: error in the existing pane + a refetch to
+   *      snap state back to canonical truth.
+   */
+  const handleReorderTiles = useCallback(async (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const visible = sorted.filter((it) => !it.pinned);
+    const oldIdx = visible.findIndex((it) => it.id === active.id);
+    const newIdx = visible.findIndex((it) => it.id === over.id);
+    if (oldIdx < 0 || newIdx < 0) return;
+    const reordered = arrayMove(visible, oldIdx, newIdx);
+    setBulkError(null);
+    try {
+      // Fire only the diffs — chips that kept their position
+      // don't need a write.
+      await Promise.all(
+        reordered.map((it, i) => {
+          if (it.position === i) return Promise.resolve(null);
+          return update(it.id, { position: i });
+        }),
+      );
+    } catch (err) {
+      setBulkError(err instanceof Error ? err.message : "Reorder failed");
+      try { await refetch(); } catch { /* ignore */ }
+    }
+  }, [sorted, update, refetch]);
 
   const bulkDelete = useCallback(async () => {
     // No more "безвозвратно" prompt — soft delete + undo toast +
@@ -516,16 +588,39 @@ export function CategoryView({ category, initialItems }: Props) {
           </div>
         )}
         {isTile ? (
-          <div className="grid grid-cols-4 gap-5">
-            {others.map((it) => (
-              <IdeaCard key={it.id} item={it} category={category}
-                selected={selectedId === it.id}
-                bulkSelected={bulkIds.has(it.id)}
-                uncategorized={showCollections && !it.collectionId}
-                onBulkToggle={toggleBulk}
-                onTogglePin={togglePin} onDelete={removeWithUndo} onEdit={setEditing} />
-            ))}
-          </div>
+          // Wrap in DndContext when manual sort is active so tiles
+          // are reorderable.  Other sort modes get the same grid
+          // without drag handlers — sensors stay mounted either
+          // way so React's hook order doesn't shift.
+          sortMode === "manual" ? (
+            <DndContext sensors={tileSensors} collisionDetection={closestCenter} onDragEnd={(e) => void handleReorderTiles(e)}>
+              <SortableContext items={others.map((it) => it.id)} strategy={rectSortingStrategy}>
+                <div className="grid grid-cols-4 gap-5">
+                  {others.map((it) => (
+                    <SortableTile key={it.id} id={it.id}>
+                      <IdeaCard item={it} category={category}
+                        selected={selectedId === it.id}
+                        bulkSelected={bulkIds.has(it.id)}
+                        uncategorized={showCollections && !it.collectionId}
+                        onBulkToggle={toggleBulk}
+                        onTogglePin={togglePin} onDelete={removeWithUndo} onEdit={setEditing} />
+                    </SortableTile>
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          ) : (
+            <div className="grid grid-cols-4 gap-5">
+              {others.map((it) => (
+                <IdeaCard key={it.id} item={it} category={category}
+                  selected={selectedId === it.id}
+                  bulkSelected={bulkIds.has(it.id)}
+                  uncategorized={showCollections && !it.collectionId}
+                  onBulkToggle={toggleBulk}
+                  onTogglePin={togglePin} onDelete={removeWithUndo} onEdit={setEditing} />
+              ))}
+            </div>
+          )
         ) : isVideo ? (
           <div className="grid grid-cols-4 gap-5">
             {others.map((it) => (
@@ -588,6 +683,34 @@ export function CategoryView({ category, initialItems }: Props) {
           onDelete={bulkDelete}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * dnd-kit sortable wrapper for an IdeaCard tile.  The wrapper
+ * picks up transform/transition from useSortable and applies them
+ * to a positioning div around the card — the card itself stays
+ * pristine and its onClick still fires (PointerSensor's distance:8
+ * activation threshold protects clicks from being eaten by the
+ * drag).  isDragging fades the placeholder so the user sees where
+ * the tile is leaving from.
+ */
+function SortableTile({ id, children }: { id: string; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+        cursor: isDragging ? "grabbing" : undefined,
+      }}
+      {...attributes}
+      {...listeners}
+    >
+      {children}
     </div>
   );
 }

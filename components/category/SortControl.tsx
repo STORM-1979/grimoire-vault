@@ -12,8 +12,10 @@ import { Icon } from "@/components/icons/Icon";
  *   - titleZ   title Я→A
  *   - tags     first-tag alphabetical, untagged entries last;
  *              ties break on created_at DESC
+ *   - manual   user-defined order set via drag-and-drop;
+ *              position ASC NULLS LAST, then created_at DESC
  */
-export type SortMode = "newest" | "oldest" | "title" | "titleZ" | "tags";
+export type SortMode = "newest" | "oldest" | "title" | "titleZ" | "tags" | "manual";
 
 const LABELS: Record<SortMode, string> = {
   newest: "Новые",
@@ -21,9 +23,10 @@ const LABELS: Record<SortMode, string> = {
   title: "А–Я",
   titleZ: "Я–А",
   tags: "По тегам",
+  manual: "Свой порядок",
 };
 
-const ORDER: SortMode[] = ["newest", "oldest", "title", "titleZ", "tags"];
+const ORDER: SortMode[] = ["newest", "oldest", "title", "titleZ", "tags", "manual"];
 
 /**
  * Pill-style dropdown matching the rest of the category header.

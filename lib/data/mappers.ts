@@ -28,6 +28,7 @@ export function rowToEntry(r: Record<string, unknown>): Entry {
     vaultId: (r.vault_id as string | null) ?? null,
     collectionId: (r.collection_id as string | null) ?? null,
     deletedAt: (r.deleted_at as string | null) ?? null,
+    position: r.position !== null && r.position !== undefined ? Number(r.position) : null,
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
   };
@@ -61,6 +62,9 @@ export function entryToRow(input: Partial<Entry> & { categoryId?: CategoryId }):
   }
   if ((input as { collectionId?: string | null }).collectionId !== undefined) {
     row.collection_id = (input as { collectionId?: string | null }).collectionId;
+  }
+  if ((input as { position?: number | null }).position !== undefined) {
+    row.position = (input as { position?: number | null }).position;
   }
   // `embedding` rides on Update inputs as `number[]` — pgvector accepts the
   // JSON array form via supabase-js. Skip when undefined; explicit null clears.

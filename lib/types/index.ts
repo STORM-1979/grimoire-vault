@@ -116,6 +116,12 @@ export interface Entry {
    * queries filter `deleted_at IS NULL` automatically.
    */
   deletedAt?: string | null;
+  /**
+   * Manual sort order set by drag-and-drop on the category tile
+   * grid.  Lower = closer to the top.  NULL = no manual position
+   * — sort modes other than "manual" ignore the field anyway.
+   */
+  position?: number | null;
   createdAt: string;                // ISO timestamp
   updatedAt: string;
 }
