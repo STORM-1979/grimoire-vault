@@ -19,7 +19,13 @@ const initial = (s: string) => (s.trim()[0] ?? "?").toUpperCase();
 
 export function CredentialRow({ item, onTogglePin, onDelete, onEdit }: Props) {
   const [revealed, setRevealed] = useState(false);
-  const masked = "•".repeat(Math.min(16, Math.max(8, item.password.length)));
+  // Password is optional now — null/empty means SSO / email-link /
+  // passkey-only account.  The row renders a "—" placeholder and
+  // hides the eye + copy chip so the slot doesn't look broken.
+  const hasPassword = item.password.length > 0;
+  const masked = hasPassword
+    ? "•".repeat(Math.min(16, Math.max(8, item.password.length)))
+    : "—";
 
   const handlePin = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -89,17 +95,21 @@ export function CredentialRow({ item, onTogglePin, onDelete, onEdit }: Props) {
       </div>
 
       <div className="min-w-0 flex items-center gap-2">
-        <span className="font-mono text-[13px] truncate text-ivory-dim flex-1 select-all">
-          {revealed ? item.password : masked}
+        <span className={`font-mono text-[13px] truncate flex-1 ${hasPassword ? "text-ivory-dim select-all" : "text-ivory-mute/60 italic"}`}>
+          {hasPassword ? (revealed ? item.password : masked) : "—"}
         </span>
-        <button
-          onClick={(e) => { e.stopPropagation(); setRevealed((r) => !r); }}
-          className="item-actions-btn"
-          title={revealed ? "Скрыть" : "Показать"}
-        >
-          <Icon name={revealed ? "eyeOff" : "eye"} size={12} />
-        </button>
-        <CopyButton value={item.password} label="password" />
+        {hasPassword && (
+          <>
+            <button
+              onClick={(e) => { e.stopPropagation(); setRevealed((r) => !r); }}
+              className="item-actions-btn"
+              title={revealed ? "Скрыть" : "Показать"}
+            >
+              <Icon name={revealed ? "eyeOff" : "eye"} size={12} />
+            </button>
+            <CopyButton value={item.password} label="password" />
+          </>
+        )}
       </div>
 
       <StrengthDot strength={item.strength} />

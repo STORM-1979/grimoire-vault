@@ -19,7 +19,14 @@ interface NewCredentialPlain {
 
 async function decryptRecord(rec: CredentialRecord, key: CryptoKey): Promise<CredentialDecrypted> {
   const username = await decryptString(key, rec.usernameEncrypted, rec.ivUsername);
-  const password = await decryptString(key, rec.passwordEncrypted, rec.ivPassword);
+  // Password ciphertext is nullable now (SSO / passkey / email-link
+  // accounts).  Empty string for the UI means "no password stored";
+  // CredentialRow + the print sheet check the empty case and hide
+  // the masked dots + copy chip.
+  let password = "";
+  if (rec.passwordEncrypted && rec.ivPassword) {
+    password = await decryptString(key, rec.passwordEncrypted, rec.ivPassword);
+  }
   let notes: string | null = null;
   if (rec.notesEncrypted && rec.ivNotes) {
     try {
@@ -44,19 +51,24 @@ async function decryptRecord(rec: CredentialRecord, key: CryptoKey): Promise<Cre
 
 async function encryptForCreate(input: NewCredentialPlain, key: CryptoKey) {
   const u = await encryptString(key, input.username);
-  const p = await encryptString(key, input.password);
+  // Only run AES-GCM on a non-empty password.  Encrypting "" would
+  // burn a fresh IV on nothing useful and would force consumers to
+  // always decrypt before checking "is there even a password" —
+  // null/null is cheaper to recognise.
+  const p = input.password ? await encryptString(key, input.password) : null;
   const n = input.notes ? await encryptString(key, input.notes) : null;
   return {
     service: input.service,
     url: input.url ?? null,
     usernameEncrypted: u.ciphertext,
     ivUsername: u.iv,
-    passwordEncrypted: p.ciphertext,
-    ivPassword: p.iv,
+    passwordEncrypted: p?.ciphertext ?? null,
+    ivPassword: p?.iv ?? null,
     notesEncrypted: n?.ciphertext ?? null,
     ivNotes: n?.iv ?? null,
     twoFactor: input.twoFactor,
-    strength: input.strength ?? undefined,
+    // Strength is meaningless when there's no password to evaluate.
+    strength: input.password ? (input.strength ?? undefined) : undefined,
     tags: input.tags,
     pinned: input.pinned,
   };

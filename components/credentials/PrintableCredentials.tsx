@@ -61,7 +61,9 @@ export function PrintableCredentials({ items }: { items: CredentialDecrypted[] }
                 <dt>Username</dt>
                 <dd>{it.username || "—"}</dd>
                 <dt>Password</dt>
-                <dd className="printable-password">{it.password}</dd>
+                <dd className={it.password ? "printable-password" : "printable-password-empty"}>
+                  {it.password || "— SSO / passkey / email-link —"}
+                </dd>
                 {it.notes && (
                   <>
                     <dt>Notes</dt>

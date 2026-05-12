@@ -342,6 +342,11 @@ body {
     font-size: 11pt;
     letter-spacing: 0.02em;
   }
+  .printable-password-empty {
+    font-style: italic;
+    font-size: 9.5pt;
+    color: #666 !important;
+  }
   .printable-notes {
     white-space: pre-wrap;
   }

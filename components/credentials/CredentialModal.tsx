@@ -66,7 +66,10 @@ export function CredentialModal({ initial, onClose, onSubmit }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!form.service.trim() || !form.password) return;
+    // Service is the only hard requirement.  Password is optional —
+    // SSO / passkey / email-link accounts have nothing to type into
+    // that field, so we let the row save without one.
+    if (!form.service.trim()) return;
     setBusy(true);
     try {
       await onSubmit({
@@ -144,10 +147,9 @@ export function CredentialModal({ initial, onClose, onSubmit }: Props) {
 
           <Field
             label="Пароль"
-            required
             hint={form.password
               ? `Сила: ${liveStrength.toUpperCase()} · ${form.password.length} символов`
-              : "Используй генератор справа — 20 символов, все классы"}
+              : "Оставь пустым, если вход через SSO / email-link / passkey — иначе используй генератор справа"}
           >
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
@@ -235,7 +237,7 @@ export function CredentialModal({ initial, onClose, onSubmit }: Props) {
             </button>
             <button
               type="submit"
-              disabled={!form.service.trim() || !form.password || busy}
+              disabled={!form.service.trim() || busy}
               className="bg-ivory text-emerald-950 px-6 py-2.5 rounded-full font-medium tracking-tight hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-2"
             >
               <Icon name={isEdit ? "check" : "lock"} size={16} /> {busy ? "..." : isEdit ? "Сохранить" : "Сохранить аккаунт"}

@@ -142,13 +142,15 @@ export interface CredentialRecord {
   userId: string;
   service: string;
   url?: string | null;
-  /** AES-GCM ciphertexts, base64 — decrypt only on client. */
+  /** AES-GCM ciphertexts, base64 — decrypt only on client.  Password
+   *  and its IV are nullable for SSO / passkey-only / email-link
+   *  accounts that have no standalone password to store. */
   usernameEncrypted: string;
-  passwordEncrypted: string;
+  passwordEncrypted?: string | null;
   notesEncrypted?: string | null;
   /** Per-field IVs (base64) — never reused across fields, AES-GCM safety. */
   ivUsername: string;
-  ivPassword: string;
+  ivPassword?: string | null;
   ivNotes?: string | null;
   twoFactor: boolean;
   strength: "weak" | "medium" | "strong" | null;

@@ -11,10 +11,14 @@ export const createCredentialSchema = z.object({
   service: z.string().trim().min(1).max(120),
   url: z.string().url().or(z.literal("")).optional().nullable(),
   usernameEncrypted: base64,
-  passwordEncrypted: base64,
+  // Password is optional — SSO / email-link / passkey-only accounts
+  // have nothing to type into the field, so we let the client send
+  // null instead of forcing a fake encryption.  iv_password follows
+  // suit (null when no ciphertext).
+  passwordEncrypted: base64.optional().nullable(),
   notesEncrypted: base64.optional().nullable(),
   ivUsername: base64,
-  ivPassword: base64,
+  ivPassword: base64.optional().nullable(),
   ivNotes: base64.optional().nullable(),
   twoFactor: z.boolean().default(false),
   strength: z.enum(["weak", "medium", "strong"]).optional().nullable(),
