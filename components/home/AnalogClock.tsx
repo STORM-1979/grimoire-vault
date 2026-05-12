@@ -71,11 +71,10 @@ export function AnalogClock() {
         // Scale by height to match the sibling calendar — the
         // homepage hero stretches both children to the same row
         // height via the grid's items-stretch, then this SVG fills
-        // that height while preserving its 1:1 aspect.  max-h caps
-        // the size on tall screens so the clock doesn't dwarf the
-        // page on, say, a 4K vertical monitor.  max-w guards
-        // against wide-but-short viewports.
-        className="h-full w-auto max-h-[560px] max-w-full"
+        // that height while preserving its 1:1 aspect.  max-h
+        // pinned to the calendar's fixed height (440px) so the two
+        // anchors stay visually balanced.
+        className="h-full w-auto max-h-[440px] max-w-full"
         role="img"
         aria-label={
           now

@@ -91,7 +91,12 @@ export function MonthCalendar() {
     && selected.d === d;
 
   return (
-    <div className="keynote rounded-2xl p-4 flex flex-col gap-3 h-full">
+    // Fixed-height shell so the clock has a concrete row height to
+    // match.  Internal layout below uses flex-1 on the days grid so
+    // the content distributes through the frame instead of leaving
+    // a void under the date footer.  ~10% smaller than the previous
+    // pass which was driven by the natural content height.
+    <div className="keynote rounded-2xl p-3.5 flex flex-col gap-2.5 h-[440px]">
       {/* Header — month name + nav controls.  "Сегодня" only shows
           when the user has wandered off the current month, to keep
           the chrome quiet during normal use. */}
@@ -140,50 +145,57 @@ export function MonthCalendar() {
         ))}
       </div>
 
-      {/* Day grid with visible hairlines.  We render a 7-col,
-          N-row sub-grid wrapped in a gold-tinted background; each
-          cell sits at gap-px so the parent's bg shows through as
-          thin gold rules between cells.  Same pattern the /
-          categories page uses for the room-grid.  Trailing empties
-          fill out the bottom row so the last week never looks
-          truncated. */}
-      <div className="rounded-b-lg overflow-hidden bg-gold/15 grid grid-cols-7 gap-px">
-        {(() => {
-          // Pad to a full 7-wide bottom row so the grid bottom edge
-          // is uniform.  Without this, months that end on a Wednesday
-          // (etc.) leave a ragged half-row that breaks the rectangle.
-          const padded = [...grid];
-          while (padded.length % 7 !== 0) padded.push(null);
-          return padded.map((d, i) => {
-            if (d === null) {
-              return <div key={`empty-${i}`} className="bg-emerald-deep/95 h-11" />;
-            }
-            const t = isToday(d);
-            const s = isSelected(d);
-            const weekendCol = i % 7 >= 5;
-            return (
-              <button
-                key={`d-${d}`}
-                type="button"
-                onClick={() => setSelected({ y: view.year, m: view.month, d })}
-                className={
-                  "h-11 flex items-center justify-center font-display text-[15px] transition relative " +
-                  (t
-                    ? "bg-gold text-emerald-deep font-semibold shadow-inner"
-                    : s
-                    ? "bg-emerald-deep/95 ring-1 ring-inset ring-gold/60 text-gold"
-                    : weekendCol
-                    ? "bg-emerald-deep/95 text-gold/70 hover:bg-white/[0.05] hover:text-gold"
-                    : "bg-emerald-deep/95 text-ivory hover:bg-white/[0.05]")
-                }
-                aria-label={`${d} ${RU_MONTHS[view.month]} ${view.year}${t ? ", сегодня" : ""}`}
-              >
-                {d}
-              </button>
-            );
-          });
-        })()}
-      </div>
+      {(() => {
+        // Pad to a full 7-wide bottom row so the grid bottom edge
+        // is uniform.  Without this, months that end on a Wednesday
+        // (etc.) leave a ragged half-row that breaks the rectangle.
+        const padded = [...grid];
+        while (padded.length % 7 !== 0) padded.push(null);
+        // Row count drives the grid-template-rows below — 5 or 6 rows
+        // depending on the month.  Equal-height rows via repeat(_,1fr)
+        // means cells distribute to fill the flex-1 container.
+        const rowCount = padded.length / 7;
+        return (
+          // Day grid with visible hairlines.  Gap-px on a gold-
+          // tinted parent makes the gaps read as thin gold rules.
+          // flex-1 stretches the grid to absorb the remaining
+          // vertical space after the header + weekday row + footer
+          // claim their content height — fills the frame.
+          <div
+            className="rounded-b-lg overflow-hidden bg-gold/15 grid grid-cols-7 gap-px flex-1"
+            style={{ gridTemplateRows: `repeat(${rowCount}, 1fr)` }}
+          >
+            {padded.map((d, i) => {
+              if (d === null) {
+                return <div key={`empty-${i}`} className="bg-emerald-deep/95" />;
+              }
+              const t = isToday(d);
+              const s = isSelected(d);
+              const weekendCol = i % 7 >= 5;
+              return (
+                <button
+                  key={`d-${d}`}
+                  type="button"
+                  onClick={() => setSelected({ y: view.year, m: view.month, d })}
+                  className={
+                    "flex items-center justify-center font-display text-[15px] transition relative " +
+                    (t
+                      ? "bg-gold text-emerald-deep font-semibold shadow-inner"
+                      : s
+                      ? "bg-emerald-deep/95 ring-1 ring-inset ring-gold/60 text-gold"
+                      : weekendCol
+                      ? "bg-emerald-deep/95 text-gold/70 hover:bg-white/[0.05] hover:text-gold"
+                      : "bg-emerald-deep/95 text-ivory hover:bg-white/[0.05]")
+                  }
+                  aria-label={`${d} ${RU_MONTHS[view.month]} ${view.year}${t ? ", сегодня" : ""}`}
+                >
+                  {d}
+                </button>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* Current date — prominent strip under the grid.  This is
           the calendar's "anchor reading" so the user always knows
