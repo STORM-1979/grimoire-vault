@@ -91,7 +91,7 @@ export function MonthCalendar() {
     && selected.d === d;
 
   return (
-    <div className="keynote rounded-2xl p-4 flex flex-col gap-3">
+    <div className="keynote rounded-2xl p-4 flex flex-col gap-3 h-full">
       {/* Header — month name + nav controls.  "Сегодня" only shows
           when the user has wandered off the current month, to keep
           the chrome quiet during normal use. */}

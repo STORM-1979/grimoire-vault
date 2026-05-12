@@ -65,10 +65,17 @@ export function AnalogClock() {
   const ACCENT = "#D4B76A";
 
   return (
-    <div className="flex items-center justify-center">
+    <div className="flex items-center justify-center h-full w-full">
       <svg
         viewBox="0 0 300 300"
-        className="w-full max-w-[540px] h-auto"
+        // Scale by height to match the sibling calendar — the
+        // homepage hero stretches both children to the same row
+        // height via the grid's items-stretch, then this SVG fills
+        // that height while preserving its 1:1 aspect.  max-h caps
+        // the size on tall screens so the clock doesn't dwarf the
+        // page on, say, a 4K vertical monitor.  max-w guards
+        // against wide-but-short viewports.
+        className="h-full w-auto max-h-[560px] max-w-full"
         role="img"
         aria-label={
           now

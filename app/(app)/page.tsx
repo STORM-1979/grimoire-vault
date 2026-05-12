@@ -1,147 +1,54 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { CATEGORIES, getCategory } from "@/lib/categories";
+import { CATEGORIES } from "@/lib/categories";
 import { categoryCounts } from "@/lib/data/entries";
-import { createClient } from "@/lib/supabase/server";
-import { rowToEntry } from "@/lib/data/mappers";
 import { Icon } from "@/components/icons/Icon";
 import { AnalogClock } from "@/components/home/AnalogClock";
 import { MonthCalendar } from "@/components/home/MonthCalendar";
 
 /**
- * Home is a Server Component.  The hero is now a clean two-column
- * panel — analog clock on the left, month calendar on the right —
- * both live, both client-rendered.  Below it the "Recently added"
- * strip and the categories grid still stream in via Suspense.
+ * Home is a Server Component.  Layout:
+ *   1. Hero: month calendar (left) + analog clock (right).  Both
+ *      stretch to the same height via items-stretch + h-full on
+ *      the calendar; the clock SVG scales by its own height to
+ *      match.
+ *   2. Categories: simple heading + 4-col grid of all 15 rooms.
  *
- * Why this hero instead of the old marketing copy: this is a
- * personal vault, the user lives here every day, and "A library of
- * everything worth keeping" earns its keep on a landing page, not
- * on a working dashboard.  Clock + calendar give the page a
- * functional anchor and a daily rhythm without nagging the user
- * about anything.
+ * The marketing copy ("Fifteen rooms of one library", recent-
+ * entries strip) was removed by request — this is a working
+ * dashboard, not a landing page.
  */
 export default function HomePage() {
   return (
     <div className="fade-in">
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 grid-bg opacity-30 pointer-events-none" />
-        <div className="max-w-[1480px] mx-auto px-10 pt-12 pb-16 grid grid-cols-12 gap-10 relative items-center">
-          {/* Clock — gets the wider column and centres in it.
-              Without the strap-lugs the case sits more like an
-              independent object, so we let it breathe. */}
-          <div className="col-span-7 flex items-center justify-center">
-            <AnalogClock />
-          </div>
-          {/* Calendar — compact 5/12 column.  Today is gold-filled;
-              clicked dates get a thin gold ring (selection is
-              local-only for now). */}
+        <div className="max-w-[1480px] mx-auto px-10 pt-12 pb-16 grid grid-cols-12 gap-10 relative items-stretch">
+          {/* Calendar — left column, natural content height drives
+              the row height.  Today is gold-filled; clicked dates
+              get a thin gold ring (selection is local-only for now). */}
           <div className="col-span-5">
             <MonthCalendar />
           </div>
+          {/* Clock — right column, scales by height to match the
+              calendar.  Container is h-full + flex-centred so the
+              SVG sits dead-centre regardless of column width. */}
+          <div className="col-span-7 flex items-center justify-center h-full">
+            <AnalogClock />
+          </div>
         </div>
       </section>
 
-      {/* Recently added — RSC + Suspense, paints under the hero independently */}
-      <section className="max-w-[1480px] mx-auto px-10 pt-12 pb-4">
-        <div className="flex items-baseline justify-between mb-5">
-          <div className="badge">Recently added</div>
-          <span className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute">
-            свежее наверху
-          </span>
-        </div>
-        <Suspense fallback={<RecentEntriesSkeleton />}>
-          <RecentEntries />
-        </Suspense>
-      </section>
-
-      {/* Categories grid — counts stream in below the static labels */}
-      <section className="max-w-[1480px] mx-auto px-10 py-16">
-        <div className="grid grid-cols-12 gap-10 mb-12">
-          <div className="col-span-6">
-            <div className="badge mb-4">Указатель — пятнадцать</div>
-            <h2 className="font-display text-[68px] font-light leading-[0.92] tracking-tightest">
-              Fifteen <span className="italic text-gold">rooms</span> of one library.
-            </h2>
-          </div>
-          <div className="col-span-5 col-start-8 self-end">
-            <p className="text-[15px] leading-[1.7] text-ivory-dim font-light">
-              Каждая комната — отдельная страница со своим ритмом. Внутри: лента,
-              поиск, добавление одной кнопкой, неограниченное вложение подкатегорий.
-            </p>
-          </div>
-        </div>
+      {/* Categories — single-heading section, grid streams in below */}
+      <section className="max-w-[1480px] mx-auto px-10 pt-8 pb-16">
+        <h2 className="font-display text-[68px] font-light leading-[0.92] tracking-tightest mb-10">
+          Категории
+        </h2>
 
         <Suspense fallback={<CategoriesGridSkeleton />}>
           <CategoriesGrid />
         </Suspense>
       </section>
-    </div>
-  );
-}
-
-/* ---- Recent entries strip ---- */
-
-async function RecentEntries() {
-  const supabase = await createClient();
-  // Latest 6 across all 14 categories — RLS scopes to the calling user.
-  const { data } = await supabase
-    .from("entries")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(6);
-  const items = (data ?? []).map(rowToEntry);
-  if (items.length === 0) {
-    return (
-      <div className="font-mono text-[10px] uppercase tracking-widest text-ivory-mute py-8 text-center border border-dashed border-white/10 rounded-2xl">
-        Vault пуст — добавь первую запись через категорию или ⌘K
-      </div>
-    );
-  }
-  return (
-    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-      {items.map((it) => {
-        const cat = getCategory(it.categoryId);
-        if (!cat) return null;
-        return (
-          <Link
-            key={it.id}
-            href={`/category/${cat.id}`}
-            className="group flex items-start gap-3 p-3 rounded-xl border border-white/8 bg-white/[0.02] hover:border-gold/40 hover:bg-white/[0.04] transition"
-          >
-            <div className="text-emerald-200 group-hover:text-gold transition flex-shrink-0 mt-0.5">
-              <Icon name={cat.icon} size={18} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-mono text-[9px] uppercase tracking-widest text-gold mb-0.5 truncate">
-                № {cat.no} · {cat.en}
-              </div>
-              <div className="font-display text-[15px] font-medium leading-tight truncate">
-                {it.title}
-              </div>
-              <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute mt-1">
-                {new Date(it.createdAt).toLocaleString("ru-RU", {
-                  day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
-                })}
-              </div>
-            </div>
-          </Link>
-        );
-      })}
-    </div>
-  );
-}
-
-function RecentEntriesSkeleton() {
-  return (
-    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-      {[0, 1, 2, 3, 4, 5].map((i) => (
-        <div key={i} className="p-3 rounded-xl border border-white/8 bg-white/[0.02] animate-pulse min-h-[64px]">
-          <div className="h-3 w-16 rounded bg-white/5 mb-2" />
-          <div className="h-4 w-3/4 rounded bg-white/5 mb-2" />
-          <div className="h-3 w-20 rounded bg-white/5" />
-        </div>
-      ))}
     </div>
   );
 }
