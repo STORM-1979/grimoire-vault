@@ -31,7 +31,7 @@ export function Header({ user }: HeaderProps) {
       <div className="max-w-[1480px] mx-auto px-12 py-4 flex items-center justify-between gap-10">
         <Logo />
 
-        <nav className="flex items-center gap-8">
+        <nav className="flex items-center gap-16">
           <NavLink href="/categories">Категории</NavLink>
           <NavLink href="/search">Поиск</NavLink>
           <NavDropdown />
@@ -45,16 +45,18 @@ export function Header({ user }: HeaderProps) {
             </span>
           )}
           <SignOutButton />
-          {/* Корзина: icon-only chip, sits to the right of Sign Out
-              by request.  Same .badge frame as the SignOut button so
-              the two chips read as a pair at the bar's edge. */}
+          {/* Корзина: icon-only chip sized to match the SignOut
+              button next to it.  Same .badge frame, same min-width
+              (100px so the trash chip doesn't read as a smaller
+              afterthought), and a bigger 18px icon centred inside
+              so the glyph remains legible without a text label. */}
           <Link
             href="/trash"
-            className="badge inline-flex items-center hover:border-gold transition"
+            className="badge inline-flex items-center justify-center hover:border-gold hover:text-gold transition min-w-[100px]"
             title="Корзина"
             aria-label="Корзина"
           >
-            <Icon name="trash" size={13} />
+            <Icon name="trash" size={18} />
           </Link>
         </div>
       </div>

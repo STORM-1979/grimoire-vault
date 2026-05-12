@@ -48,8 +48,12 @@ const PATHS: Record<IconName, React.ReactNode> = {
   wifiOff:   <g><path d="M3 3l18 18" strokeWidth="1.5"/><path d="M5 12.5a10 10 0 0 1 5-2.5M14 10c2 .3 3.7 1.2 5 2.5" fill="none" strokeWidth="1.4"/><circle cx="12" cy="19" r="1.2" fill="currentColor"/></g>,
   sort:      <g><path d="M7 5v14M3 9l4-4 4 4M17 19V5M13 15l4 4 4-4" fill="none" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></g>,
   // Classic trash can — lid bar + handle on top, body with two
-  // vertical slats inside.  Reads as "корзина" at 12–16 px.
-  trash:     <g><path d="M5 7h14" strokeWidth="1.4" strokeLinecap="round"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" fill="none" strokeWidth="1.4"/><path d="M7 7l1 13a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2l1-13" fill="none" strokeWidth="1.4"/><path d="M10 11v7M14 11v7" strokeWidth="1.4" strokeLinecap="round"/></g>,
+  // vertical slats inside.  Heavier 1.7 strokes (vs the 1.4 used
+  // across the rest of the set) because this glyph sits standalone
+  // in the header chip with no text label to anchor recognition;
+  // a slightly bolder line reads better at the 16–18 px display
+  // sizes the chip uses.
+  trash:     <g><path d="M4 7h16" strokeWidth="1.7" strokeLinecap="round"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" fill="none" strokeWidth="1.7" strokeLinejoin="round"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" fill="none" strokeWidth="1.7" strokeLinejoin="round"/><path d="M10 11v7M14 11v7" strokeWidth="1.7" strokeLinecap="round"/></g>,
 };
 
 interface IconProps extends Omit<SVGProps<SVGSVGElement>, "name"> {
