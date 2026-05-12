@@ -528,7 +528,20 @@ interface ChipState {
 function renderChip(c: EntryCollection, s: ChipState) {
   if (s.isRenaming) {
     return (
-      <span key={c.id} className="inline-flex items-center gap-1">
+      <span
+        key={c.id}
+        className="inline-flex items-center gap-1"
+        // The chip lives inside a dnd-kit SortableChipWrapper whose
+        // KeyboardSensor uses Space as the drag-activation key and
+        // listens via event bubbling.  Without stopping propagation
+        // here, typing a space in the rename input gets eaten by the
+        // sensor instead of inserted into the input value.  Same
+        // logic for pointer events — clicking inside the input
+        // shouldn't trigger a drag pickup.
+        onKeyDown={(e) => e.stopPropagation()}
+        onKeyUp={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
         <input
           autoFocus
           className="font-mono text-[11px] uppercase tracking-widest px-3.5 py-2 rounded-full bg-emerald-deep border border-gold/40 text-ivory min-w-[140px] focus:outline-none focus:border-gold"
