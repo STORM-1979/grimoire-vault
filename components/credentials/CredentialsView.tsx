@@ -216,21 +216,6 @@ export function CredentialsView() {
         />
       )}
 
-      {/* Security warning */}
-      <section className="max-w-[1480px] mx-auto px-10 pt-2">
-        <div className="flex items-start gap-4 p-5 rounded-xl border border-gold/30 bg-gold/[0.04]">
-          <div className="text-gold flex-shrink-0 mt-0.5"><Icon name="shield" size={22} /></div>
-          <div className="flex-1">
-            <div className="font-mono text-[10px] uppercase tracking-widest text-gold mb-1">Шифрование</div>
-            <p className="text-[13.5px] text-ivory-dim leading-snug font-light">
-              Пароли зашифрованы на клиенте через <span className="text-ivory">PBKDF2-SHA256 (600k итераций)</span> →{" "}
-              <span className="text-ivory">AES-GCM-256</span> с уникальным IV на каждое поле. Сервер видит только base64-blobs.
-              Мастер-пароль живёт в <span className="text-ivory">sessionStorage</span> до закрытия вкладки.
-            </p>
-          </div>
-        </div>
-      </section>
-
       {creds.error && (
         <div className="max-w-[1480px] mx-auto px-10 mt-4 font-mono text-[11px] text-red-400 flex items-center gap-2">
           <Icon name="x" size={12} /> {creds.error}
