@@ -5,7 +5,6 @@ import { Icon } from "@/components/icons/Icon";
 import { Field } from "@/components/forms/Field";
 import { StrengthDot } from "./StrengthDot";
 import { classifyStrength, generatePassword } from "@/lib/crypto";
-import { ThemedSelect } from "@/components/forms/ThemedSelect";
 import { CREDENTIAL_OWNERS } from "@/lib/credentials-owners";
 import type { CredentialDecrypted } from "@/lib/types";
 
@@ -131,12 +130,43 @@ export function CredentialModal({ initial, onClose, onSubmit }: Props) {
 
         <form onSubmit={handleSubmit} className="p-7">
           <Field label="Владелец" hint="Чей это аккаунт — для фильтрации в общем сейфе">
-            <ThemedSelect
-              options={CREDENTIAL_OWNERS.map((o) => ({ value: o.id, label: o.label }))}
-              placeholder="— Без владельца —"
-              value={form.owner}
-              onChange={(v) => setForm((f) => ({ ...f, owner: v }))}
-            />
+            {/* Chip-row picker instead of a dropdown — owners are
+                first-class collections in this category, so the
+                user should see all the buckets at once when filing
+                a new record.  Same visual language as the filter
+                strip above the table on the credentials view. */}
+            <div className="flex flex-wrap gap-2">
+              {CREDENTIAL_OWNERS.map((o) => {
+                const active = form.owner === o.id;
+                return (
+                  <button
+                    key={o.id}
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, owner: o.id }))}
+                    className={
+                      "font-mono text-[11px] uppercase tracking-widest px-3.5 py-2 rounded-full transition " +
+                      (active
+                        ? "bg-gold text-emerald-deep"
+                        : "border border-white/15 text-ivory-mute hover:text-gold hover:border-gold/40")
+                    }
+                  >
+                    {o.label}
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, owner: "" }))}
+                className={
+                  "font-mono text-[11px] uppercase tracking-widest px-3.5 py-2 rounded-full italic transition " +
+                  (form.owner === ""
+                    ? "bg-gold text-emerald-deep"
+                    : "border border-white/15 text-ivory-mute hover:text-gold hover:border-gold/40")
+                }
+              >
+                Без владельца
+              </button>
+            </div>
           </Field>
 
           <Field label="Сервис" required>
