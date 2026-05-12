@@ -16,9 +16,9 @@ import type { IconName } from "@/lib/types";
  * Trigger highlights gold when the user is on any of the bundled
  * routes; click toggles open; outside-click / Escape close.
  */
-const ITEMS: Array<{ href: string; label: string; hint: string; icon: IconName; withBadge?: boolean }> = [
+const ITEMS: Array<{ href: string; label: string; hint: string; icon: IconName }> = [
   { href: "/today",    label: "Сегодня",  hint: "Заметки и события дня",     icon: "star" },
-  { href: "/inbox",    label: "Inbox",    hint: "Импорт из Telegram-бота",   icon: "inbox",    withBadge: true },
+  { href: "/inbox",    label: "Inbox",    hint: "Импорт из Telegram-бота",   icon: "inbox" },
   { href: "/review",   label: "Review",   hint: "SM-2 повторение знаний",    icon: "refresh" },
   { href: "/graph",    label: "Граф",     hint: "Связи между записями",      icon: "drag" },
   { href: "/settings", label: "Настройки", hint: "Аккаунт · Telegram · PAT", icon: "settings" },
@@ -108,9 +108,8 @@ export function NavDropdown() {
                   <Icon name={it.icon} size={16} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-display text-[14px] font-medium leading-tight flex items-center gap-2">
+                  <div className="font-display text-[14px] font-medium leading-tight">
                     {it.label}
-                    {it.withBadge && <InboxBadge />}
                   </div>
                   <div className="font-mono text-[9px] uppercase tracking-widest text-ivory-mute mt-0.5">
                     {it.hint}
