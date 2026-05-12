@@ -228,3 +228,136 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* ===== Print — credentials sheet =====
+   When the user prints (Cmd/Ctrl+P, or our "Распечатать" button
+   that calls window.print()), hide every interactive surface and
+   render ONLY the .printable section in black ink on white paper.
+   PrintableCredentials.tsx renders the always-present markup; the
+   `hidden print:block` Tailwind classes keep it off-screen, this
+   block makes it the sole visible thing in the print preview. */
+@media print {
+  body * { visibility: hidden !important; }
+  .printable, .printable * { visibility: visible !important; }
+  .printable {
+    position: absolute !important;
+    inset: 0 !important;
+    color: #000 !important;
+    background: #fff !important;
+    font-family: var(--font-mono), monospace;
+    padding: 24pt 28pt;
+  }
+  .printable-head {
+    border-bottom: 1.5pt solid #000;
+    padding-bottom: 12pt;
+    margin-bottom: 16pt;
+  }
+  .printable-brand {
+    font-family: var(--font-fraunces), serif;
+    font-style: italic;
+    font-weight: 500;
+    font-size: 22pt;
+    line-height: 1;
+  }
+  .printable-meta {
+    font-size: 9pt;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    margin-top: 6pt;
+    color: #444 !important;
+  }
+  .printable-warning {
+    font-size: 8.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-top: 8pt;
+    padding: 6pt 9pt;
+    border: 1pt solid #000;
+    color: #000 !important;
+    line-height: 1.4;
+  }
+  .printable-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .printable-card {
+    display: grid;
+    grid-template-columns: 24pt 1fr;
+    gap: 10pt;
+    padding: 10pt 0 12pt;
+    border-bottom: 0.5pt solid #888;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .printable-index {
+    font-family: var(--font-mono), monospace;
+    font-size: 10pt;
+    color: #888 !important;
+    text-align: right;
+    padding-top: 1pt;
+  }
+  .printable-service {
+    font-family: var(--font-fraunces), serif;
+    font-weight: 500;
+    font-size: 14pt;
+    line-height: 1.1;
+  }
+  .printable-2fa {
+    font-family: var(--font-mono), monospace;
+    font-size: 8.5pt;
+    color: #555 !important;
+    letter-spacing: 0.1em;
+  }
+  .printable-url {
+    font-family: var(--font-mono), monospace;
+    font-size: 9pt;
+    color: #444 !important;
+    margin-top: 1pt;
+    word-break: break-all;
+  }
+  .printable-fields {
+    display: grid;
+    grid-template-columns: 64pt 1fr;
+    gap: 2pt 10pt;
+    margin: 6pt 0 0;
+  }
+  .printable-fields dt {
+    font-family: var(--font-mono), monospace;
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #777 !important;
+    padding-top: 2pt;
+  }
+  .printable-fields dd {
+    font-family: var(--font-mono), monospace;
+    font-size: 10pt;
+    color: #000 !important;
+    word-break: break-all;
+    margin: 0;
+  }
+  .printable-password {
+    font-weight: 700;
+    font-size: 11pt;
+    letter-spacing: 0.02em;
+  }
+  .printable-notes {
+    white-space: pre-wrap;
+  }
+  .printable-foot {
+    margin-top: 16pt;
+    padding-top: 8pt;
+    border-top: 0.5pt solid #888;
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: #888 !important;
+    text-align: center;
+  }
+  /* Page breaks at a reasonable cadence — header + first card
+     stays together on every page. */
+  @page {
+    margin: 12mm;
+  }
+}
