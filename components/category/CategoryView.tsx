@@ -150,32 +150,18 @@ export function CategoryView({ category, initialItems }: Props) {
   // Credentials (record-typed) supports user-defined collections.
   const showCollections = categorySupportsCollections(category.id);
 
-  // Build a "selected + descendants" id-set so picking a parent chip
-  // also surfaces entries assigned to its sub-collections.  Cheap —
-  // collections list is small per category.
+  // Filter scope: ONLY the directly-selected collection.  Previously
+  // a parent chip included every descendant, but that bled
+  // sub-collection entries into the parent view — a record filed in
+  // "Дизайны / Forge in America" showed both under "Forge in America"
+  // and under the parent "Дизайны".  The current rule is exact-match
+  // only: parent view shows just direct children of the parent,
+  // sub-chips show their own bucket.  To see everything beneath a
+  // parent, click each sub-chip in turn.
   const selectedScope = useMemo(() => {
     if (!selectedCollection || selectedCollection === "none") return null;
-    const childrenByParent = new Map<string, string[]>();
-    for (const c of collections) {
-      if (c.parentId) {
-        const arr = childrenByParent.get(c.parentId) ?? [];
-        arr.push(c.id);
-        childrenByParent.set(c.parentId, arr);
-      }
-    }
-    const out = new Set<string>([selectedCollection]);
-    const stack = [selectedCollection];
-    while (stack.length) {
-      const cur = stack.pop()!;
-      for (const child of childrenByParent.get(cur) ?? []) {
-        if (!out.has(child)) {
-          out.add(child);
-          stack.push(child);
-        }
-      }
-    }
-    return out;
-  }, [selectedCollection, collections]);
+    return new Set<string>([selectedCollection]);
+  }, [selectedCollection]);
 
   // Apply the collections filter before pinned/others split so all
   // downstream code (cards, keyboard nav, bulk ops) sees a consistent
