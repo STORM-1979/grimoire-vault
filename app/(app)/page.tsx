@@ -5,6 +5,7 @@ import { categoryCounts } from "@/lib/data/entries";
 import { Icon } from "@/components/icons/Icon";
 import { AnalogClock } from "@/components/home/AnalogClock";
 import { MonthCalendar } from "@/components/home/MonthCalendar";
+import { QuickLinks } from "@/components/home/QuickLinks";
 
 /**
  * Home is a Server Component.  Layout:
@@ -38,6 +39,10 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* External dock — one-click jumps to GitHub / Railway /
+          Vercel / Supabase and the (still-pending) portfolio site. */}
+      <QuickLinks />
 
       {/* Categories — single-heading section, grid streams in below */}
       <section className="max-w-[1480px] mx-auto px-10 pt-8 pb-16">
