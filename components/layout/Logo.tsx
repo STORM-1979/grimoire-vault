@@ -11,37 +11,41 @@ interface LogoProps {
 }
 
 /**
- * Two-line wordmark logo: "Grimoire" stacked over "Vault".  Italic
- * serif on top, upright accent below — reads like a magazine
- * masthead and frees horizontal space in the header.  The whole
- * block is a single link to /, no separate icon.
+ * "g"-monogram circle + stacked wordmark + "Atelier · Personal
+ * Edition" subtitle.  Restored to the original three-element
+ * masthead per request after a wordmark-only pass.  Whole block
+ * is a single link to /.
  */
-export function Logo({ size = "md" }: LogoProps) {
-  // Per-call-site sizing.  /login and /update-password pass
-  // size="lg" for the page-brand position; the in-app header uses
-  // the default md so the masthead doesn't dwarf the nav row.
-  const top = size === "lg"
-    ? "text-[36px]"
-    : size === "sm"
-    ? "text-[18px]"
-    : "text-[22px]";
-  const bottom = size === "lg"
-    ? "text-[28px]"
-    : size === "sm"
-    ? "text-[15px]"
-    : "text-[18px]";
+export function Logo({ size = "md", showText = true }: LogoProps) {
+  const dim = size === "sm" ? 26 : size === "lg" ? 44 : 34;
   return (
-    <Link
-      href="/"
-      className="group inline-block leading-[0.95] hover:opacity-90 transition"
-      title="На главную"
-    >
-      <div className={`font-display italic font-medium ${top} text-ivory tracking-tightest`}>
-        Grimoire
-      </div>
-      <div className={`font-display font-normal ${bottom} text-emerald-200 tracking-tightest mt-0.5`}>
-        Vault
-      </div>
+    <Link href="/" className="inline-flex items-center gap-3 group" title="На главную">
+      <svg width={dim} height={dim} viewBox="0 0 34 34" aria-hidden="true">
+        <circle
+          cx="17" cy="17" r="16"
+          fill="none" stroke="var(--color-gold)" strokeWidth="1"
+          className="transition-stroke group-hover:stroke-gold-soft"
+        />
+        <text
+          x="17" y="22.5"
+          fontFamily="var(--font-fraunces), serif"
+          fontStyle="italic"
+          fontWeight="500"
+          fontSize="18"
+          textAnchor="middle"
+          fill="var(--color-ivory)"
+        >g</text>
+      </svg>
+      {showText && (
+        <div className="leading-none">
+          <div className="font-display italic font-medium text-[22px] text-ivory tracking-tightest">
+            Grimoire <span className="not-italic font-normal text-emerald-200">Vault</span>
+          </div>
+          <div className="font-mono text-[10px] tracking-widest uppercase text-ivory-mute mt-1.5">
+            Atelier · Personal Edition
+          </div>
+        </div>
+      )}
     </Link>
   );
 }
