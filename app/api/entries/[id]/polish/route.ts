@@ -5,6 +5,7 @@ import { fetchYouTubeTranscript, looksLikeTranscriptError } from "@/lib/youtube-
 import { translateArrayToRussian, looksRussian } from "@/lib/translate";
 import { polishWithLLM } from "@/lib/llm-polish";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/ratelimit";
+import { log } from "@/lib/log";
 
 /**
  * POST /api/entries/[id]/polish
@@ -122,12 +123,11 @@ export const POST = withErrorHandler(async (_req: Request, ctx: RouteContext) =>
 
   const polished = await polishWithLLM(transcriptText);
   if (!polished || polished.length < 3) {
-    console.log(JSON.stringify({
-      msg: "polish.result",
+    log.info("polish.result", {
       entryId: id,
       ok: false,
       transcriptLen: transcriptText.length,
-    }));
+    });
     // Stamp metadata.polishFailedAt so the cool-down kicks in on the
     // next view.  We persist transcript regardless so a future polish
     // attempt skips the kome.ai round-trip.
@@ -149,14 +149,13 @@ export const POST = withErrorHandler(async (_req: Request, ctx: RouteContext) =>
     translated = true;
   }
 
-  console.log(JSON.stringify({
-    msg: "polish.result",
+  log.info("polish.result", {
     entryId: id,
     ok: true,
     theses: finalTheses.length,
     translated,
     transcriptLen: transcriptText.length,
-  }));
+  });
 
   // Drop any prior polishFailedAt timestamp on success — we're past
   // the cool-down regardless of when it was set.

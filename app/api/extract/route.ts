@@ -3,6 +3,7 @@ import { z } from "zod";
 import { extractMetadata } from "@/lib/og";
 import { requireUser, parseBody, withErrorHandler } from "@/lib/api-helpers";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/ratelimit";
+import { log } from "@/lib/log";
 
 /**
  * POST /api/extract — fetch a URL server-side and pull out og: meta.
@@ -39,15 +40,14 @@ export const POST = withErrorHandler(async (request: Request) => {
   }
 
   const meta = await extractMetadata(url);
-  console.log(JSON.stringify({
-    msg: "extract.result",
+  log.info("extract.result", {
     url,
     videoId: meta.videoId,
     hasContent: meta.hasContent,
     duration: meta.duration ?? null,
     hasDescription: Boolean(meta.description),
     diag: meta._diag,
-  }));
+  });
 
   if (meta.hasContent) {
     if (extractCache.size >= EXTRACT_CACHE_MAX) {

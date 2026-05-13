@@ -53,6 +53,19 @@ async function decryptRecord(rec: CredentialRecord, key: CryptoKey): Promise<Cre
   };
 }
 
+/**
+ * Canonical credential ordering — pinned first, then most-recently
+ * updated.  Extracted because the same compare lived inline in four
+ * places (refetch, create, update, togglePin); a drift between them
+ * would have shown up as items jumping around after an edit.
+ */
+function sortCredentials(list: CredentialDecrypted[]): CredentialDecrypted[] {
+  return list.sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+    return b.updatedAt.localeCompare(a.updatedAt);
+  });
+}
+
 async function encryptForCreate(input: NewCredentialPlain, key: CryptoKey) {
   const u = await encryptString(key, input.username);
   // Only run AES-GCM on a non-empty password.  Encrypting "" would
@@ -90,12 +103,7 @@ export function useCredentials(key: CryptoKey | null) {
       setLoading(true);
       const { items: rows } = await credentialsApi.list();
       const decrypted = await Promise.all(rows.map((r) => decryptRecord(r, key)));
-      // Sort: pinned first, then most recently updated
-      decrypted.sort((a, b) => {
-        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-        return b.updatedAt.localeCompare(a.updatedAt);
-      });
-      setItems(decrypted);
+      setItems(sortCredentials(decrypted));
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось загрузить");
@@ -111,10 +119,7 @@ export function useCredentials(key: CryptoKey | null) {
     const payload = await encryptForCreate(input, key);
     const created = await credentialsApi.create(payload);
     const dec = await decryptRecord(created, key);
-    setItems((prev) => [dec, ...prev].sort((a, b) => {
-      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-      return b.updatedAt.localeCompare(a.updatedAt);
-    }));
+    setItems((prev) => sortCredentials([dec, ...prev]));
     return dec;
   }, [key]);
 
@@ -131,10 +136,7 @@ export function useCredentials(key: CryptoKey | null) {
     const payload = await encryptForCreate(input, key);
     const updated = await credentialsApi.update(id, payload);
     const dec = await decryptRecord(updated, key);
-    setItems((prev) => prev.map((it) => (it.id === id ? dec : it)).sort((a, b) => {
-      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-      return b.updatedAt.localeCompare(a.updatedAt);
-    }));
+    setItems((prev) => sortCredentials(prev.map((it) => (it.id === id ? dec : it))));
     return dec;
   }, [key]);
 
@@ -142,11 +144,9 @@ export function useCredentials(key: CryptoKey | null) {
     const target = items.find((it) => it.id === id);
     if (!target) return;
     const newPinned = !target.pinned;
-    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, pinned: newPinned } : it))
-      .sort((a, b) => {
-        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-        return b.updatedAt.localeCompare(a.updatedAt);
-      }));
+    setItems((prev) =>
+      sortCredentials(prev.map((it) => (it.id === id ? { ...it, pinned: newPinned } : it)))
+    );
     try {
       await credentialsApi.update(id, { pinned: newPinned });
     } catch (e) {

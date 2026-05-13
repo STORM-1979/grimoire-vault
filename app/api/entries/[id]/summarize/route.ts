@@ -5,6 +5,7 @@ import { summarize } from "@/lib/summarize";
 import { fetchYouTubeTranscript, looksLikeTranscriptError } from "@/lib/youtube-transcript-server";
 import { translateArrayToRussian, looksRussian } from "@/lib/translate";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/ratelimit";
+import { log } from "@/lib/log";
 
 /**
  * POST /api/entries/[id]/summarize
@@ -164,14 +165,13 @@ export const POST = withErrorHandler(async (_req: Request, ctx: RouteContext) =>
     translated = true;
   }
 
-  console.log(JSON.stringify({
-    msg: "summarize.result",
+  log.info("summarize.result", {
     videoId: vid,
     theses: finalTheses.length,
     source: "extractive",
     translated,
     transcriptLen: transcript.text.length,
-  }));
+  });
 
   // Save extractive output AND the transcript itself.  /polish reads
   // metadata.transcript to skip the kome.ai round-trip on its first
