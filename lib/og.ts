@@ -86,41 +86,99 @@ function classifyAddress(host: string): string | null {
 }
 
 /**
- * Block requests to private / loopback / link-local addresses +
- * non-http(s) schemes.  Resolves DNS so a public-looking host
- * whose A record points at 127.0.0.1 / 169.254.169.254 / the AWS
- * metadata service / your RFC1918 LAN doesn't slip through —
- * which is exactly what the static-hostname check did before.
- * Returns null if the URL is safe; otherwise a short reason
- * string.
+ * Resolve a hostname once and return the first address that passes
+ * classifyAddress().  Returns null when nothing safe is available
+ * (the caller refuses to fetch).  Distinct from the literal-IP fast
+ * path because we want the resolved IP back so we can pin the
+ * connection — the previous shape resolved twice (check, then fetch)
+ * and an attacker controlling a TTL≈0 DNS record could flip from
+ * public to RFC1918 between the two lookups.
  */
-async function isUnsafeUrl(u: URL): Promise<string | null> {
-  if (u.protocol !== "http:" && u.protocol !== "https:") return "non-http scheme";
-  const host = u.hostname.toLowerCase();
-  // Fast path: hostname is itself an IP literal — no DNS round-trip
-  // needed, classifyAddress() catches everything.
+async function pickSafeAddress(host: string): Promise<{ address: string; family: 4 | 6 } | { error: string }> {
+  // Literal IP hostname — no DNS round-trip needed; classifyAddress catches it.
   const literalReason = classifyAddress(host);
-  if (literalReason) return literalReason;
-  // Slow path: real hostname.  Resolve every A / AAAA record and
-  // refuse if any of them lands in a blocked range.  Using
-  // `family: 0` returns both families.  We deliberately don't
-  // cache — DNS-rebinding attacks rely on TTL≈0; if we cached, an
-  // attacker could prime us with a public IP and then flip the
-  // record to a private one between the safety check and the
-  // actual fetch.  The cost of a fresh lookup is a few ms.
+  if (literalReason) return { error: literalReason };
   try {
     const dns = await import("node:dns/promises");
     const records = await dns.lookup(host, { all: true });
     for (const r of records) {
-      const reason = classifyAddress(r.address);
-      if (reason) return `${reason} (resolved)`;
+      if (!classifyAddress(r.address)) {
+        return { address: r.address, family: (r.family === 6 ? 6 : 4) as 4 | 6 };
+      }
     }
+    // Every record we got back was blocked — refuse.
+    return { error: "all resolved addresses blocked" };
   } catch {
-    // DNS failure → treat as unsafe.  Better to refuse than to
-    // accidentally allow a host whose addresses we couldn't verify.
-    return "dns lookup failed";
+    return { error: "dns lookup failed" };
   }
-  return null;
+}
+
+/**
+ * fetch() wrapper that defends against SSRF + DNS rebinding by:
+ *   1. Resolving the host ONCE up-front and picking a safe IP.
+ *   2. Pinning the TCP connection to that exact IP via an undici
+ *      Agent whose connect.lookup short-circuits to the resolved
+ *      address.  This is what closes the rebinding window: with a
+ *      separate isUnsafeUrl() + native fetch(), an attacker with a
+ *      TTL≈0 record could return a public IP for the safety check
+ *      and 169.254.169.254 (AWS metadata) for the actual connect.
+ *   3. Following redirects manually so each hop's hostname is re-
+ *      verified.  Native `redirect: "follow"` would happily chase a
+ *      302 from public.example.com to private.example.com (or worse,
+ *      file://, javascript:, etc.) without revisiting the guard.
+ *
+ * Returns null on any guard failure; the caller falls back to its
+ * empty-metadata path.  Errors are intentionally squashed because OG
+ * extraction is best-effort — a network blip shouldn't 500 /api/extract.
+ */
+async function safeFetch(
+  input: string | URL,
+  init: RequestInit = {},
+  hopCount = 0,
+): Promise<Response | null> {
+  if (hopCount >= 5) return null;
+  let url: URL;
+  try { url = typeof input === "string" ? new URL(input) : input; }
+  catch { return null; }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+
+  const pick = await pickSafeAddress(url.hostname.toLowerCase());
+  if ("error" in pick) return null;
+
+  const { Agent } = await import("undici");
+  const agent = new Agent({
+    connect: {
+      // The lookup callback is invoked by undici right before TCP
+      // connect.  Returning our pre-verified IP here means the
+      // kernel-level connect goes to the address we already cleared,
+      // regardless of what the DNS resolver says in the next 50 ms.
+      lookup: (_host, _opts, cb) => cb(null, pick.address, pick.family),
+    },
+  });
+
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), {
+      ...init,
+      redirect: "manual",
+      // undici extends RequestInit with `dispatcher`; the DOM types
+      // don't know about it, hence the cast.
+      ...({ dispatcher: agent } as Record<string, unknown>),
+    });
+  } catch {
+    return null;
+  }
+
+  // 30x → re-run the guard against the redirect target so a
+  // public host can't bounce us to private infra.
+  if (res.status >= 300 && res.status < 400) {
+    const location = res.headers.get("location");
+    if (!location) return res;
+    let next: URL;
+    try { next = new URL(location, url); } catch { return null; }
+    return safeFetch(next, init, hopCount + 1);
+  }
+  return res;
 }
 
 /** Extract `<meta property|name=KEY content=VAL>` — first match wins. */
@@ -221,8 +279,14 @@ async function fetchYouTubeOEmbed(videoId: string): Promise<{
  * youtube.com page and used by yt-dlp / Invidious / etc. for years.
  * If YouTube rotates it the function returns null and the caller falls
  * back to oEmbed + scrape data.
+ *
+ * Override via YOUTUBE_INNERTUBE_KEY env var so the repo isn't tied to
+ * one specific key value (rotation = config change, not a redeploy).
+ * The hardcoded default is the long-lived public key; leaving it in
+ * place means the feature works out of the box without env setup.
  */
-const INNERTUBE_KEY = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
+const INNERTUBE_KEY =
+  process.env.YOUTUBE_INNERTUBE_KEY ?? "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
 
 interface InnertubeMeta {
   title?: string;
@@ -401,15 +465,28 @@ async function fetchYouTubeMobileScrape(videoId: string): Promise<{
  * filter narrows the response to the bits we care about so we don't
  * waste bandwidth on caption tracks / format URLs / recommended lists.
  */
-const INVIDIOUS_INSTANCES = [
+// Volunteer-run mirrors die regularly; comma-separated list in
+// INVIDIOUS_INSTANCES env lets us rotate the survivors without a
+// redeploy.  Falls back to a known-good shortlist when the env is
+// unset.  Anything past 3 dead instances is wasted latency budget —
+// the fallback path is already a "last-ditch" leg, not the primary.
+const INVIDIOUS_DEFAULTS = [
   "https://invidious.f5.si",
   "https://invidious.materialio.us",
   "https://yewtu.be",
   "https://invidious.no-logs.com",
-  "https://invidious.tiekoetter.com",
-  "https://inv.nadeko.net",
-  "https://invidious.privacyredirect.com",
 ];
+
+function loadInvidiousInstances(): string[] {
+  const raw = process.env.INVIDIOUS_INSTANCES?.trim();
+  if (!raw) return INVIDIOUS_DEFAULTS;
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => /^https?:\/\//.test(s));
+}
+
+const MAX_INVIDIOUS_FAILURES = 3;
 
 interface InvidiousMeta {
   duration?: string;
@@ -420,7 +497,11 @@ interface InvidiousMeta {
 }
 
 async function fetchYouTubeInvidious(videoId: string): Promise<InvidiousMeta | null> {
-  for (const base of INVIDIOUS_INSTANCES) {
+  let failures = 0;
+  for (const base of loadInvidiousInstances()) {
+    // Short-circuit once we've burned through several dead instances —
+    // the request budget shouldn't be spent walking a list of ghosts.
+    if (failures >= MAX_INVIDIOUS_FAILURES) break;
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 4000);
     try {
@@ -432,7 +513,7 @@ async function fetchYouTubeInvidious(videoId: string): Promise<InvidiousMeta | n
         },
       );
       clearTimeout(timer);
-      if (!res.ok) continue;
+      if (!res.ok) { failures += 1; continue; }
       const data = await res.json() as {
         lengthSeconds?: number;
         title?: string;
@@ -440,7 +521,7 @@ async function fetchYouTubeInvidious(videoId: string): Promise<InvidiousMeta | n
         description?: string;
         videoThumbnails?: Array<{ url: string; width?: number; height?: number; quality?: string }>;
       };
-      if (typeof data.lengthSeconds !== "number" || data.lengthSeconds <= 0) continue;
+      if (typeof data.lengthSeconds !== "number" || data.lengthSeconds <= 0) { failures += 1; continue; }
       // Pick the largest thumbnail; quality "maxresdefault" if present.
       const thumbs = data.videoThumbnails ?? [];
       let best = thumbs.find((t) => t.quality === "maxresdefault");
@@ -456,6 +537,7 @@ async function fetchYouTubeInvidious(videoId: string): Promise<InvidiousMeta | n
       };
     } catch {
       clearTimeout(timer);
+      failures += 1;
       continue;
     }
   }
@@ -486,9 +568,6 @@ export async function extractMetadata(input: string): Promise<ExtractedMeta> {
   } catch {
     return { url: input, hasContent: false };
   }
-  const unsafe = await isUnsafeUrl(url);
-  if (unsafe) return { url: url.toString(), hasContent: false };
-
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
   let html = "";
@@ -502,8 +581,10 @@ export async function extractMetadata(input: string): Promise<ExtractedMeta> {
     consentWall: false,
   };
   try {
-    const res = await fetch(url.toString(), {
-      redirect: "follow",
+    // safeFetch resolves the host once, pins the TCP connection to a
+    // verified-safe IP via undici, and re-runs the SSRF guard on each
+    // redirect hop — see the helper above for why both steps matter.
+    const res = await safeFetch(url.toString(), {
       signal: ctrl.signal,
       headers: {
         "User-Agent": USER_AGENT,
@@ -518,6 +599,7 @@ export async function extractMetadata(input: string): Promise<ExtractedMeta> {
         Cookie: "CONSENT=YES+1; SOCS=CAI",
       },
     });
+    if (!res) return { url: finalUrl, hasContent: false, _diag: diag };
     diag.scrape = { ok: res.ok, status: res.status };
     if (!res.ok) return { url: finalUrl, hasContent: false, _diag: diag };
     finalUrl = res.url || finalUrl;

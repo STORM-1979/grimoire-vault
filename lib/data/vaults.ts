@@ -228,37 +228,33 @@ export async function revokeInvite(ownerId: string, inviteId: string): Promise<v
  */
 export async function acceptInvite(userId: string, code: string): Promise<{ vault: Vault; alreadyMember: boolean }> {
   const svc = createServiceClient();
-  const { data: inv } = await svc
-    .from("vault_invites")
-    .select("id, vault_id, expires_at, used_at")
-    .eq("code", code)
-    .maybeSingle();
-  if (!inv) throw new DataError("Invite not found", 404);
-  if (inv.used_at) throw new DataError("Invite already used", 410);
-  if (new Date(inv.expires_at) < new Date()) throw new DataError("Invite expired", 410);
-
-  // Add membership (no-op if already there).
-  const { data: existing } = await svc
-    .from("vault_members")
-    .select("user_id").eq("vault_id", inv.vault_id).eq("user_id", userId).maybeSingle();
-  const alreadyMember = !!existing;
-
-  if (!alreadyMember) {
-    const { error } = await svc.from("vault_members").insert({
-      vault_id: inv.vault_id, user_id: userId, role: "editor",
-    });
-    if (error && error.code !== "23505") throw new DataError(error.message, 500);
+  // Atomic invite consumption — see migration
+  // 20260515040000_accept_invite_atomic.sql.  Earlier draft did
+  // check → insert → mark-used as separate statements, which let two
+  // concurrent acceptances both pass the "used_at is null" check.
+  const { data: rows, error } = await svc.rpc("accept_vault_invite", {
+    p_code: code,
+    p_user_id: userId,
+  });
+  if (error) {
+    // The SQL function uses raise exception with named codes for the
+    // three not-OK cases; map them to the same HTTPs the caller used
+    // to see.
+    const msg = error.message || "";
+    if (msg.includes("invite_not_found")) throw new DataError("Invite not found", 404);
+    if (msg.includes("invite_already_used")) throw new DataError("Invite already used", 410);
+    if (msg.includes("invite_expired")) throw new DataError("Invite expired", 410);
+    throw new DataError(error.message, 500);
   }
-
-  // Mark invite consumed.  Don't fail if the update misses (race).
-  await svc.from("vault_invites").update({ used_at: new Date().toISOString(), used_by: userId }).eq("id", inv.id);
+  const row = (rows as Array<{ vault_id: string; already_member: boolean }>)?.[0];
+  if (!row) throw new DataError("Invite not found", 404);
 
   const { data: vault } = await svc
     .from("vaults").select("id, name, owner_id, created_at")
-    .eq("id", inv.vault_id).single();
+    .eq("id", row.vault_id).single();
   if (!vault) throw new DataError("Vault not found", 404);
   return {
     vault: { id: vault.id, name: vault.name, ownerId: vault.owner_id, createdAt: vault.created_at },
-    alreadyMember,
+    alreadyMember: row.already_member,
   };
 }

@@ -38,15 +38,16 @@ export default async function SharedEntryPage({
   const entry = rowToEntry(row);
   const cat = getCategory(entry.categoryId);
 
-  // Fire-and-forget hit counter bump.  Not awaited so a slow update
-  // doesn't slow down the public view.
-  void svc
-    .from("share_links")
-    .update({
-      hit_count: ((link as unknown as { hit_count?: number }).hit_count ?? 0) + 1,
-      last_hit_at: new Date().toISOString(),
-    })
-    .eq("id", link.id);
+  // Fire-and-forget hit counter bump via an atomic SQL function so
+  // two concurrent visitors don't lose increments to a read/modify/
+  // write race.  Not awaited — public render shouldn't wait on a
+  // counter.  Earlier draft cast `link.hit_count` through an unknown
+  // shim because the SELECT above never asked for the field, which
+  // meant the counter was reset to 1 on every view.
+  void svc.rpc("bump_share_hit", {
+    p_link_id: link.id,
+    p_now: new Date().toISOString(),
+  });
 
   return (
     <div className="min-h-screen bg-emerald-deep text-ivory">
