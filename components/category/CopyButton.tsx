@@ -5,21 +5,34 @@ import { Icon } from "@/components/icons/Icon";
 import type { Entry } from "@/lib/types";
 
 /**
- * Pick the right field to copy for a given entry.  Prompts have
- * inverted priority — the prompt text in `description` is what the
- * user actually pastes into the LLM, while `url` is just the source
- * link they may have grabbed from somewhere.  For every other
- * category the URL wins, but we fall back to description when URL
- * is empty so entries that stash an install command / shell snippet
- * in the description field (common pattern for Skills:
- * `npx skills add https://…`) still get a copy chip.
+ * Pick the right field to copy for a given entry.  Per-category
+ * rules so the chip lands on the artefact the user actually wants
+ * to paste, not the first non-empty string we trip over.
+ *
+ *   prompts   — the prompt body (`description`) before any source
+ *                link, because that's what pastes into the LLM.
+ *   portfolio — the live deployment URL stored in
+ *                metadata.vercelUrl (with metadata.gitUrl as the
+ *                next-best repo fallback) before the generic
+ *                `url` column.  Projects in this category track
+ *                multiple links per row, vercel is the one users
+ *                grab 90% of the time.
+ *   everything else — `url` wins, falls back to `description` so
+ *                Skills rows that stash `npx … --skill foo` in the
+ *                description still copy something useful.
  */
-function copyTextFor(item: Pick<Entry, "categoryId" | "url" | "description">): string {
+function copyTextFor(
+  item: Pick<Entry, "categoryId" | "url" | "description" | "metadata">,
+): string {
   const url = (item.url ?? "").trim();
   const desc = (item.description ?? "").trim();
-  if (item.categoryId === "prompts") {
-    return desc || url;
+  if (item.categoryId === "portfolio") {
+    const meta = item.metadata as Record<string, unknown> | undefined;
+    const v = typeof meta?.vercelUrl === "string" ? meta.vercelUrl.trim() : "";
+    const g = typeof meta?.gitUrl === "string" ? meta.gitUrl.trim() : "";
+    return v || g || url || desc;
   }
+  if (item.categoryId === "prompts") return desc || url;
   return url || desc;
 }
 
@@ -33,7 +46,9 @@ function copyTextFor(item: Pick<Entry, "categoryId" | "url" | "description">): s
  * Kanban and Credentials use their own views and never call this,
  * so we don't need to filter them out here.
  */
-export function shouldShowCopy(item: Pick<Entry, "categoryId" | "url" | "description">): boolean {
+export function shouldShowCopy(
+  item: Pick<Entry, "categoryId" | "url" | "description" | "metadata">,
+): boolean {
   return copyTextFor(item).length > 0;
 }
 
@@ -51,7 +66,7 @@ export function CopyButton({
   item,
   variant = "chip",
 }: {
-  item: Pick<Entry, "categoryId" | "url" | "description" | "title">;
+  item: Pick<Entry, "categoryId" | "url" | "description" | "title" | "metadata">;
   /** "chip" — pill button with label, used on tile cards.
    *  "icon" — square icon-only, used in compact strips. */
   variant?: "chip" | "icon";
@@ -103,11 +118,18 @@ export function CopyButton({
       type="button"
       onClick={handleCopy}
       title={title}
+      // Inline `color` style is the failsafe — text/icon both
+      // inherit it via currentColor.  On hover the inline style
+      // stays "gold" but the hover Tailwind utility flips both
+      // bg and text to the dark token explicitly.  Belt-and-
+      // suspenders against the earlier bug where hover:text-* on
+      // a custom-named theme colour silently failed and text
+      // stayed gold-on-gold (invisible).
       className={
         "font-mono text-[11px] uppercase tracking-widest px-3 py-1.5 rounded-full border transition flex items-center gap-1.5 " +
         (copied
           ? "bg-emerald-300/15 border-emerald-300/50 text-emerald-200"
-          : "border-gold/30 text-gold hover:bg-gold hover:text-emerald-deep")
+          : "border-gold/30 text-gold hover:bg-gold hover:text-[#031912] hover:border-gold")
       }
     >
       <Icon name={copied ? "check" : "copy"} size={12} />
