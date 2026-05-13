@@ -10,10 +10,24 @@ import type { Entry, CategoryId } from "@/lib/types";
 /**
  * Fire-and-forget: compute the multilingual-e5 embedding for an entry's
  * text fields and PATCH it back to the row.  Runs in the background so
- * the user-visible save flow stays snappy; failures are logged and
- * swallowed (entry is still useful for FTS without an embedding).
+ * the user-visible save flow stays snappy.
+ *
+ * AbortSignal: the hook passes in a signal tied to the component's
+ * unmount lifecycle.  When the user navigates away mid-embed, we skip
+ * the PATCH instead of firing it into the void — that PATCH could
+ * 401 after a sign-out (silent in the old version, now surfaced) or
+ * race with a different entry's save and produce a stale embedding.
+ *
+ * Failures other than abort are still soft-logged because the entry
+ * is fully usable for FTS without an embedding; the worst case is
+ * "this entry doesn't show up in semantic search" until the user
+ * re-saves it.
  */
-async function computeEmbeddingInBackground(entry: Pick<Entry, "id" | "title" | "description" | "tags" | "body">) {
+async function computeEmbeddingInBackground(
+  entry: Pick<Entry, "id" | "title" | "description" | "tags" | "body">,
+  signal?: AbortSignal,
+) {
+  if (signal?.aborted) return;
   try {
     const { embedPassage } = await import("@/lib/embeddings/client");
     const embedding = await embedPassage({
@@ -22,8 +36,13 @@ async function computeEmbeddingInBackground(entry: Pick<Entry, "id" | "title" | 
       tags: entry.tags,
       body: entry.body ?? undefined,
     });
+    if (signal?.aborted) return;
     await entriesApi.update(entry.id, { embedding });
   } catch (e) {
+    if (signal?.aborted) return;
+    // AbortError surfaces with name=AbortError on any awaited fetch;
+    // anything else is a real failure worth logging once.
+    if (e instanceof Error && e.name === "AbortError") return;
     console.warn("[embeddings] failed to compute/patch:", e);
   }
 }
@@ -54,6 +73,17 @@ export function useEntries({ categoryId, initialData = [] }: UseEntriesOptions =
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
     return b.createdAt.localeCompare(a.createdAt);
   });
+  // Signals every fire-and-forget embedding job kicked off by this
+  // hook.  Aborted on unmount so a slow embed doesn't reach the
+  // server with a stale auth context (sign-out between save and
+  // PATCH would otherwise log a confusing 401).
+  const embeddingAbort = useRef<AbortController | null>(null);
+  if (embeddingAbort.current === null) embeddingAbort.current = new AbortController();
+  useEffect(() => {
+    return () => {
+      embeddingAbort.current?.abort();
+    };
+  }, []);
 
   const refetch = useCallback(async () => {
     try {
@@ -213,7 +243,8 @@ export function useEntries({ categoryId, initialData = [] }: UseEntriesOptions =
       });
       // Background: compute + PATCH the embedding so semantic search picks
       // up the new entry.  Doesn't block the modal close / user feedback.
-      void computeEmbeddingInBackground(created);
+      // signal: aborted on unmount so we don't PATCH after sign-out.
+      void computeEmbeddingInBackground(created, embeddingAbort.current?.signal);
       return created;
     } catch (e) {
       // rollback
@@ -239,7 +270,7 @@ export function useEntries({ categoryId, initialData = [] }: UseEntriesOptions =
         ("description" in patch && patch.description !== target.description) ||
         ("body" in patch && patch.body !== target.body) ||
         ("tags" in patch && JSON.stringify(patch.tags) !== JSON.stringify(target.tags));
-      if (textChanged) void computeEmbeddingInBackground(updated);
+      if (textChanged) void computeEmbeddingInBackground(updated, embeddingAbort.current?.signal);
       return updated;
     } catch (e) {
       // rollback

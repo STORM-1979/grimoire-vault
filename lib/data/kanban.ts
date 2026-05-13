@@ -28,10 +28,16 @@ export async function listKanbanBoard(): Promise<Record<KanbanColumn, KanbanCard
 
 export async function createKanbanCard(userId: string, input: CreateKanbanInput): Promise<KanbanCard> {
   const supabase = await createClient();
-  // Insert at end of target column
+  // Insert at end of target column.  The .eq("user_id") below is
+  // defence-in-depth — RLS already scopes the read to the current
+  // user, but if a future migration disables RLS on this table for
+  // any reason (debug, schema rewrite, hot patch), the max-position
+  // probe would otherwise leak across users and collide with
+  // someone else's column.  Belt + braces.
   const { data: maxRow } = await supabase
     .from("kanban_cards")
     .select("position")
+    .eq("user_id", userId)
     .eq("column_name", input.columnName)
     .order("position", { ascending: false })
     .limit(1)
