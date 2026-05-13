@@ -15,10 +15,28 @@ import { Icon } from "@/components/icons/Icon";
  * union and the `signInWithOtp` branch — git history has the old
  * version.
  */
+/**
+ * Sanitise the `?next=` redirect target.  Accepts only paths that
+ * stay inside our own origin:
+ *   - must start with "/"
+ *   - must NOT start with "//" (which navigates to scheme-relative
+ *     URLs and lets attackers send users to evil.com)
+ *   - must NOT start with "/\" (Chrome treats "/\" the same as "//")
+ * Anything else falls back to "/".  Without this, a crafted link
+ * like /login?next=https://evil.com routed straight off-origin
+ * after sign-in.
+ */
+function safeNext(raw: string | null | undefined): string {
+  if (!raw) return "/";
+  if (!raw.startsWith("/")) return "/";
+  if (raw.startsWith("//") || raw.startsWith("/\\")) return "/";
+  return raw;
+}
+
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") ?? "/";
+  const next = safeNext(searchParams.get("next"));
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

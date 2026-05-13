@@ -426,14 +426,9 @@ export function SearchView() {
                           {hit.entry.title}
                         </h4>
                         {hit.snippet && (
-                          <p
-                            className="text-[13.5px] text-ivory-dim leading-snug font-light mt-1"
-                            dangerouslySetInnerHTML={{
-                              __html: hit.snippet
-                                .replace(/«/g, "<mark class='bg-gold/30 text-ivory rounded px-0.5'>")
-                                .replace(/»/g, "</mark>"),
-                            }}
-                          />
+                          <p className="text-[13.5px] text-ivory-dim leading-snug font-light mt-1">
+                            {renderSnippet(hit.snippet)}
+                          </p>
                         )}
                         <div className="flex items-center gap-2 flex-wrap mt-2">
                           {hit.entry.tags.slice(0, 4).map((t) => (
@@ -474,4 +469,33 @@ export function SearchView() {
       )}
     </>
   );
+}
+
+/**
+ * Render a search snippet with «...» markers turned into <mark>
+ * highlights — but as React elements, NOT via
+ * dangerouslySetInnerHTML.  The earlier version inserted raw user
+ * content into innerHTML which let any record with HTML in its
+ * description/body execute when surfaced in results (a `<script>`
+ * in a saved note → XSS).  React's text children are escaped by
+ * default, so this version is safe even against
+ * `<img src=x onerror=...>` payloads.
+ */
+function renderSnippet(snippet: string): React.ReactNode {
+  // Split on the «...» boundaries so each marked range becomes a
+  // <mark> element and the rest stays as plain text nodes.
+  const parts = snippet.split(/(«[^»]*»)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith("«") && part.endsWith("»")) {
+      return (
+        <mark
+          key={i}
+          className="bg-gold/30 text-ivory rounded px-0.5"
+        >
+          {part.slice(1, -1)}
+        </mark>
+      );
+    }
+    return <span key={i}>{part}</span>;
+  });
 }
