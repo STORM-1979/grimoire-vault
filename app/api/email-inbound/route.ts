@@ -30,6 +30,12 @@ import { createEntry } from "@/lib/data/entries";
  * end-to-end once the DNS / webhook half is in place.
  */
 
+// Module-scoped cache of the resolved owner id, keyed by the email the
+// resolution was done against.  Lambda lifetime only — Vercel recycles
+// these frequently enough that a stale value doesn't outlast a config
+// change in any meaningful way.
+let ownerCache: { email: string; id: string } | null = null;
+
 const inboundSchema = z.object({
   to: z.string().email().optional(),
   from: z.string().email().optional(),
@@ -64,21 +70,43 @@ export const POST = withErrorHandler(async (req: Request) => {
   // TODO(email-aliases): replace this with a real lookup against
   // public.email_aliases keyed by `to`.  For now we route everything
   // to the configured owner.
+  //
+  // Resolution order:
+  //   1. OWNER_USER_ID env var — direct UUID, no admin-API call.
+  //      Preferred for production: one webhook hit = one DB write,
+  //      no rate-limit pressure on Supabase's admin endpoint.
+  //   2. OWNER_EMAIL env var — fall back to admin.listUsers() and
+  //      filter by email.  Used when the admin only knows their
+  //      sign-in email, not the internal user id.
+  const svc = createServiceClient();
+  const ownerUserId = process.env.OWNER_USER_ID;
   const ownerEmail = process.env.OWNER_EMAIL;
-  if (!ownerEmail) {
+  let ownerId: string | null = null;
+
+  if (ownerUserId) {
+    ownerId = ownerUserId;
+  } else if (ownerEmail) {
+    // The admin API has its own rate limit and listing all users
+    // scales O(n) — fine for a personal vault but worth not doing on
+    // every webhook hit.  In-process memoise so repeated webhooks
+    // within the lambda's lifetime don't re-pay the cost.
+    if (!ownerCache || ownerCache.email !== ownerEmail) {
+      const { data: { users } } = await svc.auth.admin.listUsers();
+      const owner = users.find((u) => u.email === ownerEmail);
+      if (!owner) throw new HttpError("Owner not found", 503);
+      ownerCache = { email: ownerEmail, id: owner.id };
+    }
+    ownerId = ownerCache.id;
+  } else {
     throw new HttpError("Server not configured for email inbound", 503);
   }
-  const svc = createServiceClient();
-  const { data: { users } } = await svc.auth.admin.listUsers();
-  const owner = users.find((u) => u.email === ownerEmail);
-  if (!owner) throw new HttpError("Owner not found", 503);
 
   // Detect URL in the body — falls back to subject as title if none.
   const combined = (text ?? "") + " " + (html ?? "");
   const urlMatch = combined.match(/https?:\/\/[^\s)>"'`]+/);
   const url = urlMatch?.[0] ?? null;
 
-  await createEntry(owner.id, {
+  await createEntry(ownerId, {
     categoryId: url ? "web" : "misc",
     title: subject?.trim() || "(email)",
     description: text?.trim().slice(0, 2000) || null,

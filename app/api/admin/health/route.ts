@@ -14,6 +14,8 @@ interface ProbeResult {
   latencyMs: number;
   detail?: string;
   error?: string;
+  /** Non-fatal — probe succeeded but surfaced something operator-worth.  */
+  warning?: string;
 }
 
 /**
@@ -36,11 +38,16 @@ interface ProbeResult {
  * Return format is uniform across probes so the UI can render a grid of
  * green/red tiles without per-probe special cases.
  */
-async function timed(name: string, fn: () => Promise<{ detail?: string }>): Promise<ProbeResult> {
+async function timed(name: string, fn: () => Promise<{ detail?: string; warning?: string }>): Promise<ProbeResult> {
   const t0 = performance.now();
   try {
     const r = await fn();
-    return { name, ok: true, latencyMs: Math.round(performance.now() - t0), detail: r.detail };
+    return {
+      name, ok: true,
+      latencyMs: Math.round(performance.now() - t0),
+      detail: r.detail,
+      warning: r.warning,
+    };
   } catch (e) {
     return {
       name, ok: false,
@@ -97,9 +104,15 @@ export const GET = withErrorHandler(async () => {
       if (!data.ok) throw new Error("getWebhookInfo failed");
       const wh = data.result ?? {};
       const detail = `${wh.url ? "set" : "unset"} · pending=${wh.pending_update_count ?? 0}`;
-      // A non-fatal warning surfaces when there's a stuck webhook error.
-      if (wh.last_error_message) throw new Error(`last error: ${wh.last_error_message}`);
-      return { detail };
+      // last_error_message is sticky — Telegram surfaces the most recent
+      // delivery failure even after subsequent deliveries succeed.
+      // Treating it as fatal painted the whole probe red after one stale
+      // failure; now it lands as a non-fatal warning so the dashboard
+      // can show "yellow" without flipping overall health to red.
+      return {
+        detail,
+        warning: wh.last_error_message ? `last error: ${wh.last_error_message}` : undefined,
+      };
     }),
   ]);
 

@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { CATEGORIES } from "@/lib/categories";
 import { categoryCounts } from "@/lib/data/entries";
+import { createClient } from "@/lib/supabase/server";
 import { Icon } from "@/components/icons/Icon";
 import { AnalogClock } from "@/components/home/AnalogClock";
 import { MonthCalendar } from "@/components/home/MonthCalendar";
@@ -63,7 +64,10 @@ export default function HomePage() {
 async function loadCounts(): Promise<Record<string, number>> {
   // Server-side aggregation via Postgres function — single round-trip, no per-row payload.
   try {
-    return await categoryCounts();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return {};
+    return await categoryCounts(user.id);
   } catch {
     return {};
   }

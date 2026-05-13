@@ -133,7 +133,10 @@ export async function findDuplicateByContent(
   userId: string,
   input: { url?: string | null; title: string },
 ): Promise<{ id: string; categoryId: string; title: string; trashed: boolean } | null> {
-  const { computeContentHash } = await import("@/lib/dedup");
+  // computeContentHash is imported at the top of the file; the
+  // duplicate dynamic import here was leftover from before the static
+  // import landed and only forced a second module-graph traversal on
+  // cold start.
   const hash = computeContentHash(input);
   if (!hash) return null;
   const supabase = await createClient();
@@ -252,7 +255,7 @@ export async function purgeEntry(id: string): Promise<void> {
   if (error) throw new DataError(error.message, 500);
 }
 
-export async function categoryCounts(): Promise<Record<CategoryId, number>> {
+export async function categoryCounts(userId: string): Promise<Record<CategoryId, number>> {
   const supabase = await createClient();
   // Server-side aggregation — single round-trip, RLS-scoped via auth.uid() inside the function.
   // Falls back to a JS-side reduce only when the RPC is missing (e.g. a
@@ -264,10 +267,19 @@ export async function categoryCounts(): Promise<Record<CategoryId, number>> {
   // that's better than the API timing out or OOM-ing; the proper fix
   // when you hit that ceiling is to run the migration on whatever DB
   // is missing the function, not to lift the limit.
+  //
+  // `userId` is taken as an explicit param even though createClient()
+  // already scopes via RLS — that's defence-in-depth so a future
+  // service-role caller (e.g. an admin route reusing this helper)
+  // doesn't accidentally aggregate across every user's entries.
   const { data, error } = await supabase.rpc("count_entries_per_category");
   if (error) {
     if (error.code === "42883" || /function .* does not exist/i.test(error.message)) {
-      const fb = await supabase.from("entries").select("category_id").limit(10000);
+      const fb = await supabase
+        .from("entries")
+        .select("category_id")
+        .eq("user_id", userId)
+        .limit(10000);
       if (fb.error) throw new DataError(fb.error.message, 500);
       const counts = {} as Record<CategoryId, number>;
       for (const r of fb.data ?? []) {
