@@ -104,6 +104,37 @@ export async function updateCollection(
   if (input.name !== undefined && input.slug === undefined) {
     patch.slug = deriveSlug(input.name);
   }
+  // Parent-cycle guard.  Without it the user could PATCH
+  // `parentId = id` (collection becomes its own parent) or
+  // create a longer cycle like A.parent=B and B.parent=A, which
+  // crashes any UI that walks the tree (infinite recursion in
+  // the chip-strip render).  Reject self-parenting outright;
+  // for longer cycles, walk up from the proposed parent to root
+  // and refuse if we hit `id` before NULL.
+  if (input.parentId !== undefined && input.parentId !== null) {
+    if (input.parentId === id) {
+      throw new DataError("Коллекция не может быть собственным родителем", 400);
+    }
+    // Climb the proposed parent chain looking for `id`.  Bounded
+    // at 50 hops as a paranoia cap against pre-existing cycles
+    // somehow already in the DB.
+    let cursor: string | null = input.parentId;
+    for (let i = 0; i < 50; i++) {
+      if (cursor == null) break;
+      if (cursor === id) {
+        throw new DataError("Эта коллекция уже выше по дереву — нельзя сделать её ребёнка своим родителем", 400);
+      }
+      const lookup: { data: { parent_id: string | null } | null; error: { message: string } | null } =
+        await supabase
+          .from("entry_collections")
+          .select("parent_id")
+          .eq("id", cursor)
+          .maybeSingle();
+      if (lookup.error) throw new DataError(lookup.error.message, 500);
+      if (!lookup.data) break;
+      cursor = lookup.data.parent_id;
+    }
+  }
   const { data, error } = await supabase
     .from("entry_collections")
     .update(patch)

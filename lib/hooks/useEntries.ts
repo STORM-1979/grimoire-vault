@@ -73,9 +73,25 @@ export function useEntries({ categoryId, initialData = [] }: UseEntriesOptions =
     }
   }, [categoryId, activeVaultId]);
 
-  // Initial load + refetch on vault switch.
+  // Initial load + refetch on category/vault switch.  We deliberately
+  // exclude `refetch` and `initialData` from the dep array:
+  //   • refetch is stable per (categoryId, activeVaultId) tuple, but
+  //     React's lint can't prove that statically.
+  //   • initialData is captured once via the ref below — the SSR
+  //     payload is for the *first* render; downstream sync goes
+  //     through realtime + explicit refetch.  Adding initialData to
+  //     deps would refetch every time the parent re-renders with a
+  //     fresh prop array (Next streams initialData identity-fresh
+  //     on every render).
+  const hadInitialRef = useRef(initialData.length > 0);
   useEffect(() => {
-    if (initialData.length === 0) refetch();
+    if (!hadInitialRef.current) {
+      void refetch();
+    }
+    // After the first effect run, subsequent category/vault changes
+    // always need a fresh fetch — even if we had initial data on
+    // mount, that initial data belonged to the *previous* scope.
+    hadInitialRef.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categoryId, activeVaultId]);
 

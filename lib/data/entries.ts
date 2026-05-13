@@ -22,6 +22,24 @@ interface DataOpts {
   asService?: boolean;
 }
 
+/**
+ * Escape user-supplied text before interpolating it into a Postgres
+ * ILIKE pattern and a PostgREST .or() filter clause.  Mirrors the
+ * helper in lib/data/search.ts — kept private to each file because
+ * cross-importing inside lib/data caused circular import warnings
+ * in earlier Next builds.
+ *
+ * Strips `%` and `_` (ILIKE wildcards) and `(),` (PostgREST
+ * delimiters); doubles `\` so the escape escapes itself.
+ */
+function escapeIlikePattern(s: string): string {
+  return s
+    .replace(/\\/g, "\\\\")
+    .replace(/%/g, "\\%")
+    .replace(/_/g, "\\_")
+    .replace(/[(),]/g, " ");
+}
+
 async function clientFor(opts?: DataOpts) {
   if (opts?.asService) return createServiceClient();
   return createClient();
@@ -70,8 +88,14 @@ export async function listEntries(
   // and drop the value; pass the literal string instead.
   if (query.triage === "triaged") q = q.filter("triaged_at", "not.is", "null");
   if (query.q) {
-    // ILIKE on title + description as quick MVP. Full-text via search_tsv comes later.
-    q = q.or(`title.ilike.%${query.q}%,description.ilike.%${query.q}%`);
+    // ILIKE on title + description.  User input has to be escaped
+    // for two layers: the ILIKE wildcards (% and _) so a stray
+    // underscore doesn't widen the match, AND the PostgREST .or()
+    // filter syntax (commas / parens) so the query.q can't break
+    // out of the value and inject its own filter clauses.  Same
+    // helper search.ts uses on its FTS-fallback path.
+    const safe = escapeIlikePattern(query.q);
+    q = q.or(`title.ilike.%${safe}%,description.ilike.%${safe}%`);
   }
   q = q.range(query.offset, query.offset + query.limit - 1);
 

@@ -40,7 +40,7 @@ export const POST = withErrorHandler(async (request: Request) => {
       p256dh: body.keys.p256dh,
       auth_key: body.keys.auth,
       user_agent: body.userAgent ?? null,
-    }, { onConflict: "endpoint" });
+    }, { onConflict: "user_id,endpoint" });
   if (error) throw new Error(error.message);
   return NextResponse.json({ ok: true });
 });
