@@ -170,11 +170,14 @@ export function CategoryView({ category, initialItems }: Props) {
   //   • Collections list still loading → show empty (transition is
   //     ~1 paint; better than flashing every entry then collapsing)
   //   • A collection is selected → show that bucket + descendants
-  const collectionFiltered = !showCollections
-    ? items
-    : selectedCollection === null
-    ? []
-    : items.filter((it) => it.collectionId && selectedScope?.has(it.collectionId));
+  // Memoised so the downstream useMemos that depend on it (tagFacets,
+  // sortedAndPinned) don't recompute on every render just because the
+  // array identity changed.
+  const collectionFiltered = useMemo(() => {
+    if (!showCollections) return items;
+    if (selectedCollection === null) return [];
+    return items.filter((it) => it.collectionId && selectedScope?.has(it.collectionId));
+  }, [items, showCollections, selectedCollection, selectedScope]);
 
   // Distinct tag list (with counts) for the tag-picker row.  Computed
   // off the collection-filtered list so the tag chips reflect what's

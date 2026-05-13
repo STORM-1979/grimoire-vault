@@ -28,8 +28,7 @@ export function siteScreenshot(
   width = 1200,
   // height kept in the signature for compatibility / future tuning;
   // Microlink controls aspect via the page's render and we don't
-  // need to force it.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // need to force it. (Underscore prefix opts out of no-unused-vars.)
   _height = 800,
 ): string | null {
   if (!pageUrl) return null;

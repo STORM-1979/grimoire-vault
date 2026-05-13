@@ -28,6 +28,18 @@ const eslintConfig = defineConfig([
       "react-hooks/set-state-in-effect": "off",
       "react-hooks/preserve-manual-memoization": "off",
       "react-hooks/purity": "off",
+      // Underscore prefix is the conventional opt-out for intentionally
+      // unused args (placeholder for future extensibility, callback
+      // signatures we don't read). The default rule doesn't honour it,
+      // so wire it up explicitly.
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
     },
   },
 ]);

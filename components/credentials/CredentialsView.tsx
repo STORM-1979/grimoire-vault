@@ -11,7 +11,7 @@ import { CredentialModal } from "./CredentialModal";
 import { PrintableCredentials } from "./PrintableCredentials";
 import {
   topLevelOwners, childrenOf, splitOwner, joinOwner, ownerMatches,
-  ORPHAN_OWNER, OWNER_SEP,
+  ORPHAN_OWNER,
 } from "@/lib/credentials-owners";
 import type { CredentialDecrypted } from "@/lib/types";
 
