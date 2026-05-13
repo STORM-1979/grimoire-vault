@@ -3,6 +3,7 @@ import { ZodError, type ZodType } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { DataError } from "@/lib/errors";
 import { log } from "@/lib/log";
+import { sha256Hex } from "@/lib/hash";
 
 /** Resolve current user or 401. */
 export async function requireUser() {
@@ -63,14 +64,6 @@ export async function requireUserFlexible() {
   return user;
 }
 
-/** SHA-256 → hex via Web Crypto. */
-async function sha256Hex(input: string): Promise<string> {
-  const buf = new TextEncoder().encode(input);
-  const hash = await crypto.subtle.digest("SHA-256", buf);
-  return Array.from(new Uint8Array(hash))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
 
 /** Parse JSON body with Zod schema, throwing 400 on failure. */
 export async function parseBody<T>(request: Request, schema: ZodType<T>): Promise<T> {

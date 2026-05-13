@@ -91,5 +91,3 @@ export const POST = withErrorHandler(async (req: Request) => {
 
   return NextResponse.json({ ok: true });
 });
-
-void z;

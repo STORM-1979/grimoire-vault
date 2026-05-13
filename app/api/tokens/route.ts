@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser, parseBody, withErrorHandler, HttpError } from "@/lib/api-helpers";
+import { sha256Hex } from "@/lib/hash";
 
 /**
  * Personal access tokens — REST API for managing the user's PAT
@@ -55,10 +56,3 @@ export const POST = withErrorHandler(async (req: Request) => {
   }, { status: 201 });
 });
 
-async function sha256Hex(input: string): Promise<string> {
-  const buf = new TextEncoder().encode(input);
-  const hash = await crypto.subtle.digest("SHA-256", buf);
-  return Array.from(new Uint8Array(hash))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}

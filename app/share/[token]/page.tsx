@@ -5,6 +5,7 @@ import { rowToEntry } from "@/lib/data/mappers";
 import { getCategory } from "@/lib/categories";
 import { Icon } from "@/components/icons/Icon";
 import { formatDateTime } from "@/lib/utils";
+import { sha256Hex } from "@/lib/hash";
 
 /**
  * Public read-only view of one entry, accessible without login.
@@ -138,10 +139,3 @@ export default async function SharedEntryPage({
   );
 }
 
-async function sha256Hex(input: string): Promise<string> {
-  const buf = new TextEncoder().encode(input);
-  const hash = await crypto.subtle.digest("SHA-256", buf);
-  return Array.from(new Uint8Array(hash))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
