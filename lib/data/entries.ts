@@ -255,7 +255,15 @@ export async function purgeEntry(id: string): Promise<void> {
 export async function categoryCounts(): Promise<Record<CategoryId, number>> {
   const supabase = await createClient();
   // Server-side aggregation — single round-trip, RLS-scoped via auth.uid() inside the function.
-  // Falls back to the JS-side reduce if the function is missing (e.g. local dev DB without the migration).
+  // Falls back to a JS-side reduce only when the RPC is missing (e.g. a
+  // local dev DB that hasn't run the migration yet); on production
+  // Supabase the function exists so this branch is dead code 99% of
+  // the time. The 10k row cap below is intentional — it puts a hard
+  // ceiling on RAM use if the fallback ever fires against a real-size
+  // vault. Counts will be silently wrong (under-counted) past 10k, but
+  // that's better than the API timing out or OOM-ing; the proper fix
+  // when you hit that ceiling is to run the migration on whatever DB
+  // is missing the function, not to lift the limit.
   const { data, error } = await supabase.rpc("count_entries_per_category");
   if (error) {
     if (error.code === "42883" || /function .* does not exist/i.test(error.message)) {

@@ -115,7 +115,7 @@ export function useCredentials(key: CryptoKey | null) {
   useEffect(() => { refetch(); }, [refetch]);
 
   const create = useCallback(async (input: NewCredentialPlain) => {
-    if (!key) throw new Error("Vault locked");
+    if (!key) throw new Error("Vault заблокирован");
     const payload = await encryptForCreate(input, key);
     const created = await credentialsApi.create(payload);
     const dec = await decryptRecord(created, key);
@@ -132,7 +132,7 @@ export function useCredentials(key: CryptoKey | null) {
    * so sending the full re-encrypted blob is safe.
    */
   const update = useCallback(async (id: string, input: NewCredentialPlain) => {
-    if (!key) throw new Error("Vault locked");
+    if (!key) throw new Error("Vault заблокирован");
     const payload = await encryptForCreate(input, key);
     const updated = await credentialsApi.update(id, payload);
     const dec = await decryptRecord(updated, key);
