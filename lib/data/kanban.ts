@@ -63,51 +63,20 @@ export async function deleteKanbanCard(id: string): Promise<void> {
 }
 
 /**
- * DnD reorder: move card to (column, index), bump positions of others.
- * Done as a sequence of UPDATEs. For free-tier scale (a few dozen cards)
- * this is simple and safe; later we can extract to a Postgres function.
+ * DnD reorder: move card to (column, index).  All position
+ * arithmetic happens inside a single Postgres function
+ * `reorder_kanban_card` (see migration 20260515010000) so the
+ * whole operation is one transaction with a row-level lock on
+ * the source card.  The previous N-round-trip JavaScript loop
+ * could leave the board with duplicated or missing positions if
+ * it died mid-way, and two simultaneous reorders raced.
  */
 export async function reorderKanban(input: ReorderKanbanInput): Promise<void> {
   const supabase = await createClient();
-
-  // 1. Get the card to move
-  const { data: cardRow, error: cardErr } = await supabase
-    .from("kanban_cards")
-    .select("*")
-    .eq("id", input.cardId)
-    .single();
-  if (cardErr || !cardRow) throw new DataError(cardErr?.message ?? "Card not found", 404);
-
-  const fromCol = cardRow.column_name as KanbanColumn;
-  const fromPos = cardRow.position as number;
-  const toCol = input.toColumn;
-  const toIdx = input.toIndex;
-
-  // 2. Remove from source column — shift positions down
-  const { data: sourceRows } = await supabase
-    .from("kanban_cards")
-    .select("id, position")
-    .eq("column_name", fromCol)
-    .gt("position", fromPos);
-  for (const r of sourceRows ?? []) {
-    await supabase.from("kanban_cards").update({ position: (r.position as number) - 1 }).eq("id", r.id);
-  }
-
-  // 3. Make space in destination column — shift positions up
-  const { data: destRows } = await supabase
-    .from("kanban_cards")
-    .select("id, position")
-    .eq("column_name", toCol)
-    .gte("position", toIdx)
-    .neq("id", input.cardId);
-  for (const r of destRows ?? []) {
-    await supabase.from("kanban_cards").update({ position: (r.position as number) + 1 }).eq("id", r.id);
-  }
-
-  // 4. Set the card to its new position
-  const { error: updateErr } = await supabase
-    .from("kanban_cards")
-    .update({ column_name: toCol, position: toIdx })
-    .eq("id", input.cardId);
-  if (updateErr) throw new DataError(updateErr.message, 500);
+  const { error } = await supabase.rpc("reorder_kanban_card", {
+    p_card_id: input.cardId,
+    p_to_column: input.toColumn,
+    p_to_index: input.toIndex,
+  });
+  if (error) throw new DataError(error.message, 500);
 }

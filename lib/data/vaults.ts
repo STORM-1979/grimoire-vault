@@ -89,24 +89,29 @@ export async function listMembers(vaultId: string): Promise<VaultMember[]> {
     .eq("vault_id", vaultId)
     .order("joined_at", { ascending: true });
   if (error) throw new DataError(error.message, 500);
-  // Enrich with email lookup via service-role admin API (RLS-bypassing).
+  const rows = data ?? [];
+  if (rows.length === 0) return [];
+  // Single admin.listUsers() round-trip instead of per-row
+  // getUserById — the previous version was N+1 and would block
+  // the request for hundreds of ms on vaults with a handful of
+  // members.  listUsers paginates at 50 by default; we ask for
+  // enough to cover any plausible vault size in one page.
   const svc = createServiceClient();
-  const out: VaultMember[] = [];
-  for (const r of data ?? []) {
-    let email: string | null = null;
-    try {
-      const { data: u } = await svc.auth.admin.getUserById(r.user_id as string);
-      email = u?.user?.email ?? null;
-    } catch { /* ignore */ }
-    out.push({
-      vaultId: r.vault_id as string,
-      userId: r.user_id as string,
-      role: r.role as "owner" | "editor",
-      joinedAt: r.joined_at as string,
-      email,
-    });
-  }
-  return out;
+  const wanted = new Set(rows.map((r) => r.user_id as string));
+  const emails = new Map<string, string | null>();
+  try {
+    const page = await svc.auth.admin.listUsers({ perPage: 1000, page: 1 });
+    for (const u of page.data?.users ?? []) {
+      if (wanted.has(u.id)) emails.set(u.id, u.email ?? null);
+    }
+  } catch { /* fall through — emails stay null, vault still lists */ }
+  return rows.map((r) => ({
+    vaultId: r.vault_id as string,
+    userId: r.user_id as string,
+    role: r.role as "owner" | "editor",
+    joinedAt: r.joined_at as string,
+    email: emails.get(r.user_id as string) ?? null,
+  }));
 }
 
 /* ---------- Mutations ---------- */
