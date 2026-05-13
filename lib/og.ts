@@ -59,13 +59,10 @@ export interface ExtractedMeta {
   };
 }
 
-/**
- * Block requests to private / loopback / link-local addresses + non-http(s)
- * schemes.  Returns null if the URL is safe; otherwise a reason string.
- */
-function isUnsafeUrl(u: URL): string | null {
-  if (u.protocol !== "http:" && u.protocol !== "https:") return "non-http scheme";
-  const host = u.hostname.toLowerCase();
+/** Check a single address string against the private/loopback/
+ *  link-local ranges.  Used by both the IP-literal-in-hostname
+ *  fast path and the DNS-rebinding guard below. */
+function classifyAddress(host: string): string | null {
   if (host === "localhost" || host.endsWith(".localhost")) return "loopback";
   // IPv4 literal
   const v4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
@@ -79,11 +76,49 @@ function isUnsafeUrl(u: URL): string | null {
     if (a === 0) return "invalid IPv4";
   }
   // IPv6 — block ::1 (loopback), fe80::/10 (link-local), fc00::/7 (unique-local)
-  if (host.startsWith("[")) {
-    const v6 = host.replace(/^\[|\]$/g, "").toLowerCase();
+  const v6 = host.startsWith("[") ? host.replace(/^\[|\]$/g, "").toLowerCase() : host;
+  if (v6.includes(":")) {
     if (v6 === "::1" || v6 === "0:0:0:0:0:0:0:1") return "loopback IPv6";
     if (/^fe[89ab]/.test(v6)) return "link-local IPv6";
     if (/^f[cd]/.test(v6)) return "private IPv6";
+  }
+  return null;
+}
+
+/**
+ * Block requests to private / loopback / link-local addresses +
+ * non-http(s) schemes.  Resolves DNS so a public-looking host
+ * whose A record points at 127.0.0.1 / 169.254.169.254 / the AWS
+ * metadata service / your RFC1918 LAN doesn't slip through —
+ * which is exactly what the static-hostname check did before.
+ * Returns null if the URL is safe; otherwise a short reason
+ * string.
+ */
+async function isUnsafeUrl(u: URL): Promise<string | null> {
+  if (u.protocol !== "http:" && u.protocol !== "https:") return "non-http scheme";
+  const host = u.hostname.toLowerCase();
+  // Fast path: hostname is itself an IP literal — no DNS round-trip
+  // needed, classifyAddress() catches everything.
+  const literalReason = classifyAddress(host);
+  if (literalReason) return literalReason;
+  // Slow path: real hostname.  Resolve every A / AAAA record and
+  // refuse if any of them lands in a blocked range.  Using
+  // `family: 0` returns both families.  We deliberately don't
+  // cache — DNS-rebinding attacks rely on TTL≈0; if we cached, an
+  // attacker could prime us with a public IP and then flip the
+  // record to a private one between the safety check and the
+  // actual fetch.  The cost of a fresh lookup is a few ms.
+  try {
+    const dns = await import("node:dns/promises");
+    const records = await dns.lookup(host, { all: true });
+    for (const r of records) {
+      const reason = classifyAddress(r.address);
+      if (reason) return `${reason} (resolved)`;
+    }
+  } catch {
+    // DNS failure → treat as unsafe.  Better to refuse than to
+    // accidentally allow a host whose addresses we couldn't verify.
+    return "dns lookup failed";
   }
   return null;
 }
@@ -451,7 +486,7 @@ export async function extractMetadata(input: string): Promise<ExtractedMeta> {
   } catch {
     return { url: input, hasContent: false };
   }
-  const unsafe = isUnsafeUrl(url);
+  const unsafe = await isUnsafeUrl(url);
   if (unsafe) return { url: url.toString(), hasContent: false };
 
   const ctrl = new AbortController();

@@ -20,11 +20,19 @@ interface DigestRow {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  // Auth: only the Bearer secret counts.  The previous version
+  // also accepted any request whose User-Agent included
+  // "vercel-cron" — a header any client can spoof, which let an
+  // attacker trigger digest blasts at will (DoS the bot, hit
+  // Telegram rate limits, push noise to every linked chat).
+  // Vercel's cron does send the Authorization: Bearer header
+  // configured on the project, so dropping the UA fast-path
+  // costs us nothing while closing the bypass.
   const auth = request.headers.get("authorization") ?? "";
-  const expected = `Bearer ${process.env.TELEGRAM_WEBHOOK_SECRET}`;
-  // Vercel-cron also sends its own header — accept it OR our secret
-  const isCron = request.headers.get("user-agent")?.includes("vercel-cron");
-  if (auth !== expected && !isCron) {
+  const expected = process.env.TELEGRAM_WEBHOOK_SECRET
+    ? `Bearer ${process.env.TELEGRAM_WEBHOOK_SECRET}`
+    : null;
+  if (!expected || auth !== expected) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -33,10 +33,34 @@ function rowToSession(r: Record<string, unknown>): TelegramSession {
 
 /* ---- For the user's browser: link-code generation ---- */
 
+/**
+ * Generate a Telegram link code that's hard to predict.
+ *
+ * Previously the code was Math.random() × 900 × 900 ≈ 810k space.
+ * Math.random is non-cryptographic — an attacker observing one code
+ * could narrow the V8 PRNG state and predict subsequent codes,
+ * letting them claim someone else's /link before the legitimate
+ * user types it.  Telegram link gives full write access to the
+ * account via the bot, so this was real.
+ *
+ * Switch to crypto.getRandomValues, widen to 8 characters
+ * (alphanumeric, base32-style without confusables like 0/O/1/I/L):
+ * 32^8 ≈ 1.1 × 10^12 space, two-and-a-half-orders-of-magnitude
+ * harder to guess.  Still easy enough to type on a phone.
+ */
+const LINK_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"; // 31 chars, no 0/O/1/I/L
+
 function generateLinkCode(): string {
-  // 6-digit-ish code that's easy to type on a phone, e.g. 482-913
-  const n = (Math.floor(Math.random() * 900) + 100) + "-" + (Math.floor(Math.random() * 900) + 100);
-  return n;
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  const a = Array.from(bytes.slice(0, 4))
+    .map((b) => LINK_ALPHABET[b % LINK_ALPHABET.length])
+    .join("");
+  const b = Array.from(bytes.slice(4, 8))
+    .map((b) => LINK_ALPHABET[b % LINK_ALPHABET.length])
+    .join("");
+  // Eight readable chars split with a hyphen — `ABCD-EFGH`.
+  return `${a}-${b}`;
 }
 
 /**
