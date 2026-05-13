@@ -378,6 +378,204 @@ export function getBot(): Bot {
     );
   });
 
+  // ---- Documents (.md, .pdf, .txt, archives, any file the user forwards) ----
+  // Without this, document forwards were silently swallowed — the
+  // user would see no reply and nothing landed in Inbox.  We save the
+  // filename as title and the Telegram file_id so a future upload-to-R2
+  // pass can fetch the bytes via the Bot API.
+  bot.on("message:document", async (ctx) => {
+    const user = await ensureUser(ctx);
+    if (!user) { await safeReply(ctx, NOT_LINKED_TEXT); return; }
+    const doc = ctx.message.document;
+    const caption = ctx.message.caption?.trim() ?? "";
+    const filename = doc.file_name ?? "Document";
+    // .md / .txt / .pdf / .docx / etc. → Documents; anything else
+    // (zips, archives, code drops) → Misc to keep Documents clean.
+    const mdLike = /\.(md|markdown|txt|rtf)$/i.test(filename);
+    const docLike = /\.(pdf|doc|docx|odt|rtf|epub|pages)$/i.test(filename);
+    const categoryId: CategoryId = mdLike || docLike ? "documents" : "misc";
+    const inserted = await createEntryViaBot({
+      user_id: user.userId,
+      category_id: categoryId,
+      title: (caption || filename).slice(0, 200),
+      description: caption || `Файл из Telegram · ${(doc.file_size ?? 0).toLocaleString("ru-RU")} bytes`,
+      tags: [],
+      imported_via: "bot",
+      metadata: {
+        telegramFileId: doc.file_id,
+        telegramFileUniqueId: doc.file_unique_id,
+        fileName: filename,
+        mimeType: doc.mime_type,
+        fileSize: doc.file_size,
+      },
+    });
+    const where = categoryId === "documents" ? "📄 Сохранено в Documents" : "📦 Сохранено в Misc";
+    await safeReply(ctx,
+      dupOrSavedReply(inserted, where, filename,
+        "_(содержимое подтянется при следующем upload-to-R2 проходе)_"),
+      { parse_mode: "Markdown" }
+    );
+  });
+
+  // ---- Videos ----
+  // Telegram-native video (not a YouTube link — those land via the text
+  // handler).  Saved to the YouTube category so it sits alongside other
+  // watchable content; metadata carries the file_id for later download.
+  bot.on("message:video", async (ctx) => {
+    const user = await ensureUser(ctx);
+    if (!user) { await safeReply(ctx, NOT_LINKED_TEXT); return; }
+    const video = ctx.message.video;
+    const caption = ctx.message.caption?.trim() ?? "";
+    const title = (caption || video.file_name || "Video from Telegram").slice(0, 200);
+    const inserted = await createEntryViaBot({
+      user_id: user.userId,
+      category_id: "youtube",
+      title,
+      description: caption || (video.duration ? `${video.duration}s · ${video.width}×${video.height}` : null),
+      tags: [],
+      imported_via: "bot",
+      metadata: {
+        telegramFileId: video.file_id,
+        telegramFileUniqueId: video.file_unique_id,
+        fileName: video.file_name,
+        mimeType: video.mime_type,
+        fileSize: video.file_size,
+        duration: video.duration,
+        width: video.width,
+        height: video.height,
+      },
+    });
+    await safeReply(ctx, dupOrSavedReply(inserted, "🎬 Сохранено в YouTube", title), { parse_mode: "Markdown" });
+  });
+
+  // ---- Audio / voice notes ----
+  // Music tracks (audio) carry artist + title; voice notes are
+  // anonymous .ogg blobs.  Both land in Misc with the file_id so a
+  // future transcribe pass can populate the body.
+  bot.on(["message:audio", "message:voice"], async (ctx) => {
+    const user = await ensureUser(ctx);
+    if (!user) { await safeReply(ctx, NOT_LINKED_TEXT); return; }
+    const caption = ctx.message.caption?.trim() ?? "";
+    const audio = ctx.message.audio;
+    const voice = ctx.message.voice;
+    // Narrow on the discriminator first so each branch keeps the
+    // right shape — earlier draft used `a = audio ?? voice` and lost
+    // the title/performer fields during type narrowing.
+    let title: string = caption;
+    let description: string;
+    let tags: string[];
+    let metaKind: "audio" | "voice";
+    let fileId: string;
+    let fileUniqueId: string;
+    let mimeType: string | undefined;
+    let fileSize: number | undefined;
+    let duration: number;
+    if (audio) {
+      const niceTitle = audio.performer && audio.title
+        ? `${audio.performer} — ${audio.title}`
+        : audio.title ?? null;
+      if (!title) title = niceTitle ?? "Audio from Telegram";
+      description = caption || "Audio";
+      tags = ["audio"];
+      metaKind = "audio";
+      fileId = audio.file_id;
+      fileUniqueId = audio.file_unique_id;
+      mimeType = audio.mime_type;
+      fileSize = audio.file_size;
+      duration = audio.duration;
+    } else if (voice) {
+      if (!title) title = `Голосовое · ${voice.duration}s`;
+      description = caption || "Голосовое сообщение";
+      tags = ["voice"];
+      metaKind = "voice";
+      fileId = voice.file_id;
+      fileUniqueId = voice.file_unique_id;
+      mimeType = voice.mime_type;
+      fileSize = voice.file_size;
+      duration = voice.duration;
+    } else {
+      return;
+    }
+    const inserted = await createEntryViaBot({
+      user_id: user.userId,
+      category_id: "misc",
+      title: title.slice(0, 200),
+      description,
+      tags,
+      imported_via: "bot",
+      metadata: {
+        telegramFileId: fileId,
+        telegramFileUniqueId: fileUniqueId,
+        mimeType,
+        fileSize,
+        duration,
+        kind: metaKind,
+      },
+    });
+    await safeReply(ctx,
+      dupOrSavedReply(
+        inserted,
+        metaKind === "voice" ? "🎙 Сохранено в Misc (voice)" : "🎵 Сохранено в Misc (audio)",
+        title,
+      ),
+      { parse_mode: "Markdown" },
+    );
+  });
+
+  // ---- Catch-all for anything else (stickers, GIFs, contacts,
+  // forwarded posts with no text/file we can extract).  Without this,
+  // edge-case forwards just vanish; the user would see no Inbox entry
+  // and have no idea why.  We save a thin placeholder so the message
+  // at least shows up — better than silent drop.
+  bot.on("message", async (ctx) => {
+    if (ctx.message.text?.startsWith("/")) return;
+    const user = await ensureUser(ctx);
+    if (!user) return;
+    // Stickers and animations have their own discoverable shape.
+    let label = "Пересланное сообщение";
+    let extraMeta: Record<string, unknown> = {};
+    if (ctx.message.sticker) {
+      label = `Sticker · ${ctx.message.sticker.emoji ?? ""}`.trim();
+      extraMeta = { telegramFileId: ctx.message.sticker.file_id, emoji: ctx.message.sticker.emoji };
+    } else if (ctx.message.animation) {
+      label = ctx.message.animation.file_name ?? "GIF from Telegram";
+      extraMeta = { telegramFileId: ctx.message.animation.file_id };
+    } else if (ctx.message.video_note) {
+      label = `Кружочек · ${ctx.message.video_note.duration}s`;
+      extraMeta = { telegramFileId: ctx.message.video_note.file_id, duration: ctx.message.video_note.duration };
+    } else if (ctx.message.contact) {
+      label = `Контакт · ${ctx.message.contact.first_name ?? ""} ${ctx.message.contact.phone_number ?? ""}`.trim();
+      extraMeta = { contact: ctx.message.contact };
+    } else if (ctx.message.location) {
+      label = `Гео · ${ctx.message.location.latitude}, ${ctx.message.location.longitude}`;
+      extraMeta = { location: ctx.message.location };
+    } else if (ctx.message.poll) {
+      label = `Опрос · ${ctx.message.poll.question}`;
+      extraMeta = { poll: ctx.message.poll };
+    } else if (ctx.message.forward_origin) {
+      // Forwarded message that didn't trip any of the typed handlers —
+      // happens e.g. when a channel post has a media payload Telegram
+      // describes only via service fields.  Save what we have.
+      label = "Пересылка из Telegram";
+    } else {
+      // Truly unknown message shape — don't pollute Inbox with empty
+      // entries, just log and bail.  We still won't reply to avoid the
+      // bot looking like it loops on system events.
+      console.warn("[bot] unhandled message shape; keys=", Object.keys(ctx.message));
+      return;
+    }
+    const inserted = await createEntryViaBot({
+      user_id: user.userId,
+      category_id: "misc",
+      title: label.slice(0, 200),
+      description: ctx.message.caption?.trim() ?? null,
+      tags: ["telegram"],
+      imported_via: "bot",
+      metadata: { ...extraMeta, forwardOrigin: ctx.message.forward_origin ?? null },
+    });
+    await safeReply(ctx, dupOrSavedReply(inserted, "📥 Сохранено в Misc", label), { parse_mode: "Markdown" });
+  });
+
   // ---- Errors ----
   bot.catch((err) => {
     if (err.error instanceof GrammyError) {
