@@ -97,19 +97,19 @@ export async function deleteAttachment(id: string): Promise<void> {
 }
 
 /**
- * Persist a new ordering.  Caller passes the full list of IDs in the
- * desired order; we issue one UPDATE per id setting position to its
- * index.  Could be a single CTE in raw SQL; the per-row update is fine
- * for board sizes we'll realistically see (< 200 items).
+ * Persist a new ordering in one DB round-trip.  Earlier draft did
+ * N sequential UPDATEs in a JS loop — fine for tiny boards but
+ * fragile under a network hiccup (you'd see half the items in the
+ * new order and half in the old).  The reorder_attachments() SQL
+ * function does it all in a single transaction via unnest()-with-
+ * ordinality.  See migration 20260515050000_reorder_attachments.sql.
  */
 export async function reorderAttachments(entryId: string, ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
   const supabase = await createClient();
-  for (let i = 0; i < ids.length; i++) {
-    const { error } = await supabase
-      .from("entry_attachments")
-      .update({ position: i })
-      .eq("id", ids[i])
-      .eq("entry_id", entryId);
-    if (error) throw new DataError(error.message, 500);
-  }
+  const { error } = await supabase.rpc("reorder_attachments", {
+    p_entry_id: entryId,
+    p_ids: ids,
+  });
+  if (error) throw new DataError(error.message, 500);
 }

@@ -22,10 +22,30 @@ export const maxDuration = 60;
  * RLS-bypassing.  Owner gating happens before any DB call — anyone
  * signing in with a different email gets 403 without a row being read.
  */
+// In-process cache for the R2 object listing — the listing is the
+// slow leg (multi-second on a real-size bucket) and the result barely
+// moves between two dashboard refreshes.  60 s TTL: stale enough that
+// "I just uploaded a screenshot" still shows up before you refresh
+// twice, fresh enough that a hammering tab doesn't melt R2's
+// list-objects rate limit.
+const R2_CACHE_TTL_MS = 60 * 1000;
+let r2Cache: { at: number; objects: Array<{ key: string; size: number }> } | null = null;
+
+async function r2ObjectsCached(): Promise<Array<{ key: string; size: number }>> {
+  if (r2Cache && Date.now() - r2Cache.at < R2_CACHE_TTL_MS) return r2Cache.objects;
+  const objects = await listObjects("users/").catch((): Array<{ key: string; size: number }> => []);
+  r2Cache = { at: Date.now(), objects };
+  return objects;
+}
+
 export const GET = withErrorHandler(async () => {
   await requireOwner();
   const svc = createServiceClient();
 
+  // Everything fans out in one Promise.all so the round-trip latency
+  // sums to max() instead of sum() of each query.  Earlier draft did
+  // schema_migrations sequentially after the other queries finished;
+  // bringing it inside the fan-out cuts ~30 ms in the common case.
   const [
     entriesCnt,
     botCnt,
@@ -37,6 +57,7 @@ export const GET = withErrorHandler(async () => {
     lastEntry,
     lastBotImport,
     r2,
+    migrationsRes,
   ] = await Promise.all([
     svc.from("entries").select("id", { count: "exact", head: true }),
     svc.from("entries").select("id", { count: "exact", head: true }).eq("imported_via", "bot"),
@@ -50,7 +71,8 @@ export const GET = withErrorHandler(async () => {
     svc.rpc("admin_stats_per_category"),
     svc.from("entries").select("created_at").order("created_at", { ascending: false }).limit(1),
     svc.from("entries").select("created_at").eq("imported_via", "bot").order("created_at", { ascending: false }).limit(1),
-    listObjects("users/").catch((): Array<{ key: string; size: number }> => []),
+    r2ObjectsCached(),
+    svc.from("schema_migrations").select("name, applied_at").order("applied_at", { ascending: true }),
   ]);
 
   const byCategory: Record<string, number> = {};
@@ -76,11 +98,8 @@ export const GET = withErrorHandler(async () => {
     target.bytes += o.size;
   }
 
-  // Pull migration log so the dashboard can surface "9 / 9 applied".
-  const { data: migrationsData } = await svc
-    .from("schema_migrations")
-    .select("name, applied_at")
-    .order("applied_at", { ascending: true });
+  // Migration log was fetched in the Promise.all above.
+  const migrationsData = migrationsRes.data;
 
   return NextResponse.json({
     generatedAt: new Date().toISOString(),
