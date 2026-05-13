@@ -381,6 +381,7 @@ function SortableCard({
         {...listeners}
         type="button"
         title="Перетащить"
+        aria-label="Перетащить блок"
         className="absolute top-2 left-2 z-10 w-7 h-7 rounded-full bg-emerald-deep/80 backdrop-blur border border-white/15 text-ivory-mute hover:text-gold opacity-0 group-hover:opacity-100 transition flex items-center justify-center cursor-grab active:cursor-grabbing"
       >
         <Icon name="drag" size={12} />
@@ -391,6 +392,7 @@ function SortableCard({
         type="button"
         onClick={() => onDelete(att.id)}
         title="Удалить"
+        aria-label="Удалить блок"
         className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full bg-emerald-deep/80 backdrop-blur border border-red-400/40 text-red-300 hover:bg-red-400 hover:text-emerald-deep opacity-0 group-hover:opacity-100 transition flex items-center justify-center"
       >
         <Icon name="x" size={12} />

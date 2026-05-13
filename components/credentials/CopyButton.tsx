@@ -34,6 +34,7 @@ export function CopyButton({ value, label = "value", clearAfterMs = 30000 }: Pro
       disabled={disabled}
       className="item-actions-btn disabled:opacity-30 disabled:cursor-not-allowed"
       title={`Копировать ${label}${clearAfterMs > 0 ? ` (auto-clear через ${clearAfterMs / 1000}s)` : ""}`}
+      aria-label={copied ? `${label} скопирован` : `Копировать ${label}`}
     >
       <Icon name={copied ? "check" : "copy"} size={12} />
     </button>

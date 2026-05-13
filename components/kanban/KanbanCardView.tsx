@@ -69,6 +69,7 @@ export function KanbanCardView({ card, muted, dragging: forceDragging, onDelete,
             onPointerDown={(e) => e.stopPropagation()}
             className="item-actions-btn"
             title="Редактировать (двойной клик по карточке)"
+            aria-label="Редактировать карточку"
           >
             <Icon name="edit" size={11} />
           </button>
@@ -78,6 +79,7 @@ export function KanbanCardView({ card, muted, dragging: forceDragging, onDelete,
           onPointerDown={(e) => e.stopPropagation()}
           className="item-actions-btn danger"
           title="Удалить"
+          aria-label="Удалить карточку"
         >
           <Icon name="x" size={11} />
         </button>

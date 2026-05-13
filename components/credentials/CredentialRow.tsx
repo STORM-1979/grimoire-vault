@@ -47,14 +47,30 @@ export function CredentialRow({ item, onTogglePin, onDelete, onEdit }: Props) {
     <div className="cred-row group relative grid grid-cols-[44px_2fr_2.5fr_2.5fr_120px_120px] gap-4 items-center px-4 py-3.5 border-b border-white/5 hover:bg-white/[0.03] transition-colors">
       <div className="absolute top-3 right-3 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
         {onEdit && (
-          <button onClick={handleEdit} className="item-actions-btn" title="Редактировать">
+          <button
+            onClick={handleEdit}
+            className="item-actions-btn"
+            title="Редактировать"
+            aria-label="Редактировать"
+          >
             <Icon name="edit" size={13} />
           </button>
         )}
-        <button onClick={handlePin} className={`item-actions-btn ${item.pinned ? "active" : ""}`} title={item.pinned ? "Открепить" : "Закрепить"}>
+        <button
+          onClick={handlePin}
+          className={`item-actions-btn ${item.pinned ? "active" : ""}`}
+          title={item.pinned ? "Открепить" : "Закрепить"}
+          aria-label={item.pinned ? "Открепить" : "Закрепить"}
+          aria-pressed={item.pinned}
+        >
           <Icon name={item.pinned ? "pinFilled" : "pin"} size={13} />
         </button>
-        <button onClick={handleDelete} className="item-actions-btn danger" title="Удалить">
+        <button
+          onClick={handleDelete}
+          className="item-actions-btn danger"
+          title="Удалить"
+          aria-label="Удалить"
+        >
           <Icon name="x" size={13} />
         </button>
       </div>
@@ -106,7 +122,9 @@ export function CredentialRow({ item, onTogglePin, onDelete, onEdit }: Props) {
             <button
               onClick={(e) => { e.stopPropagation(); setRevealed((r) => !r); }}
               className="item-actions-btn"
-              title={revealed ? "Скрыть" : "Показать"}
+              title={revealed ? "Скрыть пароль" : "Показать пароль"}
+              aria-label={revealed ? "Скрыть пароль" : "Показать пароль"}
+              aria-pressed={revealed}
             >
               <Icon name={revealed ? "eyeOff" : "eye"} size={12} />
             </button>

@@ -552,7 +552,7 @@ function renderChip(c: EntryCollection, s: ChipState) {
             else if (e.key === "Escape") s.cancelRename();
           }}
         />
-        <button type="button" onClick={s.onRename} className="item-actions-btn" title="Сохранить">
+        <button type="button" onClick={s.onRename} className="item-actions-btn" title="Сохранить" aria-label="Сохранить переименование">
           <Icon name="check" size={12} />
         </button>
       </span>
@@ -579,6 +579,7 @@ function renderChip(c: EntryCollection, s: ChipState) {
             : "border-white/15 text-ivory-mute hover:text-red-400 hover:border-red-400/40")
         }
         title={`Удалить «${c.name}»`}
+        aria-label={`Удалить коллекцию «${c.name}»`}
       >
         <Icon name="x" size={12} />
       </button>
@@ -608,10 +609,10 @@ function InlineCreate({
           else if (e.key === "Escape") onCancel();
         }}
       />
-      <button type="button" onClick={onCommit} className="item-actions-btn" title="Создать">
+      <button type="button" onClick={onCommit} className="item-actions-btn" title="Создать" aria-label="Создать">
         <Icon name="check" size={12} />
       </button>
-      <button type="button" onClick={onCancel} className="item-actions-btn" title="Отмена">
+      <button type="button" onClick={onCancel} className="item-actions-btn" title="Отмена" aria-label="Отмена">
         <Icon name="x" size={12} />
       </button>
     </span>

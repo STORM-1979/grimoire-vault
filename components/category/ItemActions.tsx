@@ -48,7 +48,12 @@ export function ItemActions({ item, onTogglePin, onDelete, onEdit, position = "t
     <div className={`${posClass} flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10 px-1.5 py-1 rounded-full bg-emerald-deep/95 backdrop-blur-sm shadow-lg`}>
       {showCopyIcon && <CopyButton item={item} variant="icon" />}
       {onEdit && (
-        <button onClick={handleEdit} className="item-actions-btn" title="Редактировать">
+        <button
+          onClick={handleEdit}
+          className="item-actions-btn"
+          title="Редактировать"
+          aria-label="Редактировать"
+        >
           <Icon name="edit" size={13} />
         </button>
       )}
@@ -56,6 +61,8 @@ export function ItemActions({ item, onTogglePin, onDelete, onEdit, position = "t
         onClick={handlePin}
         className={`item-actions-btn ${item.pinned ? "active" : ""}`}
         title={item.pinned ? "Открепить" : "Закрепить"}
+        aria-label={item.pinned ? "Открепить" : "Закрепить"}
+        aria-pressed={item.pinned}
       >
         <Icon name={item.pinned ? "pinFilled" : "pin"} size={13} />
       </button>
@@ -63,6 +70,7 @@ export function ItemActions({ item, onTogglePin, onDelete, onEdit, position = "t
         onClick={handleDelete}
         className="item-actions-btn danger"
         title="Удалить"
+        aria-label="Удалить"
       >
         <Icon name="x" size={13} />
       </button>

@@ -62,6 +62,7 @@ export function KanbanColumnView({
               onClick={onRenameColumn}
               className="opacity-0 group-hover/col:opacity-100 text-ivory-mute hover:text-gold transition"
               title="Переименовать колонку"
+              aria-label={`Переименовать колонку «${column.name}»`}
             >
               <Icon name="edit" size={16} />
             </button>
@@ -72,6 +73,7 @@ export function KanbanColumnView({
               onClick={onDeleteColumn}
               className="opacity-0 group-hover/col:opacity-100 text-ivory-mute hover:text-red-400 transition"
               title="Удалить колонку"
+              aria-label={`Удалить колонку «${column.name}»`}
             >
               <Icon name="x" size={16} />
             </button>
@@ -81,6 +83,7 @@ export function KanbanColumnView({
             onClick={onAdd}
             className="text-ivory-mute hover:text-gold transition"
             title={`Добавить в ${column.name}`}
+            aria-label={`Добавить карточку в ${column.name}`}
           >
             <Icon name="add" size={20} />
           </button>
