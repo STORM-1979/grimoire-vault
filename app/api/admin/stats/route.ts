@@ -44,19 +44,18 @@ export const GET = withErrorHandler(async () => {
     svc.from("entries").select("id", { count: "exact", head: true }).filter("embedding", "not.is", "null"),
     svc.from("kanban_cards").select("id", { count: "exact", head: true }),
     svc.from("credentials").select("id", { count: "exact", head: true }),
-    // per-category — fetch only the discriminator for a tiny payload
-    svc.from("entries").select("category_id"),
+    // Per-category counts via Postgres GROUP BY RPC instead of
+    // fetching every row's category_id and aggregating in JS.
+    // Migration 20260515020000 ships the function.
+    svc.rpc("admin_stats_per_category"),
     svc.from("entries").select("created_at").order("created_at", { ascending: false }).limit(1),
     svc.from("entries").select("created_at").eq("imported_via", "bot").order("created_at", { ascending: false }).limit(1),
     listObjects("users/").catch((): Array<{ key: string; size: number }> => []),
   ]);
 
-  // Roll up per-category counts client-side — Postgres GROUP BY would
-  // require a custom RPC, and a few thousand string fetches is cheap.
   const byCategory: Record<string, number> = {};
-  for (const row of perCategory.data ?? []) {
-    const k = row.category_id as string;
-    byCategory[k] = (byCategory[k] ?? 0) + 1;
+  for (const row of (perCategory.data ?? []) as Array<{ category_id: string; n: number }>) {
+    byCategory[row.category_id] = Number(row.n);
   }
 
   // R2 breakdown by kind.  Path layout is `users/<uid>/<kind>/...`.
