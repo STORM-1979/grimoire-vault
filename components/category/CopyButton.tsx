@@ -118,18 +118,19 @@ export function CopyButton({
       type="button"
       onClick={handleCopy}
       title={title}
-      // Inline `color` style is the failsafe — text/icon both
-      // inherit it via currentColor.  On hover the inline style
-      // stays "gold" but the hover Tailwind utility flips both
-      // bg and text to the dark token explicitly.  Belt-and-
-      // suspenders against the earlier bug where hover:text-* on
-      // a custom-named theme colour silently failed and text
-      // stayed gold-on-gold (invisible).
+      // Hover state keeps the gold text and only darkens the
+      // border + adds a faint gold-tinted background.  The
+      // earlier flip-to-solid-gold-bg + invert-text-colour was
+      // fragile — when text-emerald-deep / text-[#031912] failed
+      // to apply (Tailwind v4 + custom theme + variants edge
+      // case), text stayed gold-on-gold and the button looked
+      // empty.  Subtle hover sidesteps the contrast risk entirely
+      // — text colour never changes, only chrome around it.
       className={
         "font-mono text-[11px] uppercase tracking-widest px-3 py-1.5 rounded-full border transition flex items-center gap-1.5 " +
         (copied
           ? "bg-emerald-300/15 border-emerald-300/50 text-emerald-200"
-          : "border-gold/30 text-gold hover:bg-gold hover:text-[#031912] hover:border-gold")
+          : "border-gold/40 text-gold hover:border-gold hover:bg-gold/10")
       }
     >
       <Icon name={copied ? "check" : "copy"} size={12} />
